@@ -26,6 +26,9 @@ const searchButton =
 const homeButton =
     document.getElementById("home-button");
 
+const lastUpdatedList =
+    document.getElementById("last-updated-list");
+
 const statusElement =
     document.getElementById("status");
 
@@ -449,6 +452,208 @@ function processRows(rows) {
 
 
 /*
+ * Convert a LAST UPDATE value into a Date.
+ *
+ * Supported formats:
+ *
+ * 2026, October 2
+ * 2026, October
+ *
+ * When the day is missing, the last day
+ * of that month is used only for sorting.
+ */
+function parseLastUpdate(value) {
+
+    if (!value) {
+        return null;
+    }
+
+
+    const match =
+        String(value)
+            .trim()
+            .match(
+                /^(\d{4})\s*,\s*([A-Za-z]+)(?:\s+(\d{1,2}))?$/
+            );
+
+
+    if (!match) {
+        return null;
+    }
+
+
+    const year =
+        Number(match[1]);
+
+
+    const monthName =
+        match[2].toLowerCase();
+
+
+    const day =
+        match[3]
+            ? Number(match[3])
+            : 0;
+
+
+    const months = {
+
+        january: 0,
+        february: 1,
+        march: 2,
+        april: 3,
+        may: 4,
+        june: 5,
+        july: 6,
+        august: 7,
+        september: 8,
+        october: 9,
+        november: 10,
+        december: 11
+
+    };
+
+
+    if (
+        !Object.prototype.hasOwnProperty.call(
+            months,
+            monthName
+        )
+    ) {
+        return null;
+    }
+
+
+    const month =
+        months[monthName];
+
+
+    /*
+     * If there is no day, use the last
+     * day of the month for sorting.
+     */
+    const actualDay =
+        day ||
+        new Date(
+            year,
+            month + 1,
+            0
+        ).getDate();
+
+
+    return new Date(
+        year,
+        month,
+        actualDay
+    );
+}
+
+
+/*
+ * Get the most recent update of a game.
+ */
+function getLatestUpdate(game) {
+
+    const dates =
+        game.ports
+            .map(
+                port =>
+                    parseLastUpdate(
+                        port.lastUpdate
+                    )
+            )
+            .filter(
+                date =>
+                    date !== null
+            );
+
+
+    if (dates.length === 0) {
+        return null;
+    }
+
+
+    return dates.reduce(
+        (latest, current) =>
+            current > latest
+                ? current
+                : latest
+    );
+}
+
+
+/*
+ * Display Last Updated section.
+ */
+function displayLastUpdated() {
+
+    const sortedGames =
+        games
+            .map(game => ({
+
+                game: game,
+
+                lastUpdate:
+                    getLatestUpdate(game)
+
+            }))
+            .filter(
+                item =>
+                    item.lastUpdate !== null
+            )
+            .sort(
+                (a, b) =>
+                    b.lastUpdate -
+                    a.lastUpdate
+            )
+            .slice(0, 10);
+
+
+    lastUpdatedList.innerHTML = "";
+
+
+    if (sortedGames.length === 0) {
+        return;
+    }
+
+
+    const fragment =
+        document.createDocumentFragment();
+
+
+    for (const item of sortedGames) {
+
+        const element =
+            document.createElement("a");
+
+
+        element.className =
+            "home-game";
+
+
+        element.href =
+            `game.html?game=${encodeURIComponent(
+                item.game.slug
+            )}`;
+
+
+        element.textContent =
+            item.game.name;
+
+
+        fragment.appendChild(
+            element
+        );
+    }
+
+
+    lastUpdatedList.appendChild(
+        fragment
+    );
+}
+
+
+/*
  * Group ports by game.
  */
 function groupGames(rows) {
@@ -678,7 +883,10 @@ function goHome() {
 
     statusElement.textContent = "";
 
-    closeSearch();
+    searchContainer.setAttribute(
+        "hidden",
+        ""
+    );
 
     closeMenu();
 }
@@ -1307,6 +1515,12 @@ async function loadGames() {
          * Create Categories menu.
          */
         displayPlatformMenu();
+
+
+        /*
+         * Create Last Updated section.
+         */
+        displayLastUpdated();
 
 
         /*
