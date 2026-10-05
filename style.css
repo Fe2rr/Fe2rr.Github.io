@@ -838,3 +838,30 @@ footer {
 
     text-decoration: none;
 }
+.home-section {
+    margin-top: 25px;
+}
+
+.home-section h2 {
+    margin-bottom: 12px;
+}
+
+#last-updated-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.home-game {
+    display: block;
+    padding: 10px 12px;
+    background: #0d302e;
+    border: 1px solid #1c4743;
+    border-radius: 6px;
+    color: #e5f0ec;
+    text-decoration: none;
+}
+
+.home-game:hover {
+    background: #123a37;
+}
