@@ -529,7 +529,7 @@ function parseLastUpdate(value) {
 
 
     const actualDay =
-        day ||
+        day || 1;
         new Date(
             year,
             month + 1,
