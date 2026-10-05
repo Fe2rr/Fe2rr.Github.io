@@ -6,44 +6,77 @@ const SHEET_URL =
     "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 
 
+/*
+ * POPULAR
+ */
+
+const POPULAR_URL =
+    "https://script.google.com/macros/s/AKfycbwDrNe5ZsympQfpuPy-bPnzIQTpDAARuTxw29R0l8J7yKiOpfChWIH-gSUocOCtV6gM/exec";
+
+
 const gameList =
     document.getElementById("game-list");
+
 
 const searchInput =
     document.getElementById("search");
 
+
 const searchContainer =
     document.getElementById("search-container");
+
 
 const searchButton =
     document.getElementById("search-button");
 
+
 const homeButton =
     document.getElementById("home-button");
+
 
 const lastUpdatedList =
     document.getElementById("last-updated-list");
 
+
 const lastUpdatedMore =
     document.getElementById("last-updated-more");
+
+
+const popularList =
+    document.getElementById("popular-list");
+
+
+const popularMore =
+    document.getElementById("popular-more");
+
+
+const popularTabs =
+    document.querySelectorAll(".popular-tab");
+
 
 const statusElement =
     document.getElementById("status");
 
+
 const menuButton =
     document.getElementById("menu-button");
+
 
 const menuClose =
     document.getElementById("menu-close");
 
+
 const sideMenu =
     document.getElementById("side-menu");
+
 
 const menuOverlay =
     document.getElementById("menu-overlay");
 
+
 const platformList =
     document.getElementById("platform-list");
+
 
 const allGamesButton =
     document.getElementById("all-games-button");
@@ -51,11 +84,20 @@ const allGamesButton =
 
 let games = [];
 
+
 let selectedPlatform = "";
+
 
 let selectedCategory = "";
 
+
 let showingAllLastUpdated = false;
+
+
+let selectedPopularPeriod = "week";
+
+
+let showingAllPopular = false;
 
 
 /*
@@ -458,9 +500,8 @@ function processRows(rows) {
  * 2026, October 2
  * 2026, October
  *
- * If the day is missing, the last
- * day of the month is used only
- * for sorting.
+ * If the day is missing, the first
+ * day of the month is used for sorting.
  */
 function parseLastUpdate(value) {
 
@@ -493,7 +534,7 @@ function parseLastUpdate(value) {
     const day =
         match[3]
             ? Number(match[3])
-            : 0;
+            : 1;
 
 
     const months = {
@@ -528,19 +569,10 @@ function parseLastUpdate(value) {
         months[monthName];
 
 
-    const actualDay =
-        day || 1;
-        new Date(
-            year,
-            month + 1,
-            0
-        ).getDate();
-
-
     return new Date(
         year,
         month,
-        actualDay
+        day
     );
 }
 
@@ -668,6 +700,263 @@ function displayLastUpdated() {
         lastUpdatedMore.hidden = true;
     }
 }
+
+
+/*
+ * Load Popular ranking.
+ */
+async function loadPopular(
+    period = selectedPopularPeriod
+) {
+
+    if (!popularList) {
+        return;
+    }
+
+
+    try {
+
+        popularList.innerHTML = `
+            <div class="home-loading">
+                Loading...
+            </div>
+        `;
+
+
+        const response =
+            await fetch(
+                `${POPULAR_URL}?popular=${encodeURIComponent(period)}`
+            );
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                `HTTP error ${response.status}`
+            );
+        }
+
+
+        const data =
+            await response.json();
+
+
+        if (
+            !data.success ||
+            !Array.isArray(data.games)
+        ) {
+
+            throw new Error(
+                data.error ||
+                "Could not load popular games."
+            );
+        }
+
+
+        const gameMap =
+            new Map(
+                games.map(game => [
+                    game.slug,
+                    game
+                ])
+            );
+
+
+        const ranking =
+            data.games
+                .map(item => {
+
+                    const game =
+                        gameMap.get(
+                            createSlug(item.game)
+                        );
+
+
+                    if (!game) {
+                        return null;
+                    }
+
+
+                    return {
+
+                        game: game,
+
+                        visits:
+                            Number(item.visits) || 0
+
+                    };
+
+                })
+                .filter(
+                    item =>
+                        item !== null
+                );
+
+
+        displayPopular(
+            ranking
+        );
+
+
+    } catch (error) {
+
+        console.error(
+            "Could not load popular games:",
+            error
+        );
+
+
+        popularList.innerHTML = `
+            <div class="error">
+                Could not load popular games.
+            </div>
+        `;
+
+        popularMore.hidden = true;
+    }
+}
+
+
+/*
+ * Display Popular.
+ */
+function displayPopular(ranking) {
+
+    popularList.innerHTML = "";
+
+
+    if (ranking.length === 0) {
+
+        popularList.innerHTML = `
+            <div class="no-results">
+                No popular games found.
+            </div>
+        `;
+
+        popularMore.hidden = true;
+
+        return;
+    }
+
+
+    const visibleGames =
+        showingAllPopular
+            ? ranking
+            : ranking.slice(0, 10);
+
+
+    const fragment =
+        document.createDocumentFragment();
+
+
+    for (
+        let i = 0;
+        i < visibleGames.length;
+        i++
+    ) {
+
+        const item =
+            visibleGames[i];
+
+
+        const element =
+            document.createElement("a");
+
+
+        element.className =
+            "home-game";
+
+
+        element.href =
+            `game.html?game=${encodeURIComponent(
+                item.game.slug
+            )}`;
+
+
+        element.textContent =
+            `${i + 1}. ${item.game.name}`;
+
+
+        fragment.appendChild(
+            element
+        );
+    }
+
+
+    popularList.appendChild(
+        fragment
+    );
+
+
+    if (
+        ranking.length > 10 &&
+        !showingAllPopular
+    ) {
+
+        popularMore.hidden = false;
+
+    } else {
+
+        popularMore.hidden = true;
+    }
+}
+
+
+/*
+ * Popular tabs.
+ */
+popularTabs.forEach(
+    tab => {
+
+        tab.addEventListener(
+            "click",
+            () => {
+
+                popularTabs.forEach(
+                    otherTab => {
+
+                        otherTab.classList.remove(
+                            "active"
+                        );
+                    }
+                );
+
+
+                tab.classList.add(
+                    "active"
+                );
+
+
+                selectedPopularPeriod =
+                    tab.dataset.period;
+
+
+                showingAllPopular = false;
+
+
+                loadPopular(
+                    selectedPopularPeriod
+                );
+            }
+        );
+    }
+);
+
+
+/*
+ * Popular View More.
+ */
+popularMore.addEventListener(
+    "click",
+    () => {
+
+        showingAllPopular = true;
+
+        loadPopular(
+            selectedPopularPeriod
+        );
+    }
+);
 
 
 /*
@@ -1493,6 +1782,8 @@ async function loadGames() {
         displayPlatformMenu();
 
         displayLastUpdated();
+
+        loadPopular();
 
 
         statusElement.textContent = "";
