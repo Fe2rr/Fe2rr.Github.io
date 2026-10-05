@@ -6,6 +6,13 @@ const SHEET_URL =
     "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 
 
+/*
+ * VISIT COUNTER
+ */
+const VISITS_URL =
+    "https://script.google.com/macros/s/AKfycbyBIziL3y23bPeAkNdMVtNPvLO-fmiPsnxcmUlg3Y7NR_ZXQ4sJIv5sdu9dqLkOBr5l/exec";
+
+
 const gameTitle =
     document.getElementById("game-title");
 
@@ -54,6 +61,38 @@ function createSlug(name) {
     return normalizeText(name)
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
+}
+
+
+/*
+ * Register a game visit.
+ */
+function registerVisit(gameSlug) {
+
+    if (!gameSlug) {
+        return;
+    }
+
+
+    const url =
+        `${VISITS_URL}?game=${encodeURIComponent(gameSlug)}`;
+
+
+    fetch(
+        url,
+        {
+            method: "GET",
+            mode: "no-cors",
+            keepalive: true
+        }
+    ).catch(
+        error => {
+            console.error(
+                "Could not register game visit:",
+                error
+            );
+        }
+    );
 }
 
 
@@ -1226,6 +1265,12 @@ async function loadGame() {
                 "No game was specified."
             );
         }
+
+
+        /*
+         * Register the visit.
+         */
+        registerVisit(requestedGame);
 
 
         statusElement.textContent =
