@@ -1,10 +1,5 @@
 /*
  * GOOGLE SHEETS
- *
- * This is your Google Sheets file.
- *
- * There is no need to modify or remove
- * merged cells.
  */
 
 const SHEET_URL =
@@ -28,6 +23,9 @@ const homeButton =
 
 const lastUpdatedList =
     document.getElementById("last-updated-list");
+
+const lastUpdatedMore =
+    document.getElementById("last-updated-more");
 
 const statusElement =
     document.getElementById("status");
@@ -57,6 +55,8 @@ let selectedPlatform = "";
 
 let selectedCategory = "";
 
+let showingAllLastUpdated = false;
+
 
 /*
  * Normalize column names.
@@ -73,7 +73,7 @@ function normalizeHeader(value) {
 
 
 /*
- * Normalize text for game comparison.
+ * Normalize text.
  */
 function normalizeText(value) {
 
@@ -86,8 +86,7 @@ function normalizeText(value) {
 
 
 /*
- * Convert the game name into an identifier
- * that can be used in the URL.
+ * Create game slug.
  */
 function createSlug(name) {
 
@@ -98,7 +97,7 @@ function createSlug(name) {
 
 
 /*
- * Full CSV parser.
+ * CSV parser.
  */
 function parseCSV(csv) {
 
@@ -452,15 +451,16 @@ function processRows(rows) {
 
 
 /*
- * Convert a LAST UPDATE value into a Date.
+ * Convert LAST UPDATE into a Date.
  *
- * Supported formats:
+ * Supported:
  *
  * 2026, October 2
  * 2026, October
  *
- * When the day is missing, the last day
- * of that month is used only for sorting.
+ * If the day is missing, the last
+ * day of the month is used only
+ * for sorting.
  */
 function parseLastUpdate(value) {
 
@@ -528,10 +528,6 @@ function parseLastUpdate(value) {
         months[monthName];
 
 
-    /*
-     * If there is no day, use the last
-     * day of the month for sorting.
-     */
     const actualDay =
         day ||
         new Date(
@@ -550,7 +546,7 @@ function parseLastUpdate(value) {
 
 
 /*
- * Get the most recent update of a game.
+ * Get latest update of a game.
  */
 function getLatestUpdate(game) {
 
@@ -583,7 +579,7 @@ function getLatestUpdate(game) {
 
 
 /*
- * Display Last Updated section.
+ * Display Last Updated.
  */
 function displayLastUpdated() {
 
@@ -605,23 +601,31 @@ function displayLastUpdated() {
                 (a, b) =>
                     b.lastUpdate -
                     a.lastUpdate
-            )
-            .slice(0, 10);
+            );
 
 
     lastUpdatedList.innerHTML = "";
 
 
     if (sortedGames.length === 0) {
+
+        lastUpdatedMore.hidden = true;
+
         return;
     }
+
+
+    const visibleGames =
+        showingAllLastUpdated
+            ? sortedGames
+            : sortedGames.slice(0, 10);
 
 
     const fragment =
         document.createDocumentFragment();
 
 
-    for (const item of sortedGames) {
+    for (const item of visibleGames) {
 
         const element =
             document.createElement("a");
@@ -650,7 +654,34 @@ function displayLastUpdated() {
     lastUpdatedList.appendChild(
         fragment
     );
+
+
+    if (
+        sortedGames.length > 10 &&
+        !showingAllLastUpdated
+    ) {
+
+        lastUpdatedMore.hidden = false;
+
+    } else {
+
+        lastUpdatedMore.hidden = true;
+    }
 }
+
+
+/*
+ * View more button.
+ */
+lastUpdatedMore.addEventListener(
+    "click",
+    () => {
+
+        showingAllLastUpdated = true;
+
+        displayLastUpdated();
+    }
+);
 
 
 /*
@@ -721,7 +752,7 @@ function groupGames(rows) {
 
 
 /*
- * Check if a game has a Dual Screen project.
+ * Check Dual Screen.
  */
 function isDualScreen(game) {
 
@@ -758,7 +789,7 @@ function closeMenu() {
 
 
 /*
- * Open / close search.
+ * Toggle search.
  */
 function toggleSearch() {
 
@@ -812,7 +843,7 @@ function closeSearch() {
 
 
 /*
- * Close search when clicking outside it.
+ * Close search outside.
  */
 document.addEventListener(
     "click",
@@ -852,13 +883,14 @@ document.addEventListener(
 
 
 /*
- * Close search when scrolling.
+ * Close search on scroll.
  */
 window.addEventListener(
     "scroll",
     () => {
 
         closeSearch();
+
     },
     {
         passive: true
@@ -867,7 +899,7 @@ window.addEventListener(
 
 
 /*
- * Return to Home.
+ * Return Home.
  */
 function goHome() {
 
@@ -919,9 +951,6 @@ function displayPlatformMenu() {
     platformList.innerHTML = "";
 
 
-    /*
-     * All Categories.
-     */
     const allButton =
         document.createElement("button");
 
@@ -958,9 +987,6 @@ function displayPlatformMenu() {
     );
 
 
-    /*
-     * Multi-game Apps.
-     */
     const multiGameButton =
         document.createElement("button");
 
@@ -998,9 +1024,6 @@ function displayPlatformMenu() {
     );
 
 
-    /*
-     * Dual Screen.
-     */
     const dualScreenButton =
         document.createElement("button");
 
@@ -1038,97 +1061,72 @@ function displayPlatformMenu() {
     );
 
 
-    /*
-     * Nintendo.
-     */
     addMenuSeparator(
         "Nintendo"
     );
-
 
     addPlatformButton(
         "NES"
     );
 
-
     addPlatformButton(
         "Super Nintendo"
     );
-
 
     addPlatformButton(
         "Nintendo 64"
     );
 
-
     addPlatformButton(
         "GameCube / Wii"
     );
-
 
     addPlatformButton(
         "Gameboy / Gameboy Color"
     );
 
-
     addPlatformButton(
         "Gameboy Advance"
     );
 
-
     addPlatformButton(
         "Nintendo DS"
     );
-
 
     addPlatformButton(
         "Nintendo 3DS"
     );
 
 
-    /*
-     * PlayStation.
-     */
     addMenuSeparator(
         "PlayStation"
     );
 
-
     addPlatformButton(
         "Playstation"
     );
-
 
     addPlatformButton(
         "Playstation Portable"
     );
 
 
-    /*
-     * Xbox.
-     */
     addMenuSeparator(
         "Xbox"
     );
 
-
     addPlatformButton(
         "Xbox"
     );
-
 
     addPlatformButton(
         "Xbox 360"
     );
 
 
-    /*
-     * Others.
-     */
     addMenuSeparator(
         "Others"
     );
-
 
     addPlatformButton(
         "Others"
@@ -1137,7 +1135,7 @@ function displayPlatformMenu() {
 
 
 /*
- * Add a menu separator/title.
+ * Menu separator.
  */
 function addMenuSeparator(title) {
 
@@ -1160,7 +1158,7 @@ function addMenuSeparator(title) {
 
 
 /*
- * Add a platform button.
+ * Platform button.
  */
 function addPlatformButton(platform) {
 
@@ -1323,7 +1321,7 @@ function displayGames(list) {
 
 
 /*
- * Filter games by search and platform.
+ * Filter games.
  */
 function displayFilteredGames() {
 
@@ -1336,10 +1334,6 @@ function displayFilteredGames() {
     const filtered =
         games.filter(game => {
 
-            /*
-             * Hide Multi-game Apps from
-             * All Categories.
-             */
             if (
                 selectedCategory !== "multi-game-apps" &&
                 game.platforms.some(
@@ -1353,9 +1347,6 @@ function displayFilteredGames() {
             }
 
 
-            /*
-             * Multi-game Apps category.
-             */
             if (
                 selectedCategory === "multi-game-apps" &&
                 !game.platforms.some(
@@ -1369,9 +1360,6 @@ function displayFilteredGames() {
             }
 
 
-            /*
-             * Dual Screen category.
-             */
             if (
                 selectedCategory === "dual-screen" &&
                 !isDualScreen(game)
@@ -1381,9 +1369,6 @@ function displayFilteredGames() {
             }
 
 
-            /*
-             * Platform filter.
-             */
             if (
                 selectedPlatform &&
                 !game.platforms.some(
@@ -1397,9 +1382,6 @@ function displayFilteredGames() {
             }
 
 
-            /*
-             * Search filter.
-             */
             if (!query) {
                 return true;
             }
@@ -1496,9 +1478,6 @@ async function loadGames() {
             groupGames(processedRows);
 
 
-        /*
-         * Alphabetical order.
-         */
         games.sort(
             (a, b) =>
                 a.name.localeCompare(
@@ -1511,22 +1490,11 @@ async function loadGames() {
         );
 
 
-        /*
-         * Create Categories menu.
-         */
         displayPlatformMenu();
 
-
-        /*
-         * Create Last Updated section.
-         */
         displayLastUpdated();
 
 
-        /*
-         * Do not display games
-         * on the Home page.
-         */
         statusElement.textContent = "";
 
 
@@ -1535,8 +1503,7 @@ async function loadGames() {
         console.error(error);
 
 
-        statusElement.textContent =
-            "";
+        statusElement.textContent = "";
 
 
         gameList.hidden = false;
@@ -1599,12 +1566,10 @@ menuButton.addEventListener(
     openMenu
 );
 
-
 menuClose.addEventListener(
     "click",
     closeMenu
 );
-
 
 menuOverlay.addEventListener(
     "click",
