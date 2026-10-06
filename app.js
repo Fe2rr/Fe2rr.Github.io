@@ -1,15 +1,13 @@
 /*
-
-* GOOGLE SHEETS
-  */
+ * GOOGLE SHEETS
+ */
 
 const SHEET_URL =
 "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 
 /*
-
-* POPULAR
-  */
+ * POPULAR
+ */
 
 const POPULAR_URL =
 "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
@@ -76,7 +74,7 @@ document.querySelectorAll(".category-sort-option");
 
 const categorySortDirection =
 document.getElementById(
-"category-sort-direction"
+    "category-sort-direction"
 );
 
 const lastUpdatedSection =
@@ -103,9 +101,8 @@ let selectedPopularPeriod = "week";
 let showingAllPopular = false;
 
 /*
-
-* Category sorting.
-  */
+ * Category sorting.
+ */
 
 let selectedCategorySort =
 "updated";
@@ -114,22 +111,24 @@ let categorySortDescending =
 false;
 
 /*
+ * All Time Popular cache.
+ */
 
-* All Time Popular cache.
-  */
+let allTimePopular =
+new Map();
 
-let allTimePopular = new Map();
+let allTimePopularLoaded =
+false;
 
-let allTimePopularLoaded = false;
+let allTimePopularLoading =
+false;
 
-let allTimePopularLoading = false;
-
-let allTimePopularCallbacks = [];
+let allTimePopularCallbacks =
+[];
 
 /*
-
-* Normalize column names.
-  */
+ * Normalize column names.
+ */
 
 function normalizeHeader(value) {
 
@@ -143,9 +142,8 @@ return value
 }
 
 /*
-
-* Normalize text.
-  */
+ * Normalize text.
+ */
 
 function normalizeText(value) {
 
@@ -158,9 +156,8 @@ return String(value || "")
 }
 
 /*
-
-* Create game slug.
-  */
+ * Create game slug.
+ */
 
 function createSlug(name) {
 
@@ -171,9 +168,8 @@ return normalizeText(name)
 }
 
 /*
-
-* CSV parser.
-  */
+ * CSV parser.
+ */
 
 function parseCSV(csv) {
 
@@ -315,9 +311,8 @@ return rows.map(values => {
 }
 
 /*
-
-* Find a column.
-  */
+ * Find a column.
+ */
 
 function getColumn(
 row,
@@ -347,9 +342,8 @@ return "";
 }
 
 /*
-
-* Convert CSV rows.
-  */
+ * Convert CSV rows.
+ */
 
 function processRows(rows) {
 
@@ -536,9 +530,8 @@ return result;
 }
 
 /*
-
-* Convert LAST UPDATE into a Date.
-  */
+ * Convert LAST UPDATE into a Date.
+ */
 
 function parseLastUpdate(value) {
 
@@ -618,9 +611,8 @@ return new Date(
 }
 
 /*
-
-* Get latest update of a game.
-  */
+ * Get latest update of a game.
+ */
 
 function getLatestUpdate(game) {
 
@@ -654,9 +646,8 @@ return dates.reduce(
 }
 
 /*
-
-* Display Last Updated.
-  */
+ * Display Last Updated.
+ */
 
 function displayLastUpdated() {
 
@@ -748,9 +739,8 @@ if (
 }
 
 /*
-
-* Load Popular ranking.
-  */
+ * Load Popular ranking.
+ */
 
 function loadPopular(
 period = selectedPopularPeriod
@@ -919,9 +909,8 @@ document.body.appendChild(
 }
 
 /*
-
-* Load All Time Popular for category sorting.
-  */
+ * Load All Time Popular for category sorting.
+ */
 
 function loadAllTimePopular(callback) {
 
@@ -1010,7 +999,6 @@ window[callbackName] =
             const callbacks =
                 allTimePopularCallbacks;
 
-
             allTimePopularCallbacks = [];
 
 
@@ -1053,7 +1041,6 @@ script.onerror =
         const callbacks =
             allTimePopularCallbacks;
 
-
         allTimePopularCallbacks = [];
 
 
@@ -1070,9 +1057,8 @@ document.body.appendChild(
 }
 
 /*
-
-* Display Popular.
-  */
+ * Display Popular.
+ */
 
 function displayPopular(ranking) {
 
@@ -1159,9 +1145,8 @@ if (
 }
 
 /*
-
-* Popular tabs.
-  */
+ * Popular tabs.
+ */
 
 popularTabs.forEach(
 tab => {
@@ -1202,9 +1187,8 @@ tab => {
 );
 
 /*
-
-* Popular View More.
-  */
+ * Popular View More.
+ */
 
 popularMore.addEventListener(
 "click",
@@ -1220,9 +1204,8 @@ popularMore.addEventListener(
 );
 
 /*
-
-* View more button.
-  */
+ * View more button.
+ */
 
 lastUpdatedMore.addEventListener(
 "click",
@@ -1236,9 +1219,8 @@ lastUpdatedMore.addEventListener(
 );
 
 /*
-
-* Group ports by game.
-  */
+ * Group ports by game.
+ */
 
 function groupGames(rows) {
 
@@ -1306,9 +1288,8 @@ return Array.from(
 }
 
 /*
-
-* Check Dual Screen.
-  */
+ * Check Dual Screen.
+ */
 
 function isDualScreen(game) {
 
@@ -1321,9 +1302,263 @@ return game.ports.some(
 }
 
 /*
+ * Build Multi-game Apps.
+ *
+ * Reuses the same relationship used by
+ * "You can also play":
+ *
+ * GAME -> PROJECT
+ *
+ * A project becomes a Multi-game App when:
+ *
+ * 1. It is associated with more than one game.
+ *
+ * OR
+ *
+ * 2. It already has PLATFORM = Multi-game Apps.
+ */
 
-* Show Home sections.
-  */
+function getMultiGameApps() {
+
+const projects = new Map();
+
+
+for (const game of games) {
+
+    for (const port of game.ports) {
+
+        const projectName =
+            port.project.trim();
+
+        const isMarkedAsApp =
+            normalizeText(
+                port.platform
+            ) === "multi-game apps" ||
+            normalizeText(
+                port.platform
+            ) === "multi game apps";
+
+
+        /*
+         * A row explicitly marked as
+         * Multi-game Apps uses GAME as
+         * the app name.
+         *
+         * This allows existing Multi-game
+         * Apps to appear even when they
+         * do not have multiple PROJECT
+         * references.
+         */
+        const appName =
+            isMarkedAsApp
+                ? game.name
+                : projectName;
+
+
+        if (!appName) {
+
+            continue;
+        }
+
+
+        const key =
+            normalizeText(appName);
+
+
+        if (!projects.has(key)) {
+
+            projects.set(
+                key,
+                {
+                    name: appName,
+                    games: new Map(),
+                    latestUpdate: null,
+                    visits: 0
+                }
+            );
+        }
+
+
+        const app =
+            projects.get(key);
+
+
+        /*
+         * A normal port belongs to the
+         * project when PROJECT matches.
+         */
+        if (
+            projectName &&
+            !isMarkedAsApp
+        ) {
+
+            const gameKey =
+                normalizeText(game.name);
+
+
+            if (
+                !app.games.has(gameKey)
+            ) {
+
+                app.games.set(
+                    gameKey,
+                    {
+                        name: game.name,
+                        year: game.year
+                    }
+                );
+            }
+        }
+
+
+        /*
+         * An explicitly marked Multi-game App
+         * is also allowed to represent the app
+         * itself. Do not add the app itself to
+         * the games list.
+         */
+
+
+        const updateDate =
+            parseLastUpdate(
+                port.lastUpdate
+            );
+
+
+        if (
+            updateDate &&
+            (
+                !app.latestUpdate ||
+                updateDate > app.latestUpdate
+            )
+        ) {
+
+            app.latestUpdate =
+                updateDate;
+        }
+    }
+}
+
+
+/*
+ * Remove projects that are not actually
+ * Multi-game Apps.
+ *
+ * Explicitly marked apps are kept even
+ * when they have only one associated game.
+ */
+
+const result = [];
+
+
+for (const app of projects.values()) {
+
+    let explicitlyMarked = false;
+
+
+    for (const game of games) {
+
+        for (const port of game.ports) {
+
+            if (
+                normalizeText(port.platform) ===
+                    "multi-game apps" &&
+                normalizeText(game.name) ===
+                    normalizeText(app.name)
+            ) {
+
+                explicitlyMarked = true;
+
+                break;
+            }
+
+
+            if (
+                normalizeText(port.platform) ===
+                    "multi game apps" &&
+                normalizeText(game.name) ===
+                    normalizeText(app.name)
+            ) {
+
+                explicitlyMarked = true;
+
+                break;
+            }
+        }
+
+
+        if (explicitlyMarked) {
+
+            break;
+        }
+    }
+
+
+    if (
+        app.games.size > 1 ||
+        explicitlyMarked
+    ) {
+
+        app.games =
+            Array.from(
+                app.games.values()
+            ).sort(
+                (a, b) =>
+                    a.name.localeCompare(
+                        b.name,
+                        "en",
+                        {
+                            sensitivity: "base"
+                        }
+                    )
+            );
+
+
+        app.slug =
+            createSlug(app.name);
+
+
+        app.gameCount =
+            app.games.length;
+
+
+        /*
+         * Use the popularity of the
+         * associated games.
+         */
+        let totalVisits = 0;
+
+
+        for (
+            const compatibleGame
+            of app.games
+        ) {
+
+            totalVisits +=
+                allTimePopular.get(
+                    createSlug(
+                        compatibleGame.name
+                    )
+                ) || 0;
+        }
+
+
+        app.visits =
+            totalVisits;
+
+
+        result.push(app);
+    }
+}
+
+
+return result;
+
+}
+
+/*
+ * Show Home sections.
+ */
 
 function showHomeSections() {
 
@@ -1336,9 +1571,8 @@ categoryControls.hidden = true;
 }
 
 /*
-
-* Show Category view.
-  */
+ * Show Category view.
+ */
 
 function showCategoryView() {
 
@@ -1351,9 +1585,8 @@ categoryControls.hidden = false;
 }
 
 /*
-
-* Update category sort direction arrow.
-  */
+ * Update category sort direction arrow.
+ */
 
 function updateCategorySortDirection() {
 
@@ -1365,9 +1598,8 @@ categorySortDirection.textContent =
 }
 
 /*
-
-* Sort games.
-  */
+ * Sort games.
+ */
 
 function sortGames(list) {
 
@@ -1489,9 +1721,366 @@ return sorted;
 }
 
 /*
+ * Sort Multi-game Apps.
+ */
 
-* Open menu.
-  */
+function sortMultiGameApps(list) {
+
+const sorted =
+    [...list];
+
+
+switch (selectedCategorySort) {
+
+    case "updated":
+
+        sorted.sort(
+            (a, b) => {
+
+                if (
+                    !a.latestUpdate &&
+                    !b.latestUpdate
+                ) {
+
+                    return 0;
+                }
+
+                if (!a.latestUpdate) {
+
+                    return 1;
+                }
+
+                if (!b.latestUpdate) {
+
+                    return -1;
+                }
+
+
+                const result =
+                    b.latestUpdate -
+                    a.latestUpdate;
+
+
+                return categorySortDescending
+                    ? -result
+                    : result;
+            }
+        );
+
+        break;
+
+
+    case "name":
+
+        sorted.sort(
+            (a, b) => {
+
+                const result =
+                    a.name.localeCompare(
+                        b.name,
+                        "en",
+                        {
+                            sensitivity: "base"
+                        }
+                    );
+
+
+                return categorySortDescending
+                    ? -result
+                    : result;
+            }
+        );
+
+        break;
+
+
+    case "popular":
+
+        sorted.sort(
+            (a, b) => {
+
+                const result =
+                    b.visits -
+                    a.visits;
+
+
+                if (result !== 0) {
+
+                    return categorySortDescending
+                        ? -result
+                        : result;
+                }
+
+
+                return a.name.localeCompare(
+                    b.name,
+                    "en",
+                    {
+                        sensitivity: "base"
+                    }
+                );
+            }
+        );
+
+        break;
+}
+
+
+return sorted;
+
+}
+
+/*
+ * Display a Multi-game App.
+ *
+ * Uses the same visual structure as
+ * "You can also play".
+ */
+
+function displayMultiGameApp(
+app,
+parentElement
+) {
+
+const section =
+    document.createElement("section");
+
+
+section.className =
+    "games-using-app";
+
+
+const toggle =
+    document.createElement("button");
+
+
+toggle.type =
+    "button";
+
+
+toggle.className =
+    "games-using-app-toggle";
+
+
+toggle.setAttribute(
+    "aria-expanded",
+    "false"
+);
+
+
+const title =
+    document.createElement("span");
+
+
+title.textContent =
+    "You can also play:";
+
+
+const arrow =
+    document.createElement("span");
+
+
+arrow.className =
+    "games-using-app-arrow";
+
+
+arrow.textContent =
+    "▼";
+
+
+toggle.appendChild(title);
+toggle.appendChild(arrow);
+
+
+const list =
+    document.createElement("div");
+
+
+list.className =
+    "games-using-app-list";
+
+
+list.hidden = true;
+
+
+for (
+    const game
+    of app.games
+) {
+
+    const link =
+        document.createElement("a");
+
+
+    link.className =
+        "games-using-app-item";
+
+
+    link.href =
+        `game.html?game=${encodeURIComponent(
+            createSlug(game.name)
+        )}`;
+
+
+    link.textContent =
+        game.name;
+
+
+    if (game.year) {
+
+        const year =
+            document.createElement("span");
+
+
+        year.textContent =
+            ` (${game.year})`;
+
+
+        link.appendChild(year);
+    }
+
+
+    list.appendChild(link);
+}
+
+
+toggle.addEventListener(
+    "click",
+    () => {
+
+        const isOpen =
+            toggle.getAttribute(
+                "aria-expanded"
+            ) === "true";
+
+
+        toggle.setAttribute(
+            "aria-expanded",
+            String(!isOpen)
+        );
+
+
+        list.hidden =
+            isOpen;
+
+
+        arrow.textContent =
+            isOpen
+                ? "▼"
+                : "▲";
+    }
+);
+
+
+section.appendChild(toggle);
+
+section.appendChild(list);
+
+parentElement.appendChild(section);
+
+}
+
+/*
+ * Display Multi-game Apps list.
+ */
+
+function displayMultiGameApps(list) {
+
+gameList.hidden = false;
+
+gameList.innerHTML = "";
+
+
+if (list.length === 0) {
+
+    gameList.innerHTML = `
+        <div class="no-results">
+            No Multi-game Apps found.
+        </div>
+    `;
+
+
+    statusElement.textContent =
+        "0 Multi-game Apps";
+
+
+    return;
+}
+
+
+statusElement.textContent =
+    `${list.length} Multi-game App${list.length !== 1 ? "s" : ""}`;
+
+
+const fragment =
+    document.createDocumentFragment();
+
+
+for (const app of list) {
+
+    const element =
+        document.createElement("div");
+
+
+    element.className =
+        "game";
+
+
+    const name =
+        document.createElement("h2");
+
+
+    name.className =
+        "game-name";
+
+
+    name.textContent =
+        app.name;
+
+
+    const info =
+        document.createElement("div");
+
+
+    info.className =
+        "game-info";
+
+
+    const count =
+        document.createElement("span");
+
+
+    count.textContent =
+        `${app.gameCount} game${app.gameCount !== 1 ? "s" : ""}`;
+
+
+    info.appendChild(count);
+
+
+    element.appendChild(name);
+
+    element.appendChild(info);
+
+
+    displayMultiGameApp(
+        app,
+        element
+    );
+
+
+    fragment.appendChild(element);
+}
+
+
+gameList.appendChild(
+fragment
+);
+
+}
+
+/*
+ * Open menu.
+ */
 
 function openMenu() {
 
@@ -1504,9 +2093,8 @@ menuOverlay.classList.add("open");
 }
 
 /*
-
-* Close menu.
-  */
+ * Close menu.
+ */
 
 function closeMenu() {
 
@@ -1517,9 +2105,8 @@ menuOverlay.classList.remove("open");
 }
 
 /*
-
-* Toggle search.
-  */
+ * Toggle search.
+ */
 
 function toggleSearch() {
 
@@ -1545,9 +2132,8 @@ if (isHidden) {
 }
 
 /*
-
-* Close search.
-  */
+ * Close search.
+ */
 
 function closeSearch() {
 
@@ -1591,9 +2177,8 @@ if (currentView === "category") {
 }
 
 /*
-
-* Close search outside.
-  */
+ * Close search outside.
+ */
 
 document.addEventListener(
 "click",
@@ -1633,9 +2218,8 @@ event => {
 );
 
 /*
-
-* Close search on scroll.
-  */
+ * Close search on scroll.
+ */
 
 window.addEventListener(
 "scroll",
@@ -1651,9 +2235,8 @@ window.addEventListener(
 );
 
 /*
-
-* Return Home.
-  */
+ * Return Home.
+ */
 
 function goHome() {
 
@@ -1695,9 +2278,8 @@ closeMenu();
 }
 
 /*
-
-* Reset category controls.
-  */
+ * Reset category controls.
+ */
 
 function resetCategoryControls() {
 
@@ -1723,9 +2305,8 @@ updateCategorySortDirection();
 }
 
 /*
-
-* Show All Games.
-  */
+ * Show All Games.
+ */
 
 function showAllGames() {
 
@@ -1759,9 +2340,8 @@ closeMenu();
 }
 
 /*
-
-* Create category menu.
-  */
+ * Create category menu.
+ */
 
 function displayPlatformMenu() {
 
@@ -1950,9 +2530,8 @@ addPlatformButton(
 }
 
 /*
-
-* Menu separator.
-  */
+ * Menu separator.
+ */
 
 function addMenuSeparator(title) {
 
@@ -1975,9 +2554,8 @@ separator
 }
 
 /*
-
-* Platform button.
-  */
+ * Platform button.
+ */
 
 function addPlatformButton(platform) {
 
@@ -2037,9 +2615,8 @@ button
 }
 
 /*
-
-* Display games.
-  */
+ * Display games.
+ */
 
 function displayGames(list) {
 
@@ -2161,9 +2738,8 @@ fragment
 }
 
 /*
-
-* Filter games inside current category.
-  */
+ * Filter games inside current category.
+ */
 
 function displayFilteredGames() {
 
@@ -2173,31 +2749,122 @@ const query =
     );
 
 
+/*
+ * Multi-game Apps uses PROJECT names
+ * instead of individual games.
+ */
+
+if (
+    selectedCategory ===
+    "multi-game-apps"
+) {
+
+    const multiGameApps =
+        getMultiGameApps();
+
+
+    const filteredApps =
+        multiGameApps.filter(
+            app =>
+                !query ||
+                normalizeText(
+                    app.name
+                ).includes(query)
+        );
+
+
+    if (query) {
+
+        filteredApps.sort(
+            (a, b) => {
+
+                const nameA =
+                    normalizeText(a.name);
+
+                const nameB =
+                    normalizeText(b.name);
+
+
+                const startsA =
+                    nameA.startsWith(query);
+
+                const startsB =
+                    nameB.startsWith(query);
+
+
+                if (
+                    startsA &&
+                    !startsB
+                ) {
+
+                    return -1;
+                }
+
+
+                if (
+                    !startsA &&
+                    startsB
+                ) {
+
+                    return 1;
+                }
+
+
+                return nameA.localeCompare(
+                    nameB,
+                    "en",
+                    {
+                        sensitivity: "base"
+                    }
+                );
+            }
+        );
+
+
+        displayMultiGameApps(
+            filteredApps
+        );
+
+        return;
+    }
+
+
+    if (
+        selectedCategorySort ===
+        "popular"
+    ) {
+
+        loadAllTimePopular(
+            () => {
+
+                const updatedApps =
+                    getMultiGameApps();
+
+
+                displayMultiGameApps(
+                    sortMultiGameApps(
+                        updatedApps
+                    )
+                );
+            }
+        );
+
+        return;
+    }
+
+
+    displayMultiGameApps(
+        sortMultiGameApps(
+            filteredApps
+        )
+    );
+
+    return;
+}
+
+
 const filtered =
     games.filter(game => {
-
-        if (
-            selectedCategory ===
-            "multi-game-apps"
-        ) {
-
-            if (
-                !game.platforms.some(
-                    platform =>
-                        normalizeText(platform) ===
-                        "multi-game-apps"
-                ) &&
-                !game.platforms.some(
-                    platform =>
-                        normalizeText(platform) ===
-                        "multi game apps"
-                )
-            ) {
-
-                return false;
-            }
-        }
-
 
         if (
             selectedCategory ===
@@ -2312,9 +2979,8 @@ displayGames(
 }
 
 /*
-
-* Global search suggestions.
-  */
+ * Global search suggestions.
+ */
 
 function searchGames() {
 
@@ -2437,9 +3103,8 @@ searchResults.hidden = false;
 }
 
 /*
-
-* Category search.
-  */
+ * Category search.
+ */
 
 categorySearchInput.addEventListener(
 "input",
@@ -2447,9 +3112,8 @@ displayFilteredGames
 );
 
 /*
-
-* Category sort options.
-  */
+ * Category sort options.
+ */
 
 categorySortOptions.forEach(
 option => {
@@ -2500,9 +3164,8 @@ option => {
 );
 
 /*
-
-* Category sort direction.
-  */
+ * Category sort direction.
+ */
 
 categorySortDirection.addEventListener(
 "click",
@@ -2521,9 +3184,8 @@ categorySortDirection.addEventListener(
 );
 
 /*
-
-* Load Google Sheets.
-  */
+ * Load Google Sheets.
+ */
 
 async function loadGames() {
 
@@ -2620,9 +3282,8 @@ try {
 }
 
 /*
-
-* Search while typing.
-  */
+ * Search while typing.
+ */
 
 searchInput.addEventListener(
 "input",
@@ -2630,9 +3291,8 @@ searchGames
 );
 
 /*
-
-* Search button.
-  */
+ * Search button.
+ */
 
 searchButton.addEventListener(
 "click",
@@ -2646,9 +3306,8 @@ event => {
 );
 
 /*
-
-* Home button.
-  */
+ * Home button.
+ */
 
 homeButton.addEventListener(
 "click",
@@ -2656,9 +3315,8 @@ goHome
 );
 
 /*
-
-* Menu events.
-  */
+ * Menu events.
+ */
 
 menuButton.addEventListener(
 "click",
@@ -2676,9 +3334,8 @@ closeMenu
 );
 
 /*
-
-* All Games.
-  */
+ * All Games.
+ */
 
 allGamesButton.addEventListener(
 "click",
@@ -2686,9 +3343,8 @@ showAllGames
 );
 
 /*
-
-* Start.
-  */
+ * Start.
+ */
 
 updateCategorySortDirection();
 
