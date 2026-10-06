@@ -82,6 +82,26 @@ const allGamesButton =
     document.getElementById("all-games-button");
 
 
+const categoryControls =
+    document.getElementById("category-controls");
+
+
+const categorySearchInput =
+    document.getElementById("category-search");
+
+
+const categorySort =
+    document.getElementById("category-sort");
+
+
+const lastUpdatedSection =
+    document.getElementById("last-updated-section");
+
+
+const popularSection =
+    document.getElementById("popular-section");
+
+
 let games = [];
 
 
@@ -89,6 +109,9 @@ let selectedPlatform = "";
 
 
 let selectedCategory = "";
+
+
+let currentView = "home";
 
 
 let showingAllLastUpdated = false;
@@ -103,6 +126,7 @@ let showingAllPopular = false;
 /*
  * Normalize column names.
  */
+
 function normalizeHeader(value) {
 
     return value
@@ -117,6 +141,7 @@ function normalizeHeader(value) {
 /*
  * Normalize text.
  */
+
 function normalizeText(value) {
 
     return String(value || "")
@@ -130,6 +155,7 @@ function normalizeText(value) {
 /*
  * Create game slug.
  */
+
 function createSlug(name) {
 
     return normalizeText(name)
@@ -141,6 +167,7 @@ function createSlug(name) {
 /*
  * CSV parser.
  */
+
 function parseCSV(csv) {
 
     const rows = [];
@@ -197,6 +224,7 @@ function parseCSV(csv) {
                 char === "\r" &&
                 csv[i + 1] === "\n"
             ) {
+
                 i++;
             }
 
@@ -248,6 +276,7 @@ function parseCSV(csv) {
 
 
     if (rows.length === 0) {
+
         return [];
     }
 
@@ -281,6 +310,7 @@ function parseCSV(csv) {
 /*
  * Find a column.
  */
+
 function getColumn(
     row,
     possibleNames
@@ -311,6 +341,7 @@ function getColumn(
 /*
  * Convert CSV rows.
  */
+
 function processRows(rows) {
 
     let currentGame = "";
@@ -340,11 +371,13 @@ function processRows(rows) {
 
 
         if (gameValue) {
+
             currentGame = gameValue;
         }
 
 
         if (yearValue) {
+
             currentYear = yearValue;
         }
 
@@ -452,6 +485,7 @@ function processRows(rows) {
             !currentGame ||
             !hasPortData
         ) {
+
             continue;
         }
 
@@ -494,18 +528,12 @@ function processRows(rows) {
 
 /*
  * Convert LAST UPDATE into a Date.
- *
- * Supported:
- *
- * 2026, October 2
- * 2026, October
- *
- * If the day is missing, the first
- * day of the month is used for sorting.
  */
+
 function parseLastUpdate(value) {
 
     if (!value) {
+
         return null;
     }
 
@@ -519,6 +547,7 @@ function parseLastUpdate(value) {
 
 
     if (!match) {
+
         return null;
     }
 
@@ -561,6 +590,7 @@ function parseLastUpdate(value) {
             monthName
         )
     ) {
+
         return null;
     }
 
@@ -580,6 +610,7 @@ function parseLastUpdate(value) {
 /*
  * Get latest update of a game.
  */
+
 function getLatestUpdate(game) {
 
     const dates =
@@ -597,6 +628,7 @@ function getLatestUpdate(game) {
 
 
     if (dates.length === 0) {
+
         return null;
     }
 
@@ -613,6 +645,7 @@ function getLatestUpdate(game) {
 /*
  * Display Last Updated.
  */
+
 function displayLastUpdated() {
 
     const sortedGames =
@@ -705,11 +738,13 @@ function displayLastUpdated() {
 /*
  * Load Popular ranking.
  */
+
 function loadPopular(
     period = selectedPopularPeriod
 ) {
 
     if (!popularList) {
+
         return;
     }
 
@@ -762,6 +797,7 @@ function loadPopular(
 
 
                             if (!game) {
+
                                 return null;
                             }
 
@@ -817,6 +853,7 @@ function loadPopular(
 
 
                 if (script) {
+
                     script.remove();
                 }
             }
@@ -871,6 +908,7 @@ function loadPopular(
 /*
  * Display Popular.
  */
+
 function displayPopular(ranking) {
 
     popularList.innerHTML = "";
@@ -958,6 +996,7 @@ function displayPopular(ranking) {
 /*
  * Popular tabs.
  */
+
 popularTabs.forEach(
     tab => {
 
@@ -999,6 +1038,7 @@ popularTabs.forEach(
 /*
  * Popular View More.
  */
+
 popularMore.addEventListener(
     "click",
     () => {
@@ -1015,6 +1055,7 @@ popularMore.addEventListener(
 /*
  * View more button.
  */
+
 lastUpdatedMore.addEventListener(
     "click",
     () => {
@@ -1029,6 +1070,7 @@ lastUpdatedMore.addEventListener(
 /*
  * Group ports by game.
  */
+
 function groupGames(rows) {
 
     const grouped = new Map();
@@ -1063,6 +1105,7 @@ function groupGames(rows) {
             !game.year &&
             port.year
         ) {
+
             game.year = port.year;
         }
 
@@ -1096,6 +1139,7 @@ function groupGames(rows) {
 /*
  * Check Dual Screen.
  */
+
 function isDualScreen(game) {
 
     return game.ports.some(
@@ -1107,8 +1151,168 @@ function isDualScreen(game) {
 
 
 /*
+ * Show Home sections.
+ */
+
+function showHomeSections() {
+
+    lastUpdatedSection.hidden = false;
+
+    popularSection.hidden = false;
+
+    categoryControls.hidden = true;
+}
+
+
+/*
+ * Show Category view.
+ */
+
+function showCategoryView() {
+
+    lastUpdatedSection.hidden = true;
+
+    popularSection.hidden = true;
+
+    categoryControls.hidden = false;
+}
+
+
+/*
+ * Sort games.
+ */
+
+function sortGames(list) {
+
+    const sorted =
+        [...list];
+
+
+    switch (categorySort.value) {
+
+        case "name-desc":
+
+            sorted.sort(
+                (a, b) =>
+                    b.name.localeCompare(
+                        a.name,
+                        "en",
+                        {
+                            sensitivity: "base"
+                        }
+                    )
+            );
+
+            break;
+
+
+        case "year-desc":
+
+            sorted.sort(
+                (a, b) => {
+
+                    const yearA =
+                        Number(a.year) || 0;
+
+                    const yearB =
+                        Number(b.year) || 0;
+
+                    return yearB - yearA;
+                }
+            );
+
+            break;
+
+
+        case "year-asc":
+
+            sorted.sort(
+                (a, b) => {
+
+                    const yearA =
+                        Number(a.year) || 0;
+
+                    const yearB =
+                        Number(b.year) || 0;
+
+                    if (yearA === 0) {
+
+                        return 1;
+                    }
+
+                    if (yearB === 0) {
+
+                        return -1;
+                    }
+
+                    return yearA - yearB;
+                }
+            );
+
+            break;
+
+
+        case "updated-desc":
+
+            sorted.sort(
+                (a, b) => {
+
+                    const dateA =
+                        getLatestUpdate(a);
+
+                    const dateB =
+                        getLatestUpdate(b);
+
+
+                    if (!dateA && !dateB) {
+
+                        return 0;
+                    }
+
+                    if (!dateA) {
+
+                        return 1;
+                    }
+
+                    if (!dateB) {
+
+                        return -1;
+                    }
+
+                    return dateB - dateA;
+                }
+            );
+
+            break;
+
+
+        case "name-asc":
+
+        default:
+
+            sorted.sort(
+                (a, b) =>
+                    a.name.localeCompare(
+                        b.name,
+                        "en",
+                        {
+                            sensitivity: "base"
+                        }
+                    )
+            );
+
+            break;
+    }
+
+
+    return sorted;
+}
+
+
+/*
  * Open menu.
  */
+
 function openMenu() {
 
     closeSearch();
@@ -1122,6 +1326,7 @@ function openMenu() {
 /*
  * Close menu.
  */
+
 function closeMenu() {
 
     sideMenu.classList.remove("open");
@@ -1133,6 +1338,7 @@ function closeMenu() {
 /*
  * Toggle search.
  */
+
 function toggleSearch() {
 
     const isHidden =
@@ -1159,6 +1365,7 @@ function toggleSearch() {
 /*
  * Close search.
  */
+
 function closeSearch() {
 
     if (
@@ -1180,13 +1387,25 @@ function closeSearch() {
     searchInput.value = "";
 
 
-    displayFilteredGames();
+    if (currentView === "category") {
+
+        displayFilteredGames();
+
+    } else {
+
+        gameList.innerHTML = "";
+
+        gameList.hidden = true;
+
+        statusElement.textContent = "";
+    }
 }
 
 
 /*
  * Close search outside.
  */
+
 document.addEventListener(
     "click",
     event => {
@@ -1227,6 +1446,7 @@ document.addEventListener(
 /*
  * Close search on scroll.
  */
+
 window.addEventListener(
     "scroll",
     () => {
@@ -1243,13 +1463,20 @@ window.addEventListener(
 /*
  * Return Home.
  */
+
 function goHome() {
+
+    currentView = "home";
 
     selectedPlatform = "";
 
     selectedCategory = "";
 
     searchInput.value = "";
+
+    categorySearchInput.value = "";
+
+    categorySort.value = "name-asc";
 
     gameList.innerHTML = "";
 
@@ -1262,6 +1489,8 @@ function goHome() {
         ""
     );
 
+    showHomeSections();
+
     closeMenu();
 }
 
@@ -1269,13 +1498,27 @@ function goHome() {
 /*
  * Show All Games.
  */
+
 function showAllGames() {
+
+    currentView = "category";
 
     selectedPlatform = "";
 
-    selectedCategory = "";
+    selectedCategory = "all-games";
+
+    categorySearchInput.value = "";
+
+    categorySort.value = "name-asc";
 
     searchInput.value = "";
+
+    searchContainer.setAttribute(
+        "hidden",
+        ""
+    );
+
+    showCategoryView();
 
     gameList.hidden = false;
 
@@ -1288,45 +1531,10 @@ function showAllGames() {
 /*
  * Create category menu.
  */
+
 function displayPlatformMenu() {
 
     platformList.innerHTML = "";
-
-
-    const allButton =
-        document.createElement("button");
-
-
-    allButton.type =
-        "button";
-
-
-    allButton.className =
-        "platform-button";
-
-
-    allButton.textContent =
-        "All Categories";
-
-
-    allButton.addEventListener(
-        "click",
-        () => {
-
-            selectedPlatform = "";
-
-            selectedCategory = "";
-
-            displayFilteredGames();
-
-            closeMenu();
-        }
-    );
-
-
-    platformList.appendChild(
-        allButton
-    );
 
 
     const multiGameButton =
@@ -1349,10 +1557,26 @@ function displayPlatformMenu() {
         "click",
         () => {
 
+            currentView = "category";
+
             selectedPlatform = "";
 
             selectedCategory =
                 "multi-game-apps";
+
+            categorySearchInput.value = "";
+
+            categorySort.value =
+                "name-asc";
+
+            searchInput.value = "";
+
+            searchContainer.setAttribute(
+                "hidden",
+                ""
+            );
+
+            showCategoryView();
 
             displayFilteredGames();
 
@@ -1386,10 +1610,26 @@ function displayPlatformMenu() {
         "click",
         () => {
 
+            currentView = "category";
+
             selectedPlatform = "";
 
             selectedCategory =
                 "dual-screen";
+
+            categorySearchInput.value = "";
+
+            categorySort.value =
+                "name-asc";
+
+            searchInput.value = "";
+
+            searchContainer.setAttribute(
+                "hidden",
+                ""
+            );
+
+            showCategoryView();
 
             displayFilteredGames();
 
@@ -1479,6 +1719,7 @@ function displayPlatformMenu() {
 /*
  * Menu separator.
  */
+
 function addMenuSeparator(title) {
 
     const separator =
@@ -1502,6 +1743,7 @@ function addMenuSeparator(title) {
 /*
  * Platform button.
  */
+
 function addPlatformButton(platform) {
 
     const button =
@@ -1524,10 +1766,26 @@ function addPlatformButton(platform) {
         "click",
         () => {
 
+            currentView = "category";
+
             selectedPlatform =
                 platform;
 
             selectedCategory = "";
+
+            categorySearchInput.value = "";
+
+            categorySort.value =
+                "name-asc";
+
+            searchInput.value = "";
+
+            searchContainer.setAttribute(
+                "hidden",
+                ""
+            );
+
+            showCategoryView();
 
             displayFilteredGames();
 
@@ -1545,6 +1803,7 @@ function addPlatformButton(platform) {
 /*
  * Display games.
  */
+
 function displayGames(list) {
 
     gameList.hidden = false;
@@ -1588,7 +1847,9 @@ function displayGames(list) {
 
 
         element.href =
-            `game.html?game=${encodeURIComponent(game.slug)}`;
+            `game.html?game=${encodeURIComponent(
+                game.slug
+            )}`;
 
 
         const name =
@@ -1663,13 +1924,14 @@ function displayGames(list) {
 
 
 /*
- * Filter games.
+ * Filter games inside current category.
  */
+
 function displayFilteredGames() {
 
     const query =
         normalizeText(
-            searchInput.value
+            categorySearchInput.value
         );
 
 
@@ -1677,33 +1939,31 @@ function displayFilteredGames() {
         games.filter(game => {
 
             if (
-                selectedCategory !== "multi-game-apps" &&
-                game.platforms.some(
-                    platform =>
-                        normalizeText(platform) ===
-                        "multi-game apps"
-                )
+                selectedCategory ===
+                "multi-game-apps"
             ) {
 
-                return false;
+                if (
+                    !game.platforms.some(
+                        platform =>
+                            normalizeText(platform) ===
+                            "multi-game-apps"
+                    ) &&
+                    !game.platforms.some(
+                        platform =>
+                            normalizeText(platform) ===
+                            "multi game apps"
+                    )
+                ) {
+
+                    return false;
+                }
             }
 
 
             if (
-                selectedCategory === "multi-game-apps" &&
-                !game.platforms.some(
-                    platform =>
-                        normalizeText(platform) ===
-                        "multi-game apps"
-                )
-            ) {
-
-                return false;
-            }
-
-
-            if (
-                selectedCategory === "dual-screen" &&
+                selectedCategory ===
+                "dual-screen" &&
                 !isDualScreen(game)
             ) {
 
@@ -1725,6 +1985,7 @@ function displayFilteredGames() {
 
 
             if (!query) {
+
                 return true;
             }
 
@@ -1759,23 +2020,104 @@ function displayFilteredGames() {
 
 
     displayGames(
-        filtered
+        sortGames(filtered)
     );
 }
 
 
 /*
- * Search.
+ * Global search.
  */
+
 function searchGames() {
 
-    displayFilteredGames();
+    const query =
+        normalizeText(
+            searchInput.value
+        );
+
+
+    if (!query) {
+
+        if (currentView === "category") {
+
+            displayFilteredGames();
+
+        } else {
+
+            gameList.innerHTML = "";
+
+            gameList.hidden = true;
+
+            statusElement.textContent = "";
+        }
+
+        return;
+    }
+
+
+    const filtered =
+        games.filter(game => {
+
+            const searchableText = [
+
+                game.name,
+
+                game.year,
+
+                ...game.ports.map(port => [
+
+                    port.project,
+
+                    port.developer,
+
+                    port.version,
+
+                    port.notes
+
+                ].join(" "))
+
+            ]
+                .join(" ")
+                .toLowerCase();
+
+
+            return normalizeText(
+                searchableText
+            ).includes(query);
+        });
+
+
+    displayGames(
+        sortGames(filtered)
+    );
 }
+
+
+/*
+ * Category search.
+ */
+
+categorySearchInput.addEventListener(
+    "input",
+    displayFilteredGames
+);
+
+
+/*
+ * Category sort.
+ */
+
+categorySort.addEventListener(
+    "change",
+    displayFilteredGames
+);
 
 
 /*
  * Load Google Sheets.
  */
+
 async function loadGames() {
 
     try {
@@ -1873,6 +2215,7 @@ async function loadGames() {
 /*
  * Search while typing.
  */
+
 searchInput.addEventListener(
     "input",
     searchGames
@@ -1882,6 +2225,7 @@ searchInput.addEventListener(
 /*
  * Search button.
  */
+
 searchButton.addEventListener(
     "click",
     event => {
@@ -1896,6 +2240,7 @@ searchButton.addEventListener(
 /*
  * Home button.
  */
+
 homeButton.addEventListener(
     "click",
     goHome
@@ -1905,15 +2250,18 @@ homeButton.addEventListener(
 /*
  * Menu events.
  */
+
 menuButton.addEventListener(
     "click",
     openMenu
 );
 
+
 menuClose.addEventListener(
     "click",
     closeMenu
 );
+
 
 menuOverlay.addEventListener(
     "click",
@@ -1924,6 +2272,7 @@ menuOverlay.addEventListener(
 /*
  * All Games.
  */
+
 allGamesButton.addEventListener(
     "click",
     showAllGames
@@ -1933,4 +2282,5 @@ allGamesButton.addEventListener(
 /*
  * Start.
  */
+
 loadGames();
