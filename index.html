@@ -87,45 +87,50 @@
         hidden
     >
 
-        <div class="category-sort">
-
-            <label for="category-sort">
-                Sort
-            </label>
-
-            <select id="category-sort">
-
-                <option value="name-asc">
-                    Name A–Z
-                </option>
-
-                <option value="name-desc">
-                    Name Z–A
-                </option>
-
-                <option value="year-desc">
-                    Year newest
-                </option>
-
-                <option value="year-asc">
-                    Year oldest
-                </option>
-
-                <option value="updated-desc">
-                    Last updated
-                </option>
-
-            </select>
-
-        </div>
-
-
         <input
             type="text"
             id="category-search"
             placeholder="Search in this category..."
             autocomplete="off"
         >
+
+
+        <div class="category-sort">
+
+            <button
+                type="button"
+                class="category-sort-option active"
+                data-sort="updated"
+            >
+                Last Updated
+            </button>
+
+            <button
+                type="button"
+                class="category-sort-option"
+                data-sort="name"
+            >
+                A–Z
+            </button>
+
+            <button
+                type="button"
+                class="category-sort-option"
+                data-sort="popular"
+            >
+                Popular
+            </button>
+
+            <button
+                type="button"
+                id="category-sort-direction"
+                class="category-sort-direction"
+                aria-label="Change sort direction"
+            >
+                ↓
+            </button>
+
+        </div>
 
     </div>
 
