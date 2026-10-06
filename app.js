@@ -2303,35 +2303,11 @@ function searchGames() {
 
     const filtered =
         games
-            .filter(game => {
-
-                const searchableText = [
-
-                    game.name,
-
-                    game.year,
-
-                    ...game.ports.map(port => [
-
-                        port.project,
-
-                        port.developer,
-
-                        port.version,
-
-                        port.notes
-
-                    ].join(" "))
-
-                ]
-                    .join(" ")
-                    .toLowerCase();
-
-
-                return normalizeText(
-                    searchableText
-                ).includes(query);
-            })
+            .filter(game =>
+                normalizeText(
+                    game.name
+                ).includes(query)
+            )
             .slice(0, 5);
 
 
