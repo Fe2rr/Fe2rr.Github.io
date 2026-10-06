@@ -90,8 +90,14 @@ const categorySearchInput =
     document.getElementById("category-search");
 
 
-const categorySort =
-    document.getElementById("category-sort");
+const categorySortOptions =
+    document.querySelectorAll(".category-sort-option");
+
+
+const categorySortDirection =
+    document.getElementById(
+        "category-sort-direction"
+    );
 
 
 const lastUpdatedSection =
@@ -125,6 +131,31 @@ let selectedPopularPeriod = "week";
 
 
 let showingAllPopular = false;
+
+
+/*
+ * Category sorting.
+ */
+
+let selectedCategorySort =
+    "updated";
+
+
+let categorySortDescending =
+    true;
+
+
+/*
+ * All Time Popular cache.
+ */
+
+let allTimePopular = new Map();
+
+let allTimePopularLoaded = false;
+
+let allTimePopularLoading = false;
+
+let allTimePopularCallbacks = [];
 
 
 /*
@@ -910,6 +941,156 @@ function loadPopular(
 
 
 /*
+ * Load All Time Popular for category sorting.
+ */
+
+function loadAllTimePopular(callback) {
+
+    if (allTimePopularLoaded) {
+
+        callback();
+
+        return;
+    }
+
+
+    allTimePopularCallbacks.push(
+        callback
+    );
+
+
+    if (allTimePopularLoading) {
+
+        return;
+    }
+
+
+    allTimePopularLoading = true;
+
+
+    const callbackName =
+        `allTimePopularCallback_${Date.now()}`;
+
+
+    window[callbackName] =
+        function(data) {
+
+            try {
+
+                if (
+                    !data.success ||
+                    !Array.isArray(data.games)
+                ) {
+
+                    throw new Error(
+                        data.error ||
+                        "Could not load All Time popularity."
+                    );
+                }
+
+
+                allTimePopular =
+                    new Map(
+                        data.games.map(item => [
+                            createSlug(item.game),
+                            Number(item.visits) || 0
+                        ])
+                    );
+
+
+                allTimePopularLoaded = true;
+
+
+            } catch (error) {
+
+                console.error(
+                    "Could not load All Time popularity:",
+                    error
+                );
+
+            } finally {
+
+                allTimePopularLoading = false;
+
+
+                delete window[callbackName];
+
+
+                const script =
+                    document.getElementById(
+                        callbackName
+                    );
+
+
+                if (script) {
+
+                    script.remove();
+                }
+
+
+                const callbacks =
+                    allTimePopularCallbacks;
+
+
+                allTimePopularCallbacks = [];
+
+
+                callbacks.forEach(
+                    callback => callback()
+                );
+            }
+        };
+
+
+    const script =
+        document.createElement("script");
+
+
+    script.id =
+        callbackName;
+
+
+    script.src =
+        `${POPULAR_URL}?popular=alltime&callback=${callbackName}`;
+
+
+    script.onerror =
+        function() {
+
+            console.error(
+                "Could not load All Time popularity."
+            );
+
+
+            allTimePopularLoading = false;
+
+
+            delete window[callbackName];
+
+
+            script.remove();
+
+
+            const callbacks =
+                allTimePopularCallbacks;
+
+
+            allTimePopularCallbacks = [];
+
+
+            callbacks.forEach(
+                callback => callback()
+            );
+        };
+
+
+    document.body.appendChild(
+        script
+    );
+}
+
+
+/*
  * Display Popular.
  */
 
@@ -1183,6 +1364,19 @@ function showCategoryView() {
 
 
 /*
+ * Update category sort direction arrow.
+ */
+
+function updateCategorySortDirection() {
+
+    categorySortDirection.textContent =
+        categorySortDescending
+            ? "↓"
+            : "↑";
+}
+
+
+/*
  * Sort games.
  */
 
@@ -1192,71 +1386,9 @@ function sortGames(list) {
         [...list];
 
 
-    switch (categorySort.value) {
+    switch (selectedCategorySort) {
 
-        case "name-desc":
-
-            sorted.sort(
-                (a, b) =>
-                    b.name.localeCompare(
-                        a.name,
-                        "en",
-                        {
-                            sensitivity: "base"
-                        }
-                    )
-            );
-
-            break;
-
-
-        case "year-desc":
-
-            sorted.sort(
-                (a, b) => {
-
-                    const yearA =
-                        Number(a.year) || 0;
-
-                    const yearB =
-                        Number(b.year) || 0;
-
-                    return yearB - yearA;
-                }
-            );
-
-            break;
-
-
-        case "year-asc":
-
-            sorted.sort(
-                (a, b) => {
-
-                    const yearA =
-                        Number(a.year) || 0;
-
-                    const yearB =
-                        Number(b.year) || 0;
-
-                    if (yearA === 0) {
-
-                        return 1;
-                    }
-
-                    if (yearB === 0) {
-
-                        return -1;
-                    }
-
-                    return yearA - yearB;
-                }
-            );
-
-            break;
-
-
-        case "updated-desc":
+        case "updated":
 
             sorted.sort(
                 (a, b) => {
@@ -1283,26 +1415,80 @@ function sortGames(list) {
                         return -1;
                     }
 
-                    return dateB - dateA;
+
+                    const result =
+                        dateB - dateA;
+
+
+                    return categorySortDescending
+                        ? result
+                        : -result;
                 }
             );
 
             break;
 
 
-        case "name-asc":
-
-        default:
+        case "name":
 
             sorted.sort(
-                (a, b) =>
-                    a.name.localeCompare(
+                (a, b) => {
+
+                    const result =
+                        a.name.localeCompare(
+                            b.name,
+                            "en",
+                            {
+                                sensitivity: "base"
+                            }
+                        );
+
+
+                    return categorySortDescending
+                        ? -result
+                        : result;
+                }
+            );
+
+            break;
+
+
+        case "popular":
+
+            sorted.sort(
+                (a, b) => {
+
+                    const visitsA =
+                        allTimePopular.get(
+                            a.slug
+                        ) || 0;
+
+                    const visitsB =
+                        allTimePopular.get(
+                            b.slug
+                        ) || 0;
+
+
+                    const result =
+                        visitsB - visitsA;
+
+
+                    if (result !== 0) {
+
+                        return categorySortDescending
+                            ? result
+                            : -result;
+                    }
+
+
+                    return a.name.localeCompare(
                         b.name,
                         "en",
                         {
                             sensitivity: "base"
                         }
-                    )
+                    );
+                }
             );
 
             break;
@@ -1489,7 +1675,11 @@ function goHome() {
 
     categorySearchInput.value = "";
 
-    categorySort.value = "name-asc";
+    selectedCategorySort = "updated";
+
+    categorySortDescending = true;
+
+    updateCategorySortDirection();
 
     gameList.innerHTML = "";
 
@@ -1509,6 +1699,33 @@ function goHome() {
 
 
 /*
+ * Reset category controls.
+ */
+
+function resetCategoryControls() {
+
+    categorySearchInput.value = "";
+
+    selectedCategorySort = "updated";
+
+    categorySortDescending = true;
+
+    categorySortOptions.forEach(
+        option => {
+
+            option.classList.toggle(
+                "active",
+                option.dataset.sort ===
+                    selectedCategorySort
+            );
+        }
+    );
+
+    updateCategorySortDirection();
+}
+
+
+/*
  * Show All Games.
  */
 
@@ -1520,9 +1737,7 @@ function showAllGames() {
 
     selectedCategory = "all-games";
 
-    categorySearchInput.value = "";
-
-    categorySort.value = "name-asc";
+    resetCategoryControls();
 
     searchInput.value = "";
 
@@ -1581,10 +1796,7 @@ function displayPlatformMenu() {
             selectedCategory =
                 "multi-game-apps";
 
-            categorySearchInput.value = "";
-
-            categorySort.value =
-                "name-asc";
+            resetCategoryControls();
 
             searchInput.value = "";
 
@@ -1638,10 +1850,7 @@ function displayPlatformMenu() {
             selectedCategory =
                 "dual-screen";
 
-            categorySearchInput.value = "";
-
-            categorySort.value =
-                "name-asc";
+            resetCategoryControls();
 
             searchInput.value = "";
 
@@ -1798,10 +2007,7 @@ function addPlatformButton(platform) {
 
             selectedCategory = "";
 
-            categorySearchInput.value = "";
-
-            categorySort.value =
-                "name-asc";
+            resetCategoryControls();
 
             searchInput.value = "";
 
@@ -2048,6 +2254,24 @@ function displayFilteredGames() {
         });
 
 
+    if (
+        selectedCategorySort ===
+        "popular"
+    ) {
+
+        loadAllTimePopular(
+            () => {
+
+                displayGames(
+                    sortGames(filtered)
+                );
+            }
+        );
+
+        return;
+    }
+
+
     displayGames(
         sortGames(filtered)
     );
@@ -2169,12 +2393,69 @@ categorySearchInput.addEventListener(
 
 
 /*
- * Category sort.
+ * Category sort options.
  */
 
-categorySort.addEventListener(
-    "change",
-    displayFilteredGames
+categorySortOptions.forEach(
+    option => {
+
+        option.addEventListener(
+            "click",
+            () => {
+
+                const newSort =
+                    option.dataset.sort;
+
+
+                if (
+                    selectedCategorySort ===
+                    newSort
+                ) {
+
+                    return;
+                }
+
+
+                selectedCategorySort =
+                    newSort;
+
+
+                categorySortOptions.forEach(
+                    otherOption => {
+
+                        otherOption.classList.toggle(
+                            "active",
+                            otherOption.dataset.sort ===
+                                selectedCategorySort
+                        );
+                    }
+                );
+
+
+                displayFilteredGames();
+            }
+        );
+    }
+);
+
+
+/*
+ * Category sort direction.
+ */
+
+categorySortDirection.addEventListener(
+    "click",
+    () => {
+
+        categorySortDescending =
+            !categorySortDescending;
+
+
+        updateCategorySortDirection();
+
+
+        displayFilteredGames();
+    }
 );
 
 
@@ -2346,5 +2627,7 @@ allGamesButton.addEventListener(
 /*
  * Start.
  */
+
+updateCategorySortDirection();
 
 loadGames();
