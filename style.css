@@ -251,7 +251,9 @@ main {
    GAME CARD
 ========================= */
 
-.game-card {
+.game {
+    display: block;
+
     background: #0a2928;
 
     border: 1px solid #173f3c;
@@ -259,22 +261,20 @@ main {
 
     padding: 15px;
 
+    color: inherit;
+    text-decoration: none;
+
     transition:
         background 0.15s,
         border-color 0.15s;
 }
 
-.game-card:hover {
+.game:hover {
     background: #0d302e;
     border-color: #24534f;
 }
 
-.game-card a {
-    color: inherit;
-    text-decoration: none;
-}
-
-.game-title {
+.game-name {
     margin: 0 0 6px;
 
     font-size: 18px;
@@ -284,6 +284,10 @@ main {
 .game-info {
     font-size: 13px;
     color: #8fa7a3;
+}
+
+.game-info span {
+    margin-right: 10px;
 }
 
 
