@@ -1,12 +1,12 @@
 * {
   box-sizing: border-box;
-  }
+}
 
 body {
-margin: 0;
-background: #071918;
-color: #d7e4e1;
-font-family: Arial, sans-serif;
+  margin: 0;
+  background: #071918;
+  color: #d7e4e1;
+  font-family: Arial, sans-serif;
 }
 
 /* =========================
@@ -14,43 +14,41 @@ HEADER
 ========================= */
 
 header {
-height: 64px;
-background: #0b2423;
-border-bottom: 1px solid #163c39;
+  height: 64px;
+  background: #0b2423;
+  border-bottom: 1px solid #163c39;
 
-display: flex;
-align-items: center;
+  display: flex;
+  align-items: center;
 
-padding: 0 16px;
-gap: 12px;
+  padding: 0 16px;
+  gap: 12px;
 
-position: sticky;
-top: 0;
-z-index: 100;
-
+  position: sticky;
+  top: 0;
+  z-index: 100;
 }
 
 header h1 {
-margin: 0;
-font-size: 20px;
-flex: 1;
+  margin: 0;
+  font-size: 20px;
+  flex: 1;
 }
 
 header button {
-background: none;
-border: none;
-color: #d7e4e1;
+  background: none;
+  border: none;
+  color: #d7e4e1;
 
-font-size: 22px;
+  font-size: 22px;
 
-cursor: pointer;
+  cursor: pointer;
 
-padding: 8px;
-
+  padding: 8px;
 }
 
 header button:hover {
-color: #ffffff;
+  color: #ffffff;
 }
 
 /* =========================
@@ -58,9 +56,9 @@ MAIN
 ========================= */
 
 main {
-max-width: 900px;
-margin: auto;
-padding: 20px 16px 40px;
+  max-width: 900px;
+  margin: auto;
+  padding: 20px 16px 40px;
 }
 
 /* =========================
@@ -68,57 +66,56 @@ SEARCH
 ========================= */
 
 .search-container {
-margin-bottom: 20px;
+  margin-bottom: 20px;
 }
 
 #search {
-width: 100%;
+  width: 100%;
 
-background: #0a2928;
-border: 1px solid #1c4743;
-border-radius: 8px;
+  background: #0a2928;
+  border: 1px solid #1c4743;
+  border-radius: 8px;
 
-color: #d7e4e1;
+  color: #d7e4e1;
 
-padding: 12px 14px;
+  padding: 12px 14px;
 
-font-size: 16px;
-
+  font-size: 16px;
 }
 
 #search:focus {
-outline: none;
-border-color: #32756e;
+  outline: none;
+  border-color: #32756e;
 }
 
 .search-results {
-margin-top: 6px;
-background: #0a2928;
-border: 1px solid #1c4743;
-border-radius: 8px;
-overflow: hidden;
+  margin-top: 6px;
+  background: #0a2928;
+  border: 1px solid #1c4743;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .search-results[hidden] {
-display: none;
+  display: none;
 }
 
 .search-result {
-display: block;
-padding: 12px 16px;
-border-bottom: 1px solid #173b38;
-color: #c8dad5;
-text-decoration: none;
-font-size: 15px;
+  display: block;
+  padding: 12px 16px;
+  border-bottom: 1px solid #173b38;
+  color: #c8dad5;
+  text-decoration: none;
+  font-size: 15px;
 }
 
 .search-result:last-child {
-border-bottom: none;
+  border-bottom: none;
 }
 
 .search-result:hover {
-background: #123a37;
-color: #e5f0ec;
+  background: #123a37;
+  color: #e5f0ec;
 }
 
 /* =========================
@@ -126,32 +123,30 @@ CATEGORY CONTROLS
 ========================= */
 
 .category-controls {
-display: flex;
-flex-direction: column;
-gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 
-margin-bottom: 20px;
-
+  margin-bottom: 20px;
 }
 
 #category-search {
-width: 100%;
+  width: 100%;
 
-background: #0a2928;
-border: 1px solid #1c4743;
-border-radius: 8px;
+  background: #0a2928;
+  border: 1px solid #1c4743;
+  border-radius: 8px;
 
-color: #d7e4e1;
+  color: #d7e4e1;
 
-padding: 12px 14px;
+  padding: 12px 14px;
 
-font-size: 16px;
-
+  font-size: 16px;
 }
 
 #category-search:focus {
-outline: none;
-border-color: #32756e;
+  outline: none;
+  border-color: #32756e;
 }
 
 /* =========================
@@ -159,72 +154,68 @@ CATEGORY SORT
 ========================= */
 
 .category-sort {
-display: flex;
-align-items: center;
+  display: flex;
+  align-items: center;
 
-width: fit-content;
+  width: fit-content;
 
-background: #0a2928;
+  background: #0a2928;
 
-border: 1px solid #173f3c;
+  border: 1px solid #173f3c;
 
-border-radius: 7px;
+  border-radius: 7px;
 
-padding: 3px;
+  padding: 3px;
 
-gap: 4px;
-
+  gap: 4px;
 }
 
 .category-sort-option {
-background: none;
+  background: none;
 
-border: none;
+  border: none;
 
-color: #819a96;
+  color: #819a96;
 
-padding: 6px 9px;
+  padding: 6px 9px;
 
-border-radius: 5px;
+  border-radius: 5px;
 
-cursor: pointer;
+  cursor: pointer;
 
-font-size: 12px;
-
+  font-size: 12px;
 }
 
 .category-sort-option:hover {
-color: #c8dad5;
+  color: #c8dad5;
 }
 
 .category-sort-option.active {
-background: #173f3c;
+  background: #173f3c;
 
-color: #d7e4e1;
-
+  color: #d7e4e1;
 }
 
 .category-sort-direction {
-background: none;
+  background: none;
 
-border: none;
+  border: none;
 
-color: #819a96;
+  color: #819a96;
 
-padding: 6px 8px;
+  padding: 6px 8px;
 
-border-radius: 5px;
+  border-radius: 5px;
 
-cursor: pointer;
+  cursor: pointer;
 
-font-size: 13px;
+  font-size: 13px;
 
-min-width: 28px;
-
+  min-width: 28px;
 }
 
 .category-sort-direction:hover {
-color: #c8dad5;
+  color: #c8dad5;
 }
 
 /* =========================
@@ -232,12 +223,11 @@ STATUS
 ========================= */
 
 #status {
-margin: 15px 0;
+  margin: 15px 0;
 
-color: #8fa7a3;
+  color: #8fa7a3;
 
-font-size: 14px;
-
+  font-size: 14px;
 }
 
 /* =========================
@@ -245,8 +235,8 @@ GAME LIST
 ========================= */
 
 #game-list {
-display: grid;
-gap: 12px;
+  display: grid;
+  gap: 12px;
 }
 
 /* =========================
@@ -254,44 +244,42 @@ GAME CARD
 ========================= */
 
 .game {
-display: block;
+  display: block;
 
-background: #0a2928;
+  background: #0a2928;
 
-border: 1px solid #173f3c;
-border-radius: 10px;
+  border: 1px solid #173f3c;
+  border-radius: 10px;
 
-padding: 15px;
+  padding: 15px;
 
-color: inherit;
-text-decoration: none;
+  color: inherit;
+  text-decoration: none;
 
-transition:
+  transition:
     background 0.15s,
     border-color 0.15s;
-
 }
 
 .game:hover {
-background: #0d302e;
-border-color: #24534f;
+  background: #0d302e;
+  border-color: #24534f;
 }
 
 .game-name {
-margin: 0 0 6px;
+  margin: 0 0 6px;
 
-font-size: 18px;
-color: #e1ece9;
-
+  font-size: 18px;
+  color: #e1ece9;
 }
 
 .game-info {
-font-size: 13px;
-color: #8fa7a3;
+  font-size: 13px;
+  color: #8fa7a3;
 }
 
 .game-info span {
-margin-right: 10px;
+  margin-right: 10px;
 }
 
 /* =========================
@@ -299,19 +287,18 @@ BACK BUTTON
 ========================= */
 
 .back-button {
-display: inline-block;
+  display: inline-block;
 
-margin-bottom: 20px;
+  margin-bottom: 20px;
 
-color: #9fc8c2;
-text-decoration: none;
+  color: #9fc8c2;
+  text-decoration: none;
 
-font-size: 14px;
-
+  font-size: 14px;
 }
 
 .back-button:hover {
-color: #ffffff;
+  color: #ffffff;
 }
 
 /* =========================
@@ -319,19 +306,18 @@ GAME HEADER
 ========================= */
 
 .game-header {
-margin-bottom: 25px;
+  margin-bottom: 25px;
 }
 
 .game-header h2 {
-margin: 0 0 8px;
+  margin: 0 0 8px;
 
-font-size: 26px;
-
+  font-size: 26px;
 }
 
 .game-meta {
-color: #8fa7a3;
-font-size: 14px;
+  color: #8fa7a3;
+  font-size: 14px;
 }
 
 /* =========================
@@ -339,8 +325,8 @@ PORT LIST
 ========================= */
 
 .port-list {
-display: grid;
-gap: 12px;
+  display: grid;
+  gap: 12px;
 }
 
 /* =========================
@@ -348,28 +334,25 @@ PORT CARD
 ========================= */
 
 .port-card {
-background: #0a2928;
+  background: #0a2928;
 
-border: 1px solid #173f3c;
-border-radius: 10px;
+  border: 1px solid #173f3c;
+  border-radius: 10px;
 
-padding: 15px;
-
+  padding: 15px;
 }
 
 .port-card h3 {
-margin: 0 0 8px;
+  margin: 0 0 8px;
 
-font-size: 17px;
-
+  font-size: 17px;
 }
 
 .port-info {
-color: #91aaa5;
-font-size: 13px;
+  color: #91aaa5;
+  font-size: 13px;
 
-margin-bottom: 10px;
-
+  margin-bottom: 10px;
 }
 
 /* =========================
@@ -377,7 +360,7 @@ PORT INFO
 ========================= */
 
 .port-info span {
-margin-right: 10px;
+  margin-right: 10px;
 }
 
 /* =========================
@@ -385,20 +368,19 @@ NOTES
 ========================= */
 
 .notes {
-margin-top: 20px;
+  margin-top: 20px;
 
-background: #0a2928;
+  background: #0a2928;
 
-border-left: 3px solid #32756e;
+  border-left: 3px solid #32756e;
 
-padding: 12px 15px;
+  padding: 12px 15px;
 
-border-radius: 6px;
+  border-radius: 6px;
 
-color: #b7c9c5;
+  color: #b7c9c5;
 
-line-height: 1.5;
-
+  line-height: 1.5;
 }
 
 /* =========================
@@ -406,20 +388,19 @@ PORT LINK
 ========================= */
 
 .port-link {
-display: inline-block;
+  display: inline-block;
 
-margin-top: 8px;
+  margin-top: 8px;
 
-color: #75b9b1;
+  color: #75b9b1;
 
-text-decoration: none;
+  text-decoration: none;
 
-font-size: 14px;
-
+  font-size: 14px;
 }
 
 .port-link:hover {
-color: #b4e1dc;
+  color: #b4e1dc;
 }
 
 /* =========================
@@ -427,12 +408,11 @@ NO RESULTS
 ========================= */
 
 .no-results {
-padding: 25px 10px;
+  padding: 25px 10px;
 
-text-align: center;
+  text-align: center;
 
-color: #829a96;
-
+  color: #829a96;
 }
 
 /* =========================
@@ -440,16 +420,15 @@ ERROR
 ========================= */
 
 .error {
-padding: 15px;
+  padding: 15px;
 
-background: #351b1b;
+  background: #351b1b;
 
-border: 1px solid #5c2929;
+  border: 1px solid #5c2929;
 
-border-radius: 8px;
+  border-radius: 8px;
 
-color: #e3b4b4;
-
+  color: #e3b4b4;
 }
 
 /* =========================
@@ -457,16 +436,15 @@ FOOTER
 ========================= */
 
 footer {
-border-top: 1px solid #163c39;
+  border-top: 1px solid #163c39;
 
-padding: 25px 16px;
+  padding: 25px 16px;
 
-text-align: center;
+  text-align: center;
 
-color: #6f8783;
+  color: #6f8783;
 
-font-size: 13px;
-
+  font-size: 13px;
 }
 
 /* =========================
@@ -475,30 +453,29 @@ MOBILE
 
 @media (max-width: 600px) {
 
-header {
+  header {
     padding: 0 10px;
-}
+  }
 
-header h1 {
+  header h1 {
     font-size: 18px;
-}
+  }
 
-main {
+  main {
     padding: 16px 12px 30px;
-}
+  }
 
-.category-sort {
+  .category-sort {
     width: 100%;
-}
+  }
 
-.category-sort-option {
+  .category-sort-option {
     flex: 1;
-}
+  }
 
-.category-sort-direction {
+  .category-sort-direction {
     flex-shrink: 0;
-}
-
+  }
 }
 
 /* =========================
@@ -506,61 +483,58 @@ SIDE MENU
 ========================= */
 
 #side-menu {
-position: fixed;
+  position: fixed;
 
-top: 0;
-left: 0;
+  top: 0;
+  left: 0;
 
-width: 280px;
-max-width: 85vw;
+  width: 280px;
+  max-width: 85vw;
 
-height: 100vh;
+  height: 100vh;
 
-background: #081f1e;
+  background: #081f1e;
 
-border-right: 1px solid #163c39;
+  border-right: 1px solid #163c39;
 
-padding: 20px;
+  padding: 20px;
 
-transform: translateX(-100%);
+  transform: translateX(-100%);
 
-transition: transform 0.2s ease;
+  transition: transform 0.2s ease;
 
-z-index: 200;
+  z-index: 200;
 
-overflow-y: auto;
-
+  overflow-y: auto;
 }
 
 #side-menu.open {
-transform: translateX(0);
+  transform: translateX(0);
 }
 
 #menu-close {
-display: block;
+  display: block;
 
-margin-left: auto;
+  margin-left: auto;
 
-background: none;
-border: none;
+  background: none;
+  border: none;
 
-color: #c8dad5;
+  color: #c8dad5;
 
-font-size: 28px;
+  font-size: 28px;
 
-cursor: pointer;
-
+  cursor: pointer;
 }
 
 #side-menu h2 {
-margin: 25px 0 10px;
+  margin: 25px 0 10px;
 
-font-size: 15px;
+  font-size: 15px;
 
-color: #7f9995;
+  color: #7f9995;
 
-text-transform: uppercase;
-
+  text-transform: uppercase;
 }
 
 /* =========================
@@ -568,27 +542,25 @@ MENU OVERLAY
 ========================= */
 
 #menu-overlay {
-position: fixed;
+  position: fixed;
 
-inset: 0;
+  inset: 0;
 
-background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.55);
 
-opacity: 0;
+  opacity: 0;
 
-pointer-events: none;
+  pointer-events: none;
 
-transition: opacity 0.2s ease;
+  transition: opacity 0.2s ease;
 
-z-index: 150;
-
+  z-index: 150;
 }
 
 #menu-overlay.visible {
-opacity: 1;
+  opacity: 1;
 
-pointer-events: auto;
-
+  pointer-events: auto;
 }
 
 /* =========================
@@ -596,36 +568,34 @@ PLATFORM LIST
 ========================= */
 
 #platform-list {
-display: flex;
-flex-direction: column;
+  display: flex;
+  flex-direction: column;
 
-gap: 4px;
-
+  gap: 4px;
 }
 
 .platform-button {
-width: 100%;
+  width: 100%;
 
-background: none;
+  background: none;
 
-border: none;
+  border: none;
 
-color: #c8dad5;
+  color: #c8dad5;
 
-text-align: left;
+  text-align: left;
 
-padding: 10px 8px;
+  padding: 10px 8px;
 
-border-radius: 6px;
+  border-radius: 6px;
 
-cursor: pointer;
+  cursor: pointer;
 
-font-size: 15px;
-
+  font-size: 15px;
 }
 
 .platform-button:hover {
-background: #10312f;
+  background: #10312f;
 }
 
 /* =========================
@@ -633,24 +603,23 @@ MENU SEPARATORS
 ========================= */
 
 .menu-separator {
-margin-top: 15px;
+  margin-top: 15px;
 
-margin-bottom: 5px;
+  margin-bottom: 5px;
 
-padding:
+  padding:
     8px 12px;
 
-color: #71908a;
+  color: #71908a;
 
-font-size: 12px;
+  font-size: 12px;
 
-font-weight: bold;
+  font-weight: bold;
 
-text-align: left;
+  text-align: left;
 
-border-top:
+  border-top:
     1px solid #1c4743;
-
 }
 
 /* =========================
@@ -658,21 +627,131 @@ GAMES USING APP
 ========================= */
 
 .games-using-app {
-margin-top: 20px;
+  margin-top: 20px;
 
-padding-top: 15px;
+  padding-top: 15px;
 
-border-top: 1px solid #173b38;
-
+  border-top: 1px solid #173b38;
 }
 
 .games-using-app h3 {
-margin: 0 0 10px;
+  margin: 0 0 10px;
 
-font-size: 14px;
+  font-size: 14px;
 
-color: #8fa7a3;
+  color: #8fa7a3;
+}
 
+/* =========================
+GAMES USING APP TOGGLE
+========================= */
+
+.games-using-app-toggle {
+  width: 100%;
+
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  background: none;
+
+  border: none;
+
+  padding: 8px 0;
+
+  color: #8fa7a3;
+
+  text-align: left;
+
+  font-size: 14px;
+
+  cursor: pointer;
+}
+
+.games-using-app-toggle:hover {
+  color: #c8dad5;
+}
+
+.games-using-app-toggle:focus {
+  outline: none;
+}
+
+.games-using-app-toggle:focus-visible {
+  outline: 1px solid #32756e;
+
+  outline-offset: 4px;
+
+  border-radius: 4px;
+}
+
+/* =========================
+GAMES USING APP ARROW
+========================= */
+
+.games-using-app-arrow {
+  flex-shrink: 0;
+
+  color: #71908a;
+
+  font-size: 11px;
+
+  transition:
+    transform 0.15s ease;
+}
+
+/* =========================
+GAMES USING APP LIST
+========================= */
+
+.games-using-app-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 4px;
+
+  margin-top: 6px;
+
+  padding-left: 4px;
+}
+
+/* =========================
+GAMES USING APP ITEM
+========================= */
+
+.games-using-app-item {
+  display: block;
+
+  padding: 8px 10px;
+
+  background: #0a2928;
+
+  border: 1px solid #173f3c;
+
+  border-radius: 6px;
+
+  color: #9fc8c2;
+
+  text-decoration: none;
+
+  font-size: 13px;
+
+  transition:
+    background 0.15s,
+    border-color 0.15s,
+    color 0.15s;
+}
+
+.games-using-app-item:hover {
+  background: #10312f;
+
+  border-color: #24534f;
+
+  color: #d7e4e1;
 }
 
 /* =========================
@@ -680,25 +759,23 @@ GAME FILES LINK
 ========================= */
 
 .game-files-link {
-margin-top: 35px;
+  margin-top: 35px;
 
-text-align: center;
+  text-align: center;
 
-color: #708984;
+  color: #708984;
 
-font-size: 13px;
-
+  font-size: 13px;
 }
 
 .game-files-link a {
-color: #79aaa4;
+  color: #79aaa4;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 .game-files-link a:hover {
-color: #a8d2cc;
+  color: #a8d2cc;
 }
 
 /* =========================
@@ -706,7 +783,7 @@ CLICKABLE HEADER
 ========================= */
 
 #home-button {
-cursor: pointer;
+  cursor: pointer;
 }
 
 /* =========================
@@ -714,14 +791,13 @@ HOME SECTIONS
 ========================= */
 
 .home-section {
-margin-bottom: 30px;
+  margin-bottom: 30px;
 }
 
 .home-section h2 {
-margin: 0 0 12px;
+  margin: 0 0 12px;
 
-font-size: 20px;
-
+  font-size: 20px;
 }
 
 /* =========================
@@ -729,51 +805,47 @@ HOME GAME LIST
 ========================= */
 
 .home-game-list {
-display: grid;
+  display: grid;
 
-gap: 8px;
-
+  gap: 8px;
 }
 
 .home-game {
-display: block;
+  display: block;
 
-padding: 12px 14px;
+  padding: 12px 14px;
 
-background: #0a2928;
+  background: #0a2928;
 
-border: 1px solid #173f3c;
+  border: 1px solid #173f3c;
 
-border-radius: 8px;
+  border-radius: 8px;
 
-color: #c8dad5;
+  color: #c8dad5;
 
-text-decoration: none;
+  text-decoration: none;
 
-transition:
+  transition:
     background 0.15s,
     border-color 0.15s;
-
 }
 
 .home-game:hover {
-background: #0d302e;
+  background: #0d302e;
 
-border-color: #24534f;
-
+  border-color: #24534f;
 }
 
 .home-game-title {
-font-size: 15px;
+  font-size: 15px;
 }
 
 .home-game-meta {
-margin-top: 4px;
+  margin-top: 4px;
 
-font-size: 12px;
+  font-size: 12px;
 
-color: #809995;
-
+  color: #809995;
 }
 
 /* =========================
@@ -781,24 +853,23 @@ HOME VIEW MORE
 ========================= */
 
 .home-view-more {
-margin-top: 12px;
+  margin-top: 12px;
 
-background: none;
+  background: none;
 
-border: none;
+  border: none;
 
-color: #79aaa4;
+  color: #79aaa4;
 
-font-size: 14px;
+  font-size: 14px;
 
-cursor: pointer;
+  cursor: pointer;
 
-padding: 6px 0;
-
+  padding: 6px 0;
 }
 
 .home-view-more:hover {
-color: #a8d2cc;
+  color: #a8d2cc;
 }
 
 /* =========================
@@ -806,16 +877,15 @@ POPULAR HEADER
 ========================= */
 
 .home-section-header {
-display: flex;
+  display: flex;
 
-align-items: center;
+  align-items: center;
 
-justify-content: space-between;
+  justify-content: space-between;
 
-gap: 12px;
+  gap: 12px;
 
-margin-bottom: 12px;
-
+  margin-bottom: 12px;
 }
 
 /* =========================
@@ -823,46 +893,43 @@ POPULAR TABS
 ========================= */
 
 .popular-tabs {
-display: flex;
+  display: flex;
 
-gap: 4px;
+  gap: 4px;
 
-background: #0a2928;
+  background: #0a2928;
 
-border: 1px solid #173f3c;
+  border: 1px solid #173f3c;
 
-border-radius: 7px;
+  border-radius: 7px;
 
-padding: 3px;
-
+  padding: 3px;
 }
 
 .popular-tab {
-background: none;
+  background: none;
 
-border: none;
+  border: none;
 
-color: #819a96;
+  color: #819a96;
 
-padding: 6px 9px;
+  padding: 6px 9px;
 
-border-radius: 5px;
+  border-radius: 5px;
 
-cursor: pointer;
+  cursor: pointer;
 
-font-size: 12px;
-
+  font-size: 12px;
 }
 
 .popular-tab:hover {
-color: #c8dad5;
+  color: #c8dad5;
 }
 
 .popular-tab.active {
-background: #173f3c;
+  background: #173f3c;
 
-color: #d7e4e1;
-
+  color: #d7e4e1;
 }
 
 /* =========================
@@ -870,10 +937,9 @@ POPULAR LIST
 ========================= */
 
 #popular-list {
-display: grid;
+  display: grid;
 
-gap: 8px;
-
+  gap: 8px;
 }
 
 /* =========================
@@ -881,71 +947,65 @@ POPULAR ITEM
 ========================= */
 
 .popular-game {
-display: flex;
+  display: flex;
 
-align-items: center;
+  align-items: center;
 
-gap: 12px;
+  gap: 12px;
 
-padding: 11px 14px;
+  padding: 11px 14px;
 
-background: #0a2928;
+  background: #0a2928;
 
-border: 1px solid #173f3c;
+  border: 1px solid #173f3c;
 
-border-radius: 8px;
+  border-radius: 8px;
 
-color: #c8dad5;
+  color: #c8dad5;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 .popular-game:hover {
-background: #0d302e;
+  background: #0d302e;
 
-border-color: #24534f;
-
+  border-color: #24534f;
 }
 
 .popular-rank {
-width: 24px;
+  width: 24px;
 
-flex-shrink: 0;
+  flex-shrink: 0;
 
-color: #66817c;
+  color: #66817c;
 
-font-size: 13px;
+  font-size: 13px;
 
-text-align: center;
-
+  text-align: center;
 }
 
 .popular-game-info {
-min-width: 0;
+  min-width: 0;
 
-flex: 1;
-
+  flex: 1;
 }
 
 .popular-game-title {
-font-size: 15px;
+  font-size: 15px;
 
-white-space: nowrap;
+  white-space: nowrap;
 
-overflow: hidden;
+  overflow: hidden;
 
-text-overflow: ellipsis;
-
+  text-overflow: ellipsis;
 }
 
 .popular-game-visits {
-margin-top: 3px;
+  margin-top: 3px;
 
-color: #718a86;
+  color: #718a86;
 
-font-size: 12px;
-
+  font-size: 12px;
 }
 
 /* =========================
@@ -953,7 +1013,7 @@ HIDDEN
 ========================= */
 
 [hidden] {
-display: none !important;
+  display: none !important;
 }
 
 /* =========================================================
@@ -966,40 +1026,35 @@ CLICKABLE HEADER
 ========================= */
 
 .header-link {
-display: block;
+  display: block;
 
-color: #e5f0ec;
+  color: #e5f0ec;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 .header-link:hover {
-color: #e5f0ec;
+  color: #e5f0ec;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 .header-link:visited {
-color: #e5f0ec;
+  color: #e5f0ec;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 .header-link:active {
-color: #e5f0ec;
+  color: #e5f0ec;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 .header-link h1 {
-color: #e5f0ec;
+  color: #e5f0ec;
 
-text-decoration: none;
-
+  text-decoration: none;
 }
 
 /* =========================
@@ -1007,31 +1062,28 @@ GAME HEADER
 ========================= */
 
 #game-header {
-margin-bottom: 25px;
+  margin-bottom: 25px;
 
-padding-bottom: 20px;
+  padding-bottom: 20px;
 
-border-bottom:
+  border-bottom:
     1px solid #1c4743;
-
 }
 
 #game-title {
-margin-bottom: 8px;
+  margin-bottom: 8px;
 
-font-size: 32px;
+  font-size: 32px;
 
-font-weight: bold;
+  font-weight: bold;
 
-color: #e5f0ec;
-
+  color: #e5f0ec;
 }
 
 #game-year {
-color: #91aaa3;
+  color: #91aaa3;
 
-font-size: 16px;
-
+  font-size: 16px;
 }
 
 /* =========================
@@ -1039,12 +1091,11 @@ PORT LIST
 ========================= */
 
 #port-list {
-display: flex;
+  display: flex;
 
-flex-direction: column;
+  flex-direction: column;
 
-gap: 15px;
-
+  gap: 15px;
 }
 
 /* =========================
@@ -1052,15 +1103,14 @@ PORT
 ========================= */
 
 #port-list .port {
-padding: 20px;
+  padding: 20px;
 
-background: #0d302e;
+  background: #0d302e;
 
-border:
+  border:
     1px solid #1c4743;
 
-border-radius: 8px;
-
+  border-radius: 8px;
 }
 
 /* =========================
@@ -1068,13 +1118,12 @@ PORT TITLE
 ========================= */
 
 #port-list .port-title {
-margin:
-0 0 18px;
+  margin:
+    0 0 18px;
 
-font-size: 21px;
+  font-size: 21px;
 
-color: #e5f0ec;
-
+  color: #e5f0ec;
 }
 
 /* =========================
@@ -1082,43 +1131,40 @@ PORT INFO
 ========================= */
 
 #port-list .port-info {
-display: flex;
+  display: flex;
 
-flex-direction: column;
+  flex-direction: column;
 
-gap: 8px;
+  gap: 8px;
 
-margin-bottom: 18px;
+  margin-bottom: 18px;
 
-color: #91aaa3;
+  color: #91aaa3;
 
-font-size: 14px;
-
+  font-size: 14px;
 }
 
 #port-list .port-info-row {
-display: flex;
+  display: flex;
 
-flex-wrap: wrap;
+  flex-wrap: wrap;
 
-gap:
+  gap:
     5px 10px;
 
-font-size: 14px;
-
+  font-size: 14px;
 }
 
 #port-list .port-info-label {
-color: #91aaa3;
+  color: #91aaa3;
 
-min-width: 190px;
+  min-width: 190px;
 
-text-transform: uppercase;
-
+  text-transform: uppercase;
 }
 
 #port-list .port-info-value {
-color: #c8dad5;
+  color: #c8dad5;
 }
 
 /* =========================
@@ -1126,24 +1172,23 @@ PORT NOTES
 ========================= */
 
 #port-list .port-notes {
-margin-top: 15px;
+  margin-top: 15px;
 
-padding-top: 15px;
+  padding-top: 15px;
 
-border-top:
+  border-top:
     1px solid #1c4743;
 
-color: #a9c0ba;
+  color: #a9c0ba;
 
-font-size: 14px;
+  font-size: 14px;
 
-line-height: 1.5;
-
+  line-height: 1.5;
 }
 
 #port-list .port-notes p {
-margin:
-7px 0 0;
+  margin:
+    7px 0 0;
 }
 
 /* =========================
@@ -1151,39 +1196,37 @@ PORT LINK
 ========================= */
 
 #port-list .port-link {
-display: inline-block;
+  display: inline-block;
 
-margin-top: 18px;
+  margin-top: 18px;
 
-padding:
+  padding:
     10px 15px;
 
-background: #123a37;
+  background: #123a37;
 
-border:
+  border:
     1px solid #2c7465;
 
-border-radius: 6px;
+  border-radius: 6px;
 
-color: #e5f0ec;
+  color: #e5f0ec;
 
-text-decoration: none;
+  text-decoration: none;
 
-font-size: 14px;
+  font-size: 14px;
 
-transition:
+  transition:
     background 0.15s,
     border-color 0.15s;
-
 }
 
 #port-list .port-link:hover {
-background: #2c7465;
+  background: #2c7465;
 
-border-color: #8fc7b5;
+  border-color: #8fc7b5;
 
-color: #ffffff;
-
+  color: #ffffff;
 }
 
 /* =========================
@@ -1192,18 +1235,22 @@ MOBILE GAME PAGE
 
 @media (max-width: 600px) {
 
-#game-title {
+  #game-title {
     font-size: 25px;
-}
+  }
 
-#port-list .port {
+  #port-list .port {
     padding: 16px;
-}
+  }
 
-#port-list .port-info-label {
+  #port-list .port-info-label {
     min-width: 100%;
 
     margin-bottom: 2px;
-}
+  }
+
+  .games-using-app-item {
+    padding: 9px 10px;
+  }
 
 }
