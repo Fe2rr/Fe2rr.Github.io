@@ -11,7 +11,7 @@ const SHEET_URL =
  */
 
 const POPULAR_URL =
-    "https://script.google.com/macros/s/AKfycbwDrNe5ZsympQfpuPy-bPnzIQTpDAARuTxw29R0l8J7yKiOpfChWIH-gSUocOCtV6gM/exec";
+    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 
 const gameList =
@@ -705,7 +705,7 @@ function displayLastUpdated() {
 /*
  * Load Popular ranking.
  */
-async function loadPopular(
+function loadPopular(
     period = selectedPopularPeriod
 ) {
 
@@ -714,106 +714,157 @@ async function loadPopular(
     }
 
 
-    try {
-
-        popularList.innerHTML = `
-            <div class="home-loading">
-                Loading...
-            </div>
-        `;
+    popularList.innerHTML = `
+        <div class="home-loading">
+            Loading...
+        </div>
+    `;
 
 
-        const response =
-            await fetch(
-                `${POPULAR_URL}?popular=${encodeURIComponent(period)}`
-            );
+    const callbackName =
+        `popularCallback_${Date.now()}`;
 
 
-        if (!response.ok) {
+    window[callbackName] =
+        function(data) {
 
-            throw new Error(
-                `HTTP error ${response.status}`
-            );
-        }
+            try {
 
+                if (
+                    !data.success ||
+                    !Array.isArray(data.games)
+                ) {
 
-        const data =
-            await response.json();
-
-
-        if (
-            !data.success ||
-            !Array.isArray(data.games)
-        ) {
-
-            throw new Error(
-                data.error ||
-                "Could not load popular games."
-            );
-        }
+                    throw new Error(
+                        data.error ||
+                        "Could not load popular games."
+                    );
+                }
 
 
-        const gameMap =
-            new Map(
-                games.map(game => [
-                    game.slug,
-                    game
-                ])
-            );
+                const gameMap =
+                    new Map(
+                        games.map(game => [
+                            game.slug,
+                            game
+                        ])
+                    );
 
 
-        const ranking =
-            data.games
-                .map(item => {
+                const ranking =
+                    data.games
+                        .map(item => {
 
-                    const game =
-                        gameMap.get(
-                            createSlug(item.game)
+                            const game =
+                                gameMap.get(
+                                    createSlug(item.game)
+                                );
+
+
+                            if (!game) {
+                                return null;
+                            }
+
+
+                            return {
+
+                                game: game,
+
+                                visits:
+                                    Number(item.visits) || 0
+
+                            };
+
+                        })
+                        .filter(
+                            item =>
+                                item !== null
                         );
 
 
-                    if (!game) {
-                        return null;
-                    }
-
-
-                    return {
-
-                        game: game,
-
-                        visits:
-                            Number(item.visits) || 0
-
-                    };
-
-                })
-                .filter(
-                    item =>
-                        item !== null
+                displayPopular(
+                    ranking
                 );
 
 
-        displayPopular(
-            ranking
-        );
+            } catch (error) {
+
+                console.error(
+                    "Could not load popular games:",
+                    error
+                );
 
 
-    } catch (error) {
+                popularList.innerHTML = `
+                    <div class="error">
+                        Could not load popular games.
+                    </div>
+                `;
 
-        console.error(
-            "Could not load popular games:",
-            error
-        );
+
+                popularMore.hidden = true;
 
 
-        popularList.innerHTML = `
-            <div class="error">
-                Could not load popular games.
-            </div>
-        `;
+            } finally {
 
-        popularMore.hidden = true;
-    }
+                delete window[callbackName];
+
+
+                const script =
+                    document.getElementById(
+                        callbackName
+                    );
+
+
+                if (script) {
+                    script.remove();
+                }
+            }
+        };
+
+
+    const script =
+        document.createElement("script");
+
+
+    script.id =
+        callbackName;
+
+
+    script.src =
+        `${POPULAR_URL}?popular=${encodeURIComponent(
+            period
+        )}&callback=${callbackName}`;
+
+
+    script.onerror =
+        function() {
+
+            console.error(
+                "Could not load popular games."
+            );
+
+
+            popularList.innerHTML = `
+                <div class="error">
+                    Could not load popular games.
+                </div>
+            `;
+
+
+            popularMore.hidden = true;
+
+
+            delete window[callbackName];
+
+
+            script.remove();
+        };
+
+
+    document.body.appendChild(
+        script
+    );
 }
 
 
@@ -833,7 +884,9 @@ function displayPopular(ranking) {
             </div>
         `;
 
+
         popularMore.hidden = true;
+
 
         return;
     }
