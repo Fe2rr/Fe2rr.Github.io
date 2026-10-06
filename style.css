@@ -148,6 +148,87 @@ main {
 }
 
 
+/* CATEGORY CONTROLS */
+
+.category-controls {
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 12px;
+
+    margin-bottom: 25px;
+}
+
+.category-controls[hidden] {
+    display: none;
+}
+
+.category-sort {
+    display: flex;
+
+    align-items: center;
+
+    gap: 10px;
+}
+
+.category-sort label {
+    color: #91aaa3;
+
+    font-size: 14px;
+}
+
+#category-sort {
+    padding:
+        8px 10px;
+
+    background: #0d302e;
+
+    color: #e5f0ec;
+
+    border:
+        1px solid #1c4743;
+
+    border-radius: 6px;
+
+    font-size: 14px;
+
+    outline: none;
+}
+
+#category-sort:focus {
+    border-color: #2c7465;
+}
+
+#category-search {
+    width: 100%;
+
+    padding:
+        14px 16px;
+
+    background: #0d302e;
+
+    color: #e5f0ec;
+
+    border:
+        1px solid #1c4743;
+
+    border-radius: 8px;
+
+    font-size: 16px;
+
+    outline: none;
+}
+
+#category-search::placeholder {
+    color: #71908a;
+}
+
+#category-search:focus {
+    border-color: #2c7465;
+}
+
+
 /* STATUS */
 
 #status {
@@ -920,4 +1001,4 @@ footer {
     color: #e5f0ec;
 
     text-decoration: underline;
-    }
+}
