@@ -10,7 +10,7 @@ const SHEET_URL =
  */
 
 const POPULAR_URL =
-"https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVX3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
+"https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 const gameList =
 document.getElementById("game-list");
