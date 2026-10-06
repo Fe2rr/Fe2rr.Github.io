@@ -1818,7 +1818,7 @@ multiGameButton.addEventListener(
 
 
 platformList.appendChild(
-    multiGameButton
+multiGameButton
 );
 
 
@@ -1872,79 +1872,79 @@ dualScreenButton.addEventListener(
 
 
 platformList.appendChild(
-    dualScreenButton
+dualScreenButton
 );
 
 
 addMenuSeparator(
-    "Nintendo"
+"Nintendo"
 );
 
 addPlatformButton(
-    "NES"
+"NES"
 );
 
 addPlatformButton(
-    "Super Nintendo"
+"Super Nintendo"
 );
 
 addPlatformButton(
-    "Nintendo 64"
+"Nintendo 64"
 );
 
 addPlatformButton(
-    "GameCube / Wii"
+"GameCube / Wii"
 );
 
 addPlatformButton(
-    "Gameboy / Gameboy Color"
+"Gameboy / Gameboy Color"
 );
 
 addPlatformButton(
-    "Gameboy Advance"
+"Gameboy Advance"
 );
 
 addPlatformButton(
-    "Nintendo DS"
+"Nintendo DS"
 );
 
 addPlatformButton(
-    "Nintendo 3DS"
+"Nintendo 3DS"
 );
 
 
 addMenuSeparator(
-    "PlayStation"
+"PlayStation"
 );
 
 addPlatformButton(
-    "Playstation"
+"Playstation"
 );
 
 addPlatformButton(
-    "Playstation Portable"
+"Playstation Portable"
 );
 
 
 addMenuSeparator(
-    "Xbox"
+"Xbox"
 );
 
 addPlatformButton(
-    "Xbox"
+"Xbox"
 );
 
 addPlatformButton(
-    "Xbox 360"
+"Xbox 360"
 );
 
 
 addMenuSeparator(
-    "Others"
+"Others"
 );
 
 addPlatformButton(
-    "Others"
+"Others"
 );
 
 }
@@ -1969,7 +1969,7 @@ separator.textContent =
 
 
 platformList.appendChild(
-    separator
+separator
 );
 
 }
@@ -2031,7 +2031,7 @@ button.addEventListener(
 
 
 platformList.appendChild(
-    button
+button
 );
 
 }
@@ -2155,7 +2155,7 @@ for (const game of list) {
 
 
 gameList.appendChild(
-    fragment
+fragment
 );
 
 }
@@ -2228,31 +2228,8 @@ const filtered =
         }
 
 
-        const searchableText = [
-
-            game.name,
-
-            game.year,
-
-            ...game.ports.map(port => [
-
-                port.project,
-
-                port.developer,
-
-                port.version,
-
-                port.notes
-
-            ].join(" "))
-
-        ]
-            .join(" ")
-            .toLowerCase();
-
-
         return normalizeText(
-            searchableText
+            game.name
         ).includes(query);
     });
 
