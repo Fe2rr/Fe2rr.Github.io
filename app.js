@@ -102,6 +102,10 @@ const popularSection =
     document.getElementById("popular-section");
 
 
+const searchResults =
+    document.getElementById("search-results");
+
+
 let games = [];
 
 
@@ -1387,6 +1391,11 @@ function closeSearch() {
     searchInput.value = "";
 
 
+    searchResults.innerHTML = "";
+
+    searchResults.hidden = true;
+
+
     if (currentView === "category") {
 
         displayFilteredGames();
@@ -1474,6 +1483,10 @@ function goHome() {
 
     searchInput.value = "";
 
+    searchResults.innerHTML = "";
+
+    searchResults.hidden = true;
+
     categorySearchInput.value = "";
 
     categorySort.value = "name-asc";
@@ -1512,6 +1525,10 @@ function showAllGames() {
     categorySort.value = "name-asc";
 
     searchInput.value = "";
+
+    searchResults.innerHTML = "";
+
+    searchResults.hidden = true;
 
     searchContainer.setAttribute(
         "hidden",
@@ -1571,6 +1588,10 @@ function displayPlatformMenu() {
 
             searchInput.value = "";
 
+            searchResults.innerHTML = "";
+
+            searchResults.hidden = true;
+
             searchContainer.setAttribute(
                 "hidden",
                 ""
@@ -1623,6 +1644,10 @@ function displayPlatformMenu() {
                 "name-asc";
 
             searchInput.value = "";
+
+            searchResults.innerHTML = "";
+
+            searchResults.hidden = true;
 
             searchContainer.setAttribute(
                 "hidden",
@@ -1779,6 +1804,10 @@ function addPlatformButton(platform) {
                 "name-asc";
 
             searchInput.value = "";
+
+            searchResults.innerHTML = "";
+
+            searchResults.hidden = true;
 
             searchContainer.setAttribute(
                 "hidden",
@@ -2026,7 +2055,7 @@ function displayFilteredGames() {
 
 
 /*
- * Global search.
+ * Global search suggestions.
  */
 
 function searchGames() {
@@ -2037,60 +2066,95 @@ function searchGames() {
         );
 
 
+    searchResults.innerHTML = "";
+
+
     if (!query) {
 
-        if (currentView === "category") {
-
-            displayFilteredGames();
-
-        } else {
-
-            gameList.innerHTML = "";
-
-            gameList.hidden = true;
-
-            statusElement.textContent = "";
-        }
+        searchResults.hidden = true;
 
         return;
     }
 
 
     const filtered =
-        games.filter(game => {
+        games
+            .filter(game => {
 
-            const searchableText = [
+                const searchableText = [
 
-                game.name,
+                    game.name,
 
-                game.year,
+                    game.year,
 
-                ...game.ports.map(port => [
+                    ...game.ports.map(port => [
 
-                    port.project,
+                        port.project,
 
-                    port.developer,
+                        port.developer,
 
-                    port.version,
+                        port.version,
 
-                    port.notes
+                        port.notes
 
-                ].join(" "))
+                    ].join(" "))
 
-            ]
-                .join(" ")
-                .toLowerCase();
-
-
-            return normalizeText(
-                searchableText
-            ).includes(query);
-        });
+                ]
+                    .join(" ")
+                    .toLowerCase();
 
 
-    displayGames(
-        sortGames(filtered)
+                return normalizeText(
+                    searchableText
+                ).includes(query);
+            })
+            .slice(0, 5);
+
+
+    if (filtered.length === 0) {
+
+        searchResults.hidden = true;
+
+        return;
+    }
+
+
+    const fragment =
+        document.createDocumentFragment();
+
+
+    for (const game of filtered) {
+
+        const element =
+            document.createElement("a");
+
+
+        element.className =
+            "search-result";
+
+
+        element.href =
+            `game.html?game=${encodeURIComponent(
+                game.slug
+            )}`;
+
+
+        element.textContent =
+            game.name;
+
+
+        fragment.appendChild(
+            element
+        );
+    }
+
+
+    searchResults.appendChild(
+        fragment
     );
+
+
+    searchResults.hidden = false;
 }
 
 
