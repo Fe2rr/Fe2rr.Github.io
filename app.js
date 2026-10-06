@@ -142,7 +142,7 @@ let selectedCategorySort =
 
 
 let categorySortDescending =
-    true;
+    false;
 
 
 /*
@@ -1371,8 +1371,8 @@ function updateCategorySortDirection() {
 
     categorySortDirection.textContent =
         categorySortDescending
-            ? "↓"
-            : "↑";
+            ? "↑"
+            : "↓";
 }
 
 
@@ -1421,8 +1421,8 @@ function sortGames(list) {
 
 
                     return categorySortDescending
-                        ? result
-                        : -result;
+                        ? -result
+                        : result;
                 }
             );
 
@@ -1476,8 +1476,8 @@ function sortGames(list) {
                     if (result !== 0) {
 
                         return categorySortDescending
-                            ? result
-                            : -result;
+                            ? -result
+                            : result;
                     }
 
 
@@ -1677,7 +1677,7 @@ function goHome() {
 
     selectedCategorySort = "updated";
 
-    categorySortDescending = true;
+    categorySortDescending = false;
 
     updateCategorySortDirection();
 
@@ -1708,7 +1708,7 @@ function resetCategoryControls() {
 
     selectedCategorySort = "updated";
 
-    categorySortDescending = true;
+    categorySortDescending = false;
 
     categorySortOptions.forEach(
         option => {
@@ -2419,6 +2419,9 @@ categorySortOptions.forEach(
                 selectedCategorySort =
                     newSort;
 
+                categorySortDescending =
+                    false;
+
 
                 categorySortOptions.forEach(
                     otherOption => {
@@ -2431,6 +2434,8 @@ categorySortOptions.forEach(
                     }
                 );
 
+
+                updateCategorySortDirection();
 
                 displayFilteredGames();
             }
