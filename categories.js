@@ -1,514 +1,178 @@
 /*
- * Show Home sections.
+ * GOOGLE SHEETS
  */
 
-function showHomeSections() {
-
-    lastUpdatedSection.hidden = false;
-
-    popularSection.hidden = false;
-
-    categoryControls.hidden = true;
-
-}
+const SHEET_URL =
+"https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 
 /*
- * Show Category view.
+ * POPULAR
  */
 
-function showCategoryView() {
+const POPULAR_URL =
+"https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
-    lastUpdatedSection.hidden = true;
+const gameList =
+document.getElementById("game-list");
 
-    popularSection.hidden = true;
+const searchInput =
+document.getElementById("search");
 
-    categoryControls.hidden = false;
+const searchContainer =
+document.getElementById("search-container");
 
-}
+const searchButton =
+document.getElementById("search-button");
+
+const homeButton =
+document.getElementById("home-button");
 
 /*
- * Update category sort direction arrow.
+ * LAST ADDED
  */
 
-function updateCategorySortDirection() {
+const lastAddedList =
+document.getElementById("last-added-list");
 
-    categorySortDirection.textContent =
-        categorySortDescending
-            ? "↑"
-            : "↓";
+const lastAddedMore =
+document.getElementById("last-added-more");
 
-}
+const lastAddedSection =
+document.getElementById("last-added-section");
 
 /*
- * Sort games.
+ * LAST UPDATED
  */
 
-function sortGames(list) {
+const lastUpdatedList =
+document.getElementById("last-updated-list");
 
-    const sorted =
-        [...list];
-
-
-    switch (selectedCategorySort) {
-
-        case "updated":
-
-            sorted.sort(
-                (a, b) => {
-
-                    const dateA =
-                        getLatestUpdate(a);
-
-                    const dateB =
-                        getLatestUpdate(b);
-
-
-                    if (!dateA && !dateB) {
-
-                        return 0;
-                    }
-
-                    if (!dateA) {
-
-                        return 1;
-                    }
-
-                    if (!dateB) {
-
-                        return -1;
-                    }
-
-
-                    const result =
-                        dateB - dateA;
-
-
-                    return categorySortDescending
-                        ? -result
-                        : result;
-                }
-            );
-
-            break;
-
-
-        case "name":
-
-            sorted.sort(
-                (a, b) => {
-
-                    const result =
-                        a.name.localeCompare(
-                            b.name,
-                            "en",
-                            {
-                                sensitivity: "base"
-                            }
-                        );
-
-
-                    return categorySortDescending
-                        ? -result
-                        : result;
-                }
-            );
-
-            break;
-
-
-        case "popular":
-
-            sorted.sort(
-                (a, b) => {
-
-                    const visitsA =
-                        allTimePopular.get(
-                            a.slug
-                        ) || 0;
-
-                    const visitsB =
-                        allTimePopular.get(
-                            b.slug
-                        ) || 0;
-
-
-                    const result =
-                        visitsB - visitsA;
-
-
-                    if (result !== 0) {
-
-                        return categorySortDescending
-                            ? -result
-                            : result;
-                    }
-
-
-                    return a.name.localeCompare(
-                        b.name,
-                        "en",
-                        {
-                            sensitivity: "base"
-                        }
-                    );
-                }
-            );
-
-            break;
-    }
-
-
-    return sorted;
-
-}
+const lastUpdatedMore =
+document.getElementById("last-updated-more");
 
 /*
- * Reset category controls.
+ * POPULAR
  */
 
-function resetCategoryControls() {
+const popularList =
+document.getElementById("popular-list");
 
-    categorySearchInput.value = "";
+const popularMore =
+document.getElementById("popular-more");
 
-    selectedCategorySort = "updated";
+const popularTabs =
+document.querySelectorAll(".popular-tab");
 
-    categorySortDescending = false;
-
-
-    categorySortOptions.forEach(
-        option => {
-
-            option.classList.toggle(
-                "active",
-                option.dataset.sort ===
-                    selectedCategorySort
-            );
-        }
-    );
-
-
-    updateCategorySortDirection();
-
-}
+const statusElement =
+document.getElementById("status");
 
 /*
- * Display filtered games.
+ * MENU
  */
 
-function displayFilteredGames() {
+const menuButton =
+document.getElementById("menu-button");
 
-    const query =
-        normalizeText(
-            categorySearchInput.value
-        );
+const menuClose =
+document.getElementById("menu-close");
 
+const sideMenu =
+document.getElementById("side-menu");
 
-    /*
-     * Multi-game Apps uses PROJECT names
-     * instead of individual games.
-     */
+const menuOverlay =
+document.getElementById("menu-overlay");
 
-    if (
-        selectedCategory ===
-        "multi-game-apps"
-    ) {
+const platformList =
+document.getElementById("platform-list");
 
-        const multiGameApps =
-            getMultiGameApps();
-
-
-        const filteredApps =
-            multiGameApps.filter(
-                app =>
-                    !query ||
-                    normalizeText(
-                        app.name
-                    ).includes(query)
-            );
-
-
-        if (query) {
-
-            filteredApps.sort(
-                (a, b) => {
-
-                    const nameA =
-                        normalizeText(a.name);
-
-                    const nameB =
-                        normalizeText(b.name);
-
-
-                    const startsA =
-                        nameA.startsWith(query);
-
-                    const startsB =
-                        nameB.startsWith(query);
-
-
-                    if (
-                        startsA &&
-                        !startsB
-                    ) {
-
-                        return -1;
-                    }
-
-
-                    if (
-                        !startsA &&
-                        startsB
-                    ) {
-
-                        return 1;
-                    }
-
-
-                    return nameA.localeCompare(
-                        nameB,
-                        "en",
-                        {
-                            sensitivity: "base"
-                        }
-                    );
-                }
-            );
-
-
-            displayMultiGameApps(
-                filteredApps
-            );
-
-            return;
-        }
-
-
-        if (
-            selectedCategorySort ===
-            "popular"
-        ) {
-
-            loadAllTimePopular(
-                () => {
-
-                    const updatedApps =
-                        getMultiGameApps();
-
-
-                    displayMultiGameApps(
-                        sortMultiGameApps(
-                            updatedApps
-                        )
-                    );
-                }
-            );
-
-            return;
-        }
-
-
-        displayMultiGameApps(
-            sortMultiGameApps(
-                filteredApps
-            )
-        );
-
-        return;
-    }
-
-
-    const filtered =
-        games.filter(game => {
-
-            if (
-                selectedCategory ===
-                "dual-screen" &&
-                !isDualScreen(game)
-            ) {
-
-                return false;
-            }
-
-
-            if (
-                selectedPlatform &&
-                !game.platforms.some(
-                    platform =>
-                        normalizeText(platform) ===
-                        normalizeText(selectedPlatform)
-                )
-            ) {
-
-                return false;
-            }
-
-
-            if (!query) {
-
-                return true;
-            }
-
-
-            return normalizeText(
-                game.name
-            ).includes(query);
-        });
-
-
-    if (query) {
-
-        filtered.sort(
-            (a, b) => {
-
-                const nameA =
-                    normalizeText(a.name);
-
-                const nameB =
-                    normalizeText(b.name);
-
-
-                const startsA =
-                    nameA.startsWith(query);
-
-                const startsB =
-                    nameB.startsWith(query);
-
-
-                if (
-                    startsA &&
-                    !startsB
-                ) {
-
-                    return -1;
-                }
-
-
-                if (
-                    !startsA &&
-                    startsB
-                ) {
-
-                    return 1;
-                }
-
-
-                return nameA.localeCompare(
-                    nameB,
-                    "en",
-                    {
-                        sensitivity: "base"
-                    }
-                );
-            }
-        );
-    }
-
-
-    if (
-        selectedCategorySort ===
-        "popular"
-    ) {
-
-        loadAllTimePopular(
-            () => {
-
-                displayGames(
-                    query
-                        ? filtered
-                        : sortGames(filtered)
-                );
-            }
-        );
-
-        return;
-    }
-
-
-    displayGames(
-        query
-            ? filtered
-            : sortGames(filtered)
-    );
-
-}
+const allGamesButton =
+document.getElementById("all-games-button");
 
 /*
- * Category search.
+ * CATEGORY CONTROLS
  */
 
-categorySearchInput.addEventListener(
-    "input",
-    displayFilteredGames
+const categoryControls =
+document.getElementById("category-controls");
+
+const categorySearchInput =
+document.getElementById("category-search");
+
+const categorySortOptions =
+document.querySelectorAll(".category-sort-option");
+
+const categorySortDirection =
+document.getElementById(
+    "category-sort-direction"
 );
 
 /*
- * Category sort options.
+ * HOME SECTIONS
  */
 
-categorySortOptions.forEach(
-    option => {
+const lastUpdatedSection =
+document.getElementById("last-updated-section");
 
-        option.addEventListener(
-            "click",
-            () => {
+const popularSection =
+document.getElementById("popular-section");
 
-                const newSort =
-                    option.dataset.sort;
-
-
-                if (
-                    selectedCategorySort ===
-                    newSort
-                ) {
-
-                    return;
-                }
-
-
-                selectedCategorySort =
-                    newSort;
-
-                categorySortDescending =
-                    false;
-
-
-                categorySortOptions.forEach(
-                    otherOption => {
-
-                        otherOption.classList.toggle(
-                            "active",
-                            otherOption.dataset.sort ===
-                                selectedCategorySort
-                        );
-                    }
-                );
-
-
-                updateCategorySortDirection();
-
-                displayFilteredGames();
-            }
-        );
-    }
-
-);
+const searchResults =
+document.getElementById("search-results");
 
 /*
- * Category sort direction.
+ * GENERAL STATE
  */
 
-categorySortDirection.addEventListener(
-    "click",
-    () => {
+let games = [];
 
-        categorySortDescending =
-            !categorySortDescending;
+let selectedPlatform = "";
 
+let selectedCategory = "";
 
-        updateCategorySortDirection();
+let currentView = "home";
 
+/*
+ * LAST ADDED STATE
+ */
 
-        displayFilteredGames();
-    }
+let showingAllLastAdded = false;
 
-);
+/*
+ * LAST UPDATED STATE
+ */
+
+let showingAllLastUpdated = false;
+
+/*
+ * POPULAR STATE
+ */
+
+let selectedPopularPeriod = "week";
+
+let showingAllPopular = false;
+
+/*
+ * CATEGORY SORTING
+ */
+
+let selectedCategorySort =
+"updated";
+
+let categorySortDescending =
+false;
+
+/*
+ * ALL TIME POPULAR CACHE
+ */
+
+let allTimePopular =
+new Map();
+
+let allTimePopularLoaded =
+false;
+
+let allTimePopularLoading =
+false;
+
+let allTimePopularCallbacks =
+[];
