@@ -28,6 +28,7 @@ async function loadGames() {
         );
 
         displayPlatformMenu();
+        displayLastAdded();
         displayLastUpdated();
         loadPopular();
 
