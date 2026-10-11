@@ -5,10 +5,8 @@
 function parseLastUpdate(value) {
 
     if (!value) {
-
         return null;
     }
-
 
     const match =
         String(value)
@@ -17,29 +15,21 @@ function parseLastUpdate(value) {
                 /^(\d{4})\s*,\s*([A-Za-z]+)(?:\s+(\d{1,2}))?$/
             );
 
-
     if (!match) {
-
         return null;
     }
 
-
-    const year =
-        Number(match[1]);
-
+    const year = Number(match[1]);
 
     const monthName =
         match[2].toLowerCase();
-
 
     const day =
         match[3]
             ? Number(match[3])
             : 1;
 
-
     const months = {
-
         january: 0,
         february: 1,
         march: 2,
@@ -52,9 +42,7 @@ function parseLastUpdate(value) {
         october: 9,
         november: 10,
         december: 11
-
     };
-
 
     if (
         !Object.prototype.hasOwnProperty.call(
@@ -62,25 +50,176 @@ function parseLastUpdate(value) {
             monthName
         )
     ) {
-
         return null;
     }
 
-
-    const month =
-        months[monthName];
-
-
     return new Date(
         year,
-        month,
+        months[monthName],
         day
     );
-
 }
 
 /*
- * Get latest update of a game.
+ * Convert DATE ADDED into a Date.
+ *
+ * Supports formats such as:
+ * 2026, October 10
+ * 2026, October
+ * 2026-10-10
+ * 10/10/2026
+ */
+
+function parseDateAdded(value) {
+
+    if (!value) {
+        return null;
+    }
+
+    const text =
+        String(value).trim();
+
+    if (!text) {
+        return null;
+    }
+
+    /*
+     * Format: YYYY, Month DD
+     * Also accepts: YYYY, Month
+     */
+
+    const monthMatch =
+        text.match(
+            /^(\d{4})\s*,\s*([A-Za-z]+)(?:\s+(\d{1,2}))?$/
+        );
+
+    if (monthMatch) {
+
+        const year =
+            Number(monthMatch[1]);
+
+        const monthName =
+            monthMatch[2].toLowerCase();
+
+        const day =
+            monthMatch[3]
+                ? Number(monthMatch[3])
+                : 1;
+
+        const months = {
+            january: 0,
+            february: 1,
+            march: 2,
+            april: 3,
+            may: 4,
+            june: 5,
+            july: 6,
+            august: 7,
+            september: 8,
+            october: 9,
+            november: 10,
+            december: 11
+        };
+
+        if (
+            !Object.prototype.hasOwnProperty.call(
+                months,
+                monthName
+            )
+        ) {
+            return null;
+        }
+
+        const month =
+            months[monthName];
+
+        const date =
+            new Date(year, month, day);
+
+        if (
+            date.getFullYear() !== year ||
+            date.getMonth() !== month ||
+            date.getDate() !== day
+        ) {
+            return null;
+        }
+
+        return date;
+    }
+
+    /*
+     * Format: YYYY-MM-DD
+     */
+
+    const isoMatch =
+        text.match(
+            /^(\d{4})-(\d{1,2})-(\d{1,2})$/
+        );
+
+    if (isoMatch) {
+
+        const year =
+            Number(isoMatch[1]);
+
+        const month =
+            Number(isoMatch[2]) - 1;
+
+        const day =
+            Number(isoMatch[3]);
+
+        const date =
+            new Date(year, month, day);
+
+        if (
+            date.getFullYear() !== year ||
+            date.getMonth() !== month ||
+            date.getDate() !== day
+        ) {
+            return null;
+        }
+
+        return date;
+    }
+
+    /*
+     * Format: DD/MM/YYYY
+     */
+
+    const localMatch =
+        text.match(
+            /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+        );
+
+    if (localMatch) {
+
+        const day =
+            Number(localMatch[1]);
+
+        const month =
+            Number(localMatch[2]) - 1;
+
+        const year =
+            Number(localMatch[3]);
+
+        const date =
+            new Date(year, month, day);
+
+        if (
+            date.getFullYear() !== year ||
+            date.getMonth() !== month ||
+            date.getDate() !== day
+        ) {
+            return null;
+        }
+
+        return date;
+    }
+
+    return null;
+}
+
+/*
+ * Get the latest update of a game.
  */
 
 function getLatestUpdate(game) {
@@ -98,12 +237,9 @@ function getLatestUpdate(game) {
                     date !== null
             );
 
-
     if (dates.length === 0) {
-
         return null;
     }
-
 
     return dates.reduce(
         (latest, current) =>
@@ -111,7 +247,113 @@ function getLatestUpdate(game) {
                 ? current
                 : latest
     );
+}
 
+/*
+ * Get the DATE ADDED of a game.
+ *
+ * If a game has multiple rows, use
+ * its most recent DATE ADDED value.
+ */
+
+function getDateAdded(game) {
+
+    const dates =
+        game.ports
+            .map(
+                port =>
+                    parseDateAdded(
+                        port.dateAdded
+                    )
+            )
+            .filter(
+                date =>
+                    date !== null
+            );
+
+    if (dates.length === 0) {
+        return null;
+    }
+
+    return dates.reduce(
+        (latest, current) =>
+            current > latest
+                ? current
+                : latest
+    );
+}
+
+/*
+ * Display Last Added.
+ */
+
+function displayLastAdded() {
+
+    if (
+        !lastAddedList ||
+        !lastAddedMore
+    ) {
+        return;
+    }
+
+    const sortedGames =
+        games
+            .map(game => ({
+                game: game,
+                dateAdded: getDateAdded(game)
+            }))
+            .filter(
+                item =>
+                    item.dateAdded !== null
+            )
+            .sort(
+                (a, b) =>
+                    b.dateAdded - a.dateAdded
+            );
+
+    lastAddedList.innerHTML = "";
+
+    if (sortedGames.length === 0) {
+
+        lastAddedMore.hidden = true;
+
+        return;
+    }
+
+    const visibleGames =
+        showingAllLastAdded
+            ? sortedGames
+            : sortedGames.slice(0, 10);
+
+    const fragment =
+        document.createDocumentFragment();
+
+    for (const item of visibleGames) {
+
+        const element =
+            document.createElement("a");
+
+        element.className =
+            "home-game";
+
+        element.href =
+            `game.html?game=${encodeURIComponent(
+                item.game.slug
+            )}`;
+
+        element.textContent =
+            item.game.name;
+
+        fragment.appendChild(element);
+    }
+
+    lastAddedList.appendChild(fragment);
+
+    lastAddedMore.hidden =
+        !(
+            sortedGames.length > 10 &&
+            !showingAllLastAdded
+        );
 }
 
 /*
@@ -123,12 +365,8 @@ function displayLastUpdated() {
     const sortedGames =
         games
             .map(game => ({
-
                 game: game,
-
-                lastUpdate:
-                    getLatestUpdate(game)
-
+                lastUpdate: getLatestUpdate(game)
             }))
             .filter(
                 item =>
@@ -136,13 +374,10 @@ function displayLastUpdated() {
             )
             .sort(
                 (a, b) =>
-                    b.lastUpdate -
-                    a.lastUpdate
+                    b.lastUpdate - a.lastUpdate
             );
 
-
     lastUpdatedList.innerHTML = "";
-
 
     if (sortedGames.length === 0) {
 
@@ -151,60 +386,40 @@ function displayLastUpdated() {
         return;
     }
 
-
     const visibleGames =
         showingAllLastUpdated
             ? sortedGames
             : sortedGames.slice(0, 10);
 
-
     const fragment =
         document.createDocumentFragment();
-
 
     for (const item of visibleGames) {
 
         const element =
             document.createElement("a");
 
-
         element.className =
             "home-game";
-
 
         element.href =
             `game.html?game=${encodeURIComponent(
                 item.game.slug
             )}`;
 
-
         element.textContent =
             item.game.name;
 
+        fragment.appendChild(element);
+    }
 
-        fragment.appendChild(
-            element
+    lastUpdatedList.appendChild(fragment);
+
+    lastUpdatedMore.hidden =
+        !(
+            sortedGames.length > 10 &&
+            !showingAllLastUpdated
         );
-    }
-
-
-    lastUpdatedList.appendChild(
-        fragment
-    );
-
-
-    if (
-        sortedGames.length > 10 &&
-        !showingAllLastUpdated
-    ) {
-
-        lastUpdatedMore.hidden = false;
-
-    } else {
-
-        lastUpdatedMore.hidden = true;
-    }
-
 }
 
 /*
@@ -216,10 +431,8 @@ function loadPopular(
 ) {
 
     if (!popularList) {
-
         return;
     }
-
 
     popularList.innerHTML = `
         <div class="home-loading">
@@ -227,10 +440,8 @@ function loadPopular(
         </div>
     `;
 
-
     const callbackName =
         `popularCallback_${Date.now()}`;
-
 
     window[callbackName] =
         function(data) {
@@ -241,13 +452,11 @@ function loadPopular(
                     !data.success ||
                     !Array.isArray(data.games)
                 ) {
-
                     throw new Error(
                         data.error ||
                         "Could not load popular games."
                     );
                 }
-
 
                 const gameMap =
                     new Map(
@@ -256,7 +465,6 @@ function loadPopular(
                             game
                         ])
                     );
-
 
                 const ranking =
                     data.games
@@ -267,20 +475,14 @@ function loadPopular(
                                     createSlug(item.game)
                                 );
 
-
                             if (!game) {
-
                                 return null;
                             }
 
-
                             return {
-
                                 game: game,
-
                                 visits:
                                     Number(item.visits) || 0
-
                             };
 
                         })
@@ -289,11 +491,7 @@ function loadPopular(
                                 item !== null
                         );
 
-
-                displayPopular(
-                    ranking
-                );
-
+                displayPopular(ranking);
 
             } catch (error) {
 
@@ -302,49 +500,39 @@ function loadPopular(
                     error
                 );
 
-
                 popularList.innerHTML = `
                     <div class="error">
                         Could not load popular games.
                     </div>
                 `;
 
-
                 popularMore.hidden = true;
-
 
             } finally {
 
                 delete window[callbackName];
-
 
                 const script =
                     document.getElementById(
                         callbackName
                     );
 
-
                 if (script) {
-
                     script.remove();
                 }
             }
         };
 
-
     const script =
         document.createElement("script");
 
-
     script.id =
         callbackName;
-
 
     script.src =
         `${POPULAR_URL}?popular=${encodeURIComponent(
             period
         )}&callback=${callbackName}`;
-
 
     script.onerror =
         function() {
@@ -353,28 +541,20 @@ function loadPopular(
                 "Could not load popular games."
             );
 
-
             popularList.innerHTML = `
                 <div class="error">
                     Could not load popular games.
                 </div>
             `;
 
-
             popularMore.hidden = true;
 
-
             delete window[callbackName];
-
 
             script.remove();
         };
 
-
-    document.body.appendChild(
-        script
-    );
-
+    document.body.appendChild(script);
 }
 
 /*
@@ -390,24 +570,16 @@ function loadAllTimePopular(callback) {
         return;
     }
 
-
-    allTimePopularCallbacks.push(
-        callback
-    );
-
+    allTimePopularCallbacks.push(callback);
 
     if (allTimePopularLoading) {
-
         return;
     }
 
-
     allTimePopularLoading = true;
-
 
     const callbackName =
         `allTimePopularCallback_${Date.now()}`;
-
 
     window[callbackName] =
         function(data) {
@@ -418,13 +590,11 @@ function loadAllTimePopular(callback) {
                     !data.success ||
                     !Array.isArray(data.games)
                 ) {
-
                     throw new Error(
                         data.error ||
                         "Could not load All Time popularity."
                     );
                 }
-
 
                 allTimePopular =
                     new Map(
@@ -434,9 +604,7 @@ function loadAllTimePopular(callback) {
                         ])
                     );
 
-
                 allTimePopularLoaded = true;
-
 
             } catch (error) {
 
@@ -449,27 +617,21 @@ function loadAllTimePopular(callback) {
 
                 allTimePopularLoading = false;
 
-
                 delete window[callbackName];
-
 
                 const script =
                     document.getElementById(
                         callbackName
                     );
 
-
                 if (script) {
-
                     script.remove();
                 }
-
 
                 const callbacks =
                     allTimePopularCallbacks;
 
                 allTimePopularCallbacks = [];
-
 
                 callbacks.forEach(
                     callback => callback()
@@ -477,18 +639,14 @@ function loadAllTimePopular(callback) {
             }
         };
 
-
     const script =
         document.createElement("script");
-
 
     script.id =
         callbackName;
 
-
     script.src =
         `${POPULAR_URL}?popular=alltime&callback=${callbackName}`;
-
 
     script.onerror =
         function() {
@@ -497,32 +655,23 @@ function loadAllTimePopular(callback) {
                 "Could not load All Time popularity."
             );
 
-
             allTimePopularLoading = false;
-
 
             delete window[callbackName];
 
-
             script.remove();
-
 
             const callbacks =
                 allTimePopularCallbacks;
 
             allTimePopularCallbacks = [];
 
-
             callbacks.forEach(
                 callback => callback()
             );
         };
 
-
-    document.body.appendChild(
-        script
-    );
-
+    document.body.appendChild(script);
 }
 
 /*
@@ -533,7 +682,6 @@ function displayPopular(ranking) {
 
     popularList.innerHTML = "";
 
-
     if (ranking.length === 0) {
 
         popularList.innerHTML = `
@@ -542,23 +690,18 @@ function displayPopular(ranking) {
             </div>
         `;
 
-
         popularMore.hidden = true;
-
 
         return;
     }
-
 
     const visibleGames =
         showingAllPopular
             ? ranking
             : ranking.slice(0, 10);
 
-
     const fragment =
         document.createDocumentFragment();
-
 
     for (
         let i = 0;
@@ -569,48 +712,30 @@ function displayPopular(ranking) {
         const item =
             visibleGames[i];
 
-
         const element =
             document.createElement("a");
 
-
         element.className =
             "home-game";
-
 
         element.href =
             `game.html?game=${encodeURIComponent(
                 item.game.slug
             )}`;
 
-
         element.textContent =
             `${i + 1}. ${item.game.name}`;
 
+        fragment.appendChild(element);
+    }
 
-        fragment.appendChild(
-            element
+    popularList.appendChild(fragment);
+
+    popularMore.hidden =
+        !(
+            ranking.length > 10 &&
+            !showingAllPopular
         );
-    }
-
-
-    popularList.appendChild(
-        fragment
-    );
-
-
-    if (
-        ranking.length > 10 &&
-        !showingAllPopular
-    ) {
-
-        popularMore.hidden = false;
-
-    } else {
-
-        popularMore.hidden = true;
-    }
-
 }
 
 /*
@@ -626,25 +751,18 @@ popularTabs.forEach(
 
                 popularTabs.forEach(
                     otherTab => {
-
                         otherTab.classList.remove(
                             "active"
                         );
                     }
                 );
 
-
-                tab.classList.add(
-                    "active"
-                );
-
+                tab.classList.add("active");
 
                 selectedPopularPeriod =
                     tab.dataset.period;
 
-
                 showingAllPopular = false;
-
 
                 loadPopular(
                     selectedPopularPeriod
@@ -652,8 +770,24 @@ popularTabs.forEach(
             }
         );
     }
-
 );
+
+/*
+ * Last Added View More.
+ */
+
+if (lastAddedMore) {
+
+    lastAddedMore.addEventListener(
+        "click",
+        () => {
+
+            showingAllLastAdded = true;
+
+            displayLastAdded();
+        }
+    );
+}
 
 /*
  * Popular View More.
@@ -669,11 +803,10 @@ popularMore.addEventListener(
             selectedPopularPeriod
         );
     }
-
 );
 
 /*
- * View more button.
+ * Last Updated View More.
  */
 
 lastUpdatedMore.addEventListener(
@@ -684,5 +817,4 @@ lastUpdatedMore.addEventListener(
 
         displayLastUpdated();
     }
-
 );
