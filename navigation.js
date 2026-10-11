@@ -224,6 +224,7 @@ function displayPlatformMenu() {
     addPlatformButton("Super Nintendo");
     addPlatformButton("Nintendo 64");
     addPlatformButton("GameCube / Wii");
+    addPlatformButton("Nintendo Wii U");
     addPlatformButton("Gameboy / Gameboy Color");
     addPlatformButton("Gameboy Advance");
     addPlatformButton("Nintendo DS");
@@ -231,6 +232,8 @@ function displayPlatformMenu() {
 
     addMenuSeparator("PlayStation");
     addPlatformButton("Playstation");
+    addPlatformButton("Playstation 2");
+addPlatformButton("Playstation 4");
     addPlatformButton("Playstation Portable");
 
     addMenuSeparator("Xbox");
