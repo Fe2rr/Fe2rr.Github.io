@@ -4,6 +4,8 @@
 
 function showHomeSections() {
 
+    lastAddedSection.hidden = false;
+
     lastUpdatedSection.hidden = false;
 
     popularSection.hidden = false;
@@ -17,6 +19,8 @@ function showHomeSections() {
  */
 
 function showCategoryView() {
+
+    lastAddedSection.hidden = true;
 
     lastUpdatedSection.hidden = true;
 
