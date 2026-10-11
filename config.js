@@ -27,11 +27,32 @@ document.getElementById("search-button");
 const homeButton =
 document.getElementById("home-button");
 
+/*
+ * LAST ADDED
+ */
+
+const lastAddedList =
+document.getElementById("last-added-list");
+
+const lastAddedMore =
+document.getElementById("last-added-more");
+
+const lastAddedSection =
+document.getElementById("last-added-section");
+
+/*
+ * LAST UPDATED
+ */
+
 const lastUpdatedList =
 document.getElementById("last-updated-list");
 
 const lastUpdatedMore =
 document.getElementById("last-updated-more");
+
+/*
+ * POPULAR
+ */
 
 const popularList =
 document.getElementById("popular-list");
@@ -44,6 +65,10 @@ document.querySelectorAll(".popular-tab");
 
 const statusElement =
 document.getElementById("status");
+
+/*
+ * MENU
+ */
 
 const menuButton =
 document.getElementById("menu-button");
@@ -63,6 +88,10 @@ document.getElementById("platform-list");
 const allGamesButton =
 document.getElementById("all-games-button");
 
+/*
+ * CATEGORY CONTROLS
+ */
+
 const categoryControls =
 document.getElementById("category-controls");
 
@@ -77,6 +106,10 @@ document.getElementById(
     "category-sort-direction"
 );
 
+/*
+ * HOME SECTIONS
+ */
+
 const lastUpdatedSection =
 document.getElementById("last-updated-section");
 
@@ -86,6 +119,10 @@ document.getElementById("popular-section");
 const searchResults =
 document.getElementById("search-results");
 
+/*
+ * GENERAL STATE
+ */
+
 let games = [];
 
 let selectedPlatform = "";
@@ -94,14 +131,28 @@ let selectedCategory = "";
 
 let currentView = "home";
 
+/*
+ * LAST ADDED STATE
+ */
+
+let showingAllLastAdded = false;
+
+/*
+ * LAST UPDATED STATE
+ */
+
 let showingAllLastUpdated = false;
+
+/*
+ * POPULAR STATE
+ */
 
 let selectedPopularPeriod = "week";
 
 let showingAllPopular = false;
 
 /*
- * Category sorting.
+ * CATEGORY SORTING
  */
 
 let selectedCategorySort =
@@ -111,7 +162,7 @@ let categorySortDescending =
 false;
 
 /*
- * All Time Popular cache.
+ * ALL TIME POPULAR CACHE
  */
 
 let allTimePopular =
