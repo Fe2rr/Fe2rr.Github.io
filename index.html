@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Community Android Ports</title>
+
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header>
+
+    <button id="menu-button" type="button">
+        ☰
+    </button>
+
+    <h1 id="home-button">Community Android Ports</h1>
+
+    <button
+        id="search-button"
+        type="button"
+        aria-label="Open search"
+        aria-controls="search-container"
+        aria-expanded="false"
+    >
+        <svg
+            class="search-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+        >
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-4-4"></path>
+        </svg>
+    </button>
+
+</header>
+
+
+<div id="menu-overlay"></div>
+
+
+<nav id="side-menu">
+
+    <button id="menu-close" type="button">
+        ×
+    </button>
+
+    <h2>Games</h2>
+
+    <button
+        id="all-games-button"
+        type="button"
+        class="platform-button"
+    >
+        All Games
+    </button>
+
+    <h2>Categories</h2>
+
+    <div id="platform-list"></div>
+
+</nav>
+
+
+<main>
+
+    <div
+        id="search-container"
+        class="search-container"
+        hidden
+    >
+
+        <input
+            type="text"
+            id="search"
+            placeholder="Search game..."
+            autocomplete="off"
+        >
+
+        <div
+            id="search-results"
+            class="search-results"
+            hidden
+        ></div>
+
+    </div>
+
+
+    <div
+        id="category-controls"
+        class="category-controls"
+        hidden
+    >
+
+        <input
+            type="text"
+            id="category-search"
+            placeholder="Search in this category..."
+            autocomplete="off"
+        >
+
+        <div class="category-sort">
+
+            <button
+                type="button"
+                class="category-sort-option active"
+                data-sort="updated"
+            >
+                Last Updated
+            </button>
+
+            <button
+                type="button"
+                class="category-sort-option"
+                data-sort="name"
+            >
+                A–Z
+            </button>
+
+            <button
+                type="button"
+                class="category-sort-option"
+                data-sort="popular"
+            >
+                Popular
+            </button>
+
+            <button
+                type="button"
+                id="category-sort-direction"
+                class="category-sort-direction"
+                aria-label="Change sort direction"
+            >
+                ↓
+            </button>
+
+        </div>
+
+    </div>
+
+
+    <section
+        id="last-updated-section"
+        class="home-section"
+    >
+
+        <h2>Last Updated</h2>
+
+        <div id="last-updated-list"></div>
+
+        <button
+            id="last-updated-more"
+            class="home-view-more"
+            type="button"
+            hidden
+        >
+            View more →
+        </button>
+
+    </section>
+
+
+    <section
+        id="popular-section"
+        class="home-section"
+    >
+
+        <div class="home-section-header">
+
+            <h2>Popular</h2>
+
+            <div class="popular-tabs">
+
+                <button
+                    class="popular-tab active"
+                    data-period="week"
+                    type="button"
+                >
+                    Week
+                </button>
+
+                <button
+                    class="popular-tab"
+                    data-period="month"
+                    type="button"
+                >
+                    Month
+                </button>
+
+                <button
+                    class="popular-tab"
+                    data-period="alltime"
+                    type="button"
+                >
+                    All Time
+                </button>
+
+            </div>
+
+        </div>
+
+        <div id="popular-list"></div>
+
+        <button
+            id="popular-more"
+            class="home-view-more"
+            type="button"
+        >
+            View more →
+        </button>
+
+    </section>
+
+
+    <div id="status"></div>
+
+    <div id="game-list" hidden></div>
+
+
+    <p class="game-files-link">
+
+        Game files available
+
+        <a
+            href="https://docs.google.com/spreadsheets/d/1wXlykMGC7rQCgebOkA4Awtd4wN9nMHCTkZUFf4KHQ-k/edit?usp=drivesdk"
+            target="_blank"
+            rel="noopener noreferrer"
+        >
+            here
+        </a>
+
+    </p>
+
+</main>
+
+
+<footer>
+
+    <p>
+        Community Android Ports
+    </p>
+
+</footer>
+
+
+<script src="config.js"></script>
+<script src="data.js"></script>
+<script src="home.js"></script>
+<script src="multi-game-apps.js"></script>
+<script src="categories.js"></script>
+<script src="navigation.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
