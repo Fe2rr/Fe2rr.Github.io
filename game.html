@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -14,9 +13,7 @@
 <header>
     <button id="menu-button" type="button" aria-label="Open menu">☰</button>
 
-    <h1>
-        <a href="index.html">Community Android Ports</a>
-    </h1>
+    <h1 id="home-button">Community Android Ports</h1>
 
     <button
         id="search-button"
@@ -125,7 +122,10 @@
 <script>
     // Return to the previous page when possible.
     document.getElementById("back-button").addEventListener("click", function(event) {
-        if (document.referrer && new URL(document.referrer).origin === location.origin) {
+        if (
+            document.referrer &&
+            new URL(document.referrer).origin === location.origin
+        ) {
             event.preventDefault();
             history.back();
         }
