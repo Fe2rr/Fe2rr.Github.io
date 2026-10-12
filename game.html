@@ -6,6 +6,30 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game - Community Android Ports</title>
     <link rel="stylesheet" href="style.css">
+
+    <style>
+        /* Make category links look like menu buttons. */
+        #side-menu a.platform-button {
+            display: block;
+            text-decoration: none;
+        }
+
+        #side-menu a.platform-button:link,
+        #side-menu a.platform-button:visited {
+            color: #c8dad5;
+            text-decoration: none;
+        }
+
+        #side-menu a.platform-button:hover {
+            background: #10312f;
+            text-decoration: none;
+        }
+
+        /* Keep the site title clickable. */
+        #home-button {
+            cursor: pointer;
+        }
+    </style>
 </head>
 
 <body>
@@ -120,6 +144,11 @@
 </footer>
 
 <script>
+    // Return to the home page when clicking the site title.
+    document.getElementById("home-button").addEventListener("click", function() {
+        window.location.href = "index.html";
+    });
+
     // Return to the previous page when possible.
     document.getElementById("back-button").addEventListener("click", function(event) {
         if (
@@ -139,16 +168,21 @@
 
     menuButton.addEventListener("click", function() {
         sideMenu.classList.add("open");
-        menuOverlay.classList.add("open");
+        menuOverlay.classList.add("visible");
     });
 
     function closeMenu() {
         sideMenu.classList.remove("open");
-        menuOverlay.classList.remove("open");
+        menuOverlay.classList.remove("visible");
     }
 
     menuClose.addEventListener("click", closeMenu);
     menuOverlay.addEventListener("click", closeMenu);
+
+    // Close the menu after selecting a category.
+    document.querySelectorAll("#side-menu a.platform-button").forEach(function(link) {
+        link.addEventListener("click", closeMenu);
+    });
 
     // Toggle search and show matching game names.
     const searchButton = document.getElementById("search-button");
