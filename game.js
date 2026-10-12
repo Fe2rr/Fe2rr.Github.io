@@ -1,3 +1,4 @@
+
 /*
  * GOOGLE SHEETS
  */
@@ -9,6 +10,7 @@ const SHEET_URL =
 /*
  * VISIT COUNTER
  */
+
 const VISITS_URL =
     "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
@@ -29,6 +31,7 @@ const statusElement =
 /*
  * Normalize headers.
  */
+
 function normalizeHeader(value) {
 
     return value
@@ -43,6 +46,7 @@ function normalizeHeader(value) {
 /*
  * Normalize text.
  */
+
 function normalizeText(value) {
 
     return String(value || "")
@@ -56,6 +60,7 @@ function normalizeText(value) {
 /*
  * Create the same slug used by app.js.
  */
+
 function createSlug(name) {
 
     return normalizeText(name)
@@ -67,16 +72,15 @@ function createSlug(name) {
 /*
  * Register a game visit.
  */
+
 function registerVisit(gameSlug) {
 
     if (!gameSlug) {
         return;
     }
 
-
     const url =
         `${VISITS_URL}?game=${encodeURIComponent(gameSlug)}`;
-
 
     fetch(
         url,
@@ -99,6 +103,7 @@ function registerVisit(gameSlug) {
 /*
  * CSV parser.
  */
+
 function parseCSV(csv) {
 
     const rows = [];
@@ -107,15 +112,14 @@ function parseCSV(csv) {
     let field = "";
     let insideQuotes = false;
 
-
     for (let i = 0; i < csv.length; i++) {
 
         const char = csv[i];
 
-
         /*
          * Quotes.
          */
+
         if (char === '"') {
 
             if (
@@ -135,10 +139,10 @@ function parseCSV(csv) {
             continue;
         }
 
-
         /*
          * Comma outside quotes.
          */
+
         if (
             char === "," &&
             !insideQuotes
@@ -150,10 +154,10 @@ function parseCSV(csv) {
             continue;
         }
 
-
         /*
          * End of row.
          */
+
         if (
             (char === "\n" || char === "\r") &&
             !insideQuotes
@@ -166,10 +170,8 @@ function parseCSV(csv) {
                 i++;
             }
 
-
             row.push(field);
             field = "";
-
 
             if (
                 row.some(
@@ -181,27 +183,24 @@ function parseCSV(csv) {
                 rows.push(row);
             }
 
-
             row = [];
 
             continue;
         }
 
-
         field += char;
     }
-
 
     /*
      * Last field.
      */
+
     if (
         field.length > 0 ||
         row.length > 0
     ) {
 
         row.push(field);
-
 
         if (
             row.some(
@@ -214,28 +213,26 @@ function parseCSV(csv) {
         }
     }
 
-
     if (rows.length === 0) {
         return [];
     }
 
-
     /*
      * First row = headers.
      */
+
     const headers =
         rows.shift().map(
             normalizeHeader
         );
 
-
     /*
      * Convert rows into objects.
      */
+
     return rows.map(values => {
 
         const rowObject = {};
-
 
         headers.forEach(
             (header, index) => {
@@ -246,7 +243,6 @@ function parseCSV(csv) {
             }
         );
 
-
         return rowObject;
     });
 }
@@ -255,13 +251,13 @@ function parseCSV(csv) {
 /*
  * Find a column.
  */
+
 function getColumn(row, possibleNames) {
 
     for (const name of possibleNames) {
 
         const key =
             normalizeHeader(name);
-
 
         if (
             Object.prototype.hasOwnProperty.call(
@@ -273,7 +269,6 @@ function getColumn(row, possibleNames) {
             return row[key];
         }
     }
-
 
     return "";
 }
@@ -287,13 +282,13 @@ function getColumn(row, possibleNames) {
  * If GAME is empty, the game from the
  * previous row is inherited.
  */
+
 function processRows(rows) {
 
     let currentGame = "";
     let currentYear = "";
 
     const result = [];
-
 
     for (const row of rows) {
 
@@ -305,7 +300,6 @@ function processRows(rows) {
                 "JUEGO"
             ]).trim();
 
-
         const yearValue =
             getColumn(row, [
                 "YEAR",
@@ -313,26 +307,26 @@ function processRows(rows) {
                 "AÑO"
             ]).trim();
 
-
         /*
          * Update current game.
          */
+
         if (gameValue) {
             currentGame = gameValue;
         }
 
-
         /*
          * Update current year.
          */
+
         if (yearValue) {
             currentYear = yearValue;
         }
 
-
         /*
          * PLATFORM.
          */
+
         const platform =
             getColumn(row, [
                 "PLATFORM",
@@ -340,20 +334,20 @@ function processRows(rows) {
                 "PLATAFORMA"
             ]);
 
-
         /*
          * Project name.
          */
+
         const project =
             getColumn(row, [
                 "PROJECT",
                 "PROYECTO"
             ]);
 
-
         /*
          * LINK = text displayed on the button.
          */
+
         const link =
             getColumn(row, [
                 "LINK",
@@ -361,15 +355,14 @@ function processRows(rows) {
                 "ENLACE"
             ]);
 
-
         /*
          * URL = actual destination.
          */
+
         const url =
             getColumn(row, [
                 "URL"
             ]);
-
 
         const developer =
             getColumn(row, [
@@ -378,13 +371,11 @@ function processRows(rows) {
                 "DESARROLLADOR"
             ]);
 
-
         const version =
             getColumn(row, [
                 "VERSION",
                 "VERSIÓN"
             ]);
-
 
         const controller =
             getColumn(row, [
@@ -394,7 +385,6 @@ function processRows(rows) {
                 "MANDO"
             ]);
 
-
         const files =
             getColumn(row, [
                 "NEEDS GAME FILES?",
@@ -403,6 +393,15 @@ function processRows(rows) {
                 "NECESITA ARCHIVOS"
             ]);
 
+        /*
+         * DATA URL = destination for the
+         * "Needs Game Files?" label.
+         */
+
+        const dataUrl =
+            getColumn(row, [
+                "DATA URL"
+            ]);
 
         const works =
             getColumn(row, [
@@ -411,14 +410,12 @@ function processRows(rows) {
                 "FUNCIONA"
             ]);
 
-
         const lastUpdate =
             getColumn(row, [
                 "LAST UPDATE",
                 "LAST UPDATED",
                 "ÚLTIMA ACTUALIZACIÓN"
             ]);
-
 
         const notes =
             getColumn(row, [
@@ -427,11 +424,11 @@ function processRows(rows) {
                 "NOTAS"
             ]);
 
-
         /*
          * Determine whether this row contains
          * port information.
          */
+
         const hasPortData =
             project ||
             link ||
@@ -440,10 +437,10 @@ function processRows(rows) {
             version ||
             controller ||
             files ||
+            dataUrl ||
             works ||
             lastUpdate ||
             notes;
-
 
         if (
             !currentGame ||
@@ -452,7 +449,6 @@ function processRows(rows) {
 
             continue;
         }
-
 
         result.push({
 
@@ -476,6 +472,8 @@ function processRows(rows) {
 
             files: files.trim(),
 
+            dataUrl: dataUrl.trim(),
+
             works: works.trim(),
 
             lastUpdate: lastUpdate.trim(),
@@ -485,7 +483,6 @@ function processRows(rows) {
         });
     }
 
-
     return result;
 }
 
@@ -493,13 +490,13 @@ function processRows(rows) {
 /*
  * Get the requested game from the URL.
  */
+
 function getRequestedGame() {
 
     const params =
         new URLSearchParams(
             window.location.search
         );
-
 
     return params.get("game") || "";
 }
@@ -508,6 +505,7 @@ function getRequestedGame() {
 /*
  * Display an information row.
  */
+
 function createInfoRow(
     label,
     value
@@ -517,42 +515,87 @@ function createInfoRow(
         return null;
     }
 
-
     const row =
         document.createElement("div");
-
 
     row.className =
         "port-info-row";
 
-
     const labelElement =
         document.createElement("span");
-
 
     labelElement.className =
         "port-info-label";
 
-
     labelElement.textContent =
         label;
-
 
     const valueElement =
         document.createElement("span");
 
-
     valueElement.className =
         "port-info-value";
-
 
     valueElement.textContent =
         value;
 
-
     row.appendChild(labelElement);
     row.appendChild(valueElement);
 
+    return row;
+}
+
+
+/*
+ * Display an information row with a
+ * linked label.
+ */
+
+function createInfoRowWithLinkedLabel(
+    label,
+    value,
+    url
+) {
+
+    if (!value) {
+        return null;
+    }
+
+    const row =
+        document.createElement("div");
+
+    row.className =
+        "port-info-row";
+
+    const labelElement =
+        document.createElement("a");
+
+    labelElement.className =
+        "port-info-label";
+
+    labelElement.href =
+        url;
+
+    labelElement.target =
+        "_blank";
+
+    labelElement.rel =
+        "noopener noreferrer";
+
+    labelElement.textContent =
+        label;
+
+    const valueElement =
+        document.createElement("span");
+
+    valueElement.className =
+        "port-info-value";
+
+    valueElement.textContent =
+        value;
+
+    row.appendChild(labelElement);
+    row.appendChild(valueElement);
 
     return row;
 }
@@ -562,6 +605,7 @@ function createInfoRow(
  * Check whether the selected entry is
  * a Multi-game App.
  */
+
 function isMultiGameApp(game) {
 
     return game.ports.some(
@@ -576,6 +620,7 @@ function isMultiGameApp(game) {
  * Check whether a specific port uses
  * a Multi-game App.
  */
+
 function isMultiGameAppPort(
     port,
     allRows
@@ -585,10 +630,8 @@ function isMultiGameAppPort(
         return false;
     }
 
-
     const projectName =
         normalizeText(port.project);
-
 
     return allRows.some(
         row =>
@@ -606,6 +649,7 @@ function isMultiGameAppPort(
  * A game uses the app when its PROJECT
  * matches the app name.
  */
+
 function findGamesUsingApp(
     appName,
     allRows
@@ -614,10 +658,8 @@ function findGamesUsingApp(
     const appNameNormalized =
         normalizeText(appName);
 
-
     const gamesUsingApp =
         new Map();
-
 
     for (const row of allRows) {
 
@@ -628,10 +670,10 @@ function findGamesUsingApp(
             continue;
         }
 
-
         /*
          * Do not include the app itself.
          */
+
         if (
             normalizeText(row.game) ===
             appNameNormalized
@@ -639,10 +681,10 @@ function findGamesUsingApp(
             continue;
         }
 
-
         /*
          * PROJECT must match the app name.
          */
+
         if (
             normalizeText(row.project) !==
             appNameNormalized
@@ -650,10 +692,8 @@ function findGamesUsingApp(
             continue;
         }
 
-
         const key =
             normalizeText(row.game);
-
 
         if (
             !gamesUsingApp.has(key)
@@ -668,7 +708,6 @@ function findGamesUsingApp(
             );
         }
     }
-
 
     return Array.from(
         gamesUsingApp.values()
@@ -692,6 +731,7 @@ function findGamesUsingApp(
  * parentElement allows the list to be
  * placed inside a specific port card.
  */
+
 function displayGamesUsingApp(
     appName,
     allRows,
@@ -704,80 +744,65 @@ function displayGamesUsingApp(
             allRows
         );
 
-
     if (
         gamesUsingApp.length === 0
     ) {
         return;
     }
 
-
     const section =
         document.createElement("section");
-
 
     section.className =
         "games-using-app";
 
-
     /*
      * Collapsible header.
      */
+
     const toggle =
         document.createElement("button");
-
 
     toggle.type =
         "button";
 
-
     toggle.className =
         "games-using-app-toggle";
-
 
     toggle.setAttribute(
         "aria-expanded",
         "false"
     );
 
-
     const title =
         document.createElement("span");
-
 
     title.textContent =
         "With this port you can also play:";
 
-
     const arrow =
         document.createElement("span");
-
 
     arrow.className =
         "games-using-app-arrow";
 
-
     arrow.textContent =
         "▼";
-
 
     toggle.appendChild(title);
     toggle.appendChild(arrow);
 
-
     /*
      * Game list.
      */
+
     const list =
         document.createElement("div");
-
 
     list.className =
         "games-using-app-list";
 
-
     list.hidden = true;
-
 
     for (
         const game
@@ -787,42 +812,35 @@ function displayGamesUsingApp(
         const link =
             document.createElement("a");
 
-
         link.className =
             "games-using-app-item";
-
 
         link.href =
             `game.html?game=${encodeURIComponent(
                 createSlug(game.name)
             )}`;
 
-
         link.textContent =
             game.name;
-
 
         if (game.year) {
 
             const year =
                 document.createElement("span");
 
-
             year.textContent =
                 ` (${game.year})`;
-
 
             link.appendChild(year);
         }
 
-
         list.appendChild(link);
     }
-
 
     /*
      * Toggle open / closed.
      */
+
     toggle.addEventListener(
         "click",
         () => {
@@ -832,16 +850,13 @@ function displayGamesUsingApp(
                     "aria-expanded"
                 ) === "true";
 
-
             toggle.setAttribute(
                 "aria-expanded",
                 String(!isOpen)
             );
 
-
             list.hidden =
                 isOpen;
-
 
             arrow.textContent =
                 isOpen
@@ -850,10 +865,8 @@ function displayGamesUsingApp(
         }
     );
 
-
     section.appendChild(toggle);
     section.appendChild(list);
-
 
     parentElement.appendChild(section);
 }
@@ -862,6 +875,7 @@ function displayGamesUsingApp(
 /*
  * Display the selected game.
  */
+
 function displayGame(
     game,
     allRows
@@ -870,17 +884,13 @@ function displayGame(
     gameTitle.textContent =
         game.name;
 
-
     gameYear.textContent =
         game.year || "";
-
 
     statusElement.textContent =
         `${game.ports.length} port${game.ports.length !== 1 ? "s" : ""}`;
 
-
     portList.innerHTML = "";
-
 
     for (
         let index = 0;
@@ -891,44 +901,37 @@ function displayGame(
         const port =
             game.ports[index];
 
-
         const card =
             document.createElement("div");
-
 
         card.className =
             "port";
 
-
         /*
          * Port title.
          */
+
         const title =
             document.createElement("h2");
 
-
         title.className =
             "port-title";
-
 
         title.textContent =
             port.project ||
             `Port ${index + 1}`;
 
-
         card.appendChild(title);
-
 
         /*
          * Port information.
          */
+
         const info =
             document.createElement("div");
 
-
         info.className =
             "port-info";
-
 
         const fields = [
 
@@ -946,64 +949,75 @@ function displayGame(
 
         ];
 
-
         for (
             const [label, value]
             of fields
         ) {
 
-            const row =
-                createInfoRow(
-                    label,
-                    value
-                );
+            let row;
 
+            /*
+             * Link the label to DATA URL
+             * when a destination is available.
+             */
+
+            if (
+                label === "Needs Game Files?" &&
+                port.dataUrl
+            ) {
+
+                row =
+                    createInfoRowWithLinkedLabel(
+                        label,
+                        value,
+                        port.dataUrl
+                    );
+
+            } else {
+
+                row =
+                    createInfoRow(
+                        label,
+                        value
+                    );
+            }
 
             if (row) {
                 info.appendChild(row);
             }
         }
 
-
         card.appendChild(info);
-
 
         /*
          * Notes.
          */
+
         if (port.notes) {
 
             const notes =
                 document.createElement("div");
 
-
             notes.className =
                 "port-notes";
-
 
             const notesTitle =
                 document.createElement("strong");
 
-
             notesTitle.textContent =
                 "Notes";
-
 
             const notesText =
                 document.createElement("p");
 
-
             notesText.textContent =
                 port.notes;
-
 
             notes.appendChild(notesTitle);
             notes.appendChild(notesText);
 
-
             card.appendChild(notes);
         }
-
 
         /*
          * Port link.
@@ -1011,48 +1025,43 @@ function displayGame(
          * LINK = button text.
          * URL = destination.
          */
+
         if (port.url) {
 
             const link =
                 document.createElement("a");
 
-
             link.className =
                 "port-link";
-
 
             link.href =
                 port.url;
 
-
             link.target =
                 "_blank";
 
-
             link.rel =
                 "noopener noreferrer";
-
 
             link.textContent =
                 port.link ||
                 "Open Port →";
 
-
             card.appendChild(link);
         }
-
 
         /*
          * Add the port card to the page.
          */
-        portList.appendChild(card);
 
+        portList.appendChild(card);
 
         /*
          * If this specific port uses a
          * Multi-game App, display the
          * other games supported by it.
          */
+
         if (
             isMultiGameAppPort(
                 port,
@@ -1068,11 +1077,11 @@ function displayGame(
         }
     }
 
-
     /*
      * If this is a Multi-game App,
      * display the games that use it.
      */
+
     if (
         isMultiGameApp(game)
     ) {
@@ -1081,12 +1090,12 @@ function displayGame(
          * Keep the original behavior
          * for the Multi-game App page.
          */
+
         const gamesUsingApp =
             findGamesUsingApp(
                 game.name,
                 allRows
             );
-
 
         if (
             gamesUsingApp.length > 0
@@ -1095,69 +1104,56 @@ function displayGame(
             const section =
                 document.createElement("section");
 
-
             section.className =
                 "games-using-app";
-
 
             /*
              * Collapsible header.
              */
+
             const toggle =
                 document.createElement("button");
-
 
             toggle.type =
                 "button";
 
-
             toggle.className =
                 "games-using-app-toggle";
-
 
             toggle.setAttribute(
                 "aria-expanded",
                 "false"
             );
 
-
             const title =
                 document.createElement("span");
-
 
             title.textContent =
                 "Games using this app";
 
-
             const arrow =
                 document.createElement("span");
-
 
             arrow.className =
                 "games-using-app-arrow";
 
-
             arrow.textContent =
                 "▼";
-
 
             toggle.appendChild(title);
             toggle.appendChild(arrow);
 
-
             /*
              * Game list.
              */
+
             const list =
                 document.createElement("div");
-
 
             list.className =
                 "games-using-app-list";
 
-
             list.hidden = true;
-
 
             for (
                 const compatibleGame
@@ -1167,10 +1163,8 @@ function displayGame(
                 const link =
                     document.createElement("a");
 
-
                 link.className =
                     "games-using-app-item";
-
 
                 link.href =
                     `game.html?game=${encodeURIComponent(
@@ -1179,10 +1173,8 @@ function displayGame(
                         )
                     )}`;
 
-
                 link.textContent =
                     compatibleGame.name;
-
 
                 if (
                     compatibleGame.year
@@ -1191,22 +1183,19 @@ function displayGame(
                     const year =
                         document.createElement("span");
 
-
                     year.textContent =
                         ` (${compatibleGame.year})`;
-
 
                     link.appendChild(year);
                 }
 
-
                 list.appendChild(link);
             }
-
 
             /*
              * Toggle open / closed.
              */
+
             toggle.addEventListener(
                 "click",
                 () => {
@@ -1216,16 +1205,13 @@ function displayGame(
                             "aria-expanded"
                         ) === "true";
 
-
                     toggle.setAttribute(
                         "aria-expanded",
                         String(!isOpen)
                     );
 
-
                     list.hidden =
                         isOpen;
-
 
                     arrow.textContent =
                         isOpen
@@ -1234,10 +1220,8 @@ function displayGame(
                 }
             );
 
-
             section.appendChild(toggle);
             section.appendChild(list);
-
 
             portList.appendChild(section);
         }
@@ -1248,6 +1232,7 @@ function displayGame(
 /*
  * Load the selected game.
  */
+
 async function loadGame() {
 
     try {
@@ -1255,10 +1240,10 @@ async function loadGame() {
         const requestedGame =
             getRequestedGame();
 
-
         /*
          * Make sure a game was specified.
          */
+
         if (!requestedGame) {
 
             throw new Error(
@@ -1266,24 +1251,22 @@ async function loadGame() {
             );
         }
 
-
         /*
          * Register the visit.
          */
-        registerVisit(requestedGame);
 
+        registerVisit(requestedGame);
 
         statusElement.textContent =
             "Loading ports...";
-
 
         /*
          * Abort the request if Google Sheets
          * does not respond within 15 seconds.
          */
+
         const controller =
             new AbortController();
-
 
         const timeout =
             setTimeout(
@@ -1291,9 +1274,7 @@ async function loadGame() {
                 15000
             );
 
-
         let response;
-
 
         try {
 
@@ -1311,7 +1292,6 @@ async function loadGame() {
             clearTimeout(timeout);
         }
 
-
         if (!response.ok) {
 
             throw new Error(
@@ -1319,13 +1299,12 @@ async function loadGame() {
             );
         }
 
-
         /*
          * Read CSV.
          */
+
         const csv =
             await response.text();
-
 
         if (
             !csv ||
@@ -1337,13 +1316,12 @@ async function loadGame() {
             );
         }
 
-
         /*
          * Parse CSV.
          */
+
         const rows =
             parseCSV(csv);
-
 
         if (rows.length === 0) {
 
@@ -1352,13 +1330,12 @@ async function loadGame() {
             );
         }
 
-
         /*
          * Process ports.
          */
+
         const processedRows =
             processRows(rows);
-
 
         if (
             processedRows.length === 0
@@ -1369,17 +1346,16 @@ async function loadGame() {
             );
         }
 
-
         /*
          * Find the requested game.
          */
+
         const matchingRows =
             processedRows.filter(
                 row =>
                     createSlug(row.game) ===
                     requestedGame
             );
-
 
         if (
             matchingRows.length === 0
@@ -1390,10 +1366,10 @@ async function loadGame() {
             );
         }
 
-
         /*
          * Build game object.
          */
+
         const game = {
 
             name:
@@ -1407,22 +1383,21 @@ async function loadGame() {
 
         };
 
-
         /*
          * Update browser title.
          */
+
         document.title =
             `${game.name} - Community Android Ports`;
-
 
         /*
          * Display game.
          */
+
         displayGame(
             game,
             processedRows
         );
-
 
     } catch (error) {
 
@@ -1431,26 +1406,22 @@ async function loadGame() {
             error
         );
 
-
         gameTitle.textContent =
             "Error";
-
 
         gameYear.textContent =
             "";
 
-
         statusElement.textContent =
             "";
-
 
         let message =
             error.message;
 
-
         /*
          * Special message for a timeout.
          */
+
         if (
             error.name === "AbortError"
         ) {
@@ -1458,7 +1429,6 @@ async function loadGame() {
             message =
                 "Google Sheets did not respond within 15 seconds.";
         }
-
 
         portList.innerHTML = `
             <div class="error">
@@ -1480,4 +1450,5 @@ async function loadGame() {
 /*
  * Start.
  */
+
 loadGame();
