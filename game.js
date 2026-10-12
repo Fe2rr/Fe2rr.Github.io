@@ -395,7 +395,7 @@ function processRows(rows) {
 
         /*
          * DATA URL = destination for the
-         * "Needs Game Files?" label.
+         * value of "Needs Game Files?".
          */
 
         const dataUrl =
@@ -548,10 +548,10 @@ function createInfoRow(
 
 /*
  * Display an information row with a
- * linked label.
+ * linked value instead of a linked label.
  */
 
-function createInfoRowWithLinkedLabel(
+function createInfoRowWithLinkedValue(
     label,
     value,
     url
@@ -567,29 +567,37 @@ function createInfoRowWithLinkedLabel(
     row.className =
         "port-info-row";
 
+    /*
+     * The label remains plain text.
+     */
+
     const labelElement =
-        document.createElement("a");
+        document.createElement("span");
 
     labelElement.className =
         "port-info-label";
 
-    labelElement.href =
-        url;
-
-    labelElement.target =
-        "_blank";
-
-    labelElement.rel =
-        "noopener noreferrer";
-
     labelElement.textContent =
         label;
 
+    /*
+     * Only the value becomes a link.
+     */
+
     const valueElement =
-        document.createElement("span");
+        document.createElement("a");
 
     valueElement.className =
         "port-info-value";
+
+    valueElement.href =
+        url;
+
+    valueElement.target =
+        "_blank";
+
+    valueElement.rel =
+        "noopener noreferrer";
 
     valueElement.textContent =
         value;
@@ -957,7 +965,7 @@ function displayGame(
             let row;
 
             /*
-             * Link the label to DATA URL
+             * Link the VALUE to DATA URL
              * when a destination is available.
              */
 
@@ -967,7 +975,7 @@ function displayGame(
             ) {
 
                 row =
-                    createInfoRowWithLinkedLabel(
+                    createInfoRowWithLinkedValue(
                         label,
                         value,
                         port.dataUrl
