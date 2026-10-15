@@ -290,10 +290,11 @@ function getColumn(row, possibleNames) {
 /*
  * Process rows.
  *
- * GAME and YEAR can be merged in Google Sheets.
+ * GAME, YEAR and game metadata can be
+ * merged in Google Sheets.
  *
- * If GAME is empty, the game from the
- * previous row is inherited.
+ * Empty cells inherit the latest value
+ * from the current game.
  */
 
 function processRows(rows) {
@@ -301,9 +302,17 @@ function processRows(rows) {
     let currentGame = "";
     let currentYear = "";
 
+    let currentGenre = "";
+    let currentCoverUrl = "";
+    let currentDescription = "";
+
     const result = [];
 
     for (const row of rows) {
+
+        /*
+         * Game name.
+         */
 
         const gameValue =
             getColumn(row, [
@@ -312,6 +321,10 @@ function processRows(rows) {
                 "NAME",
                 "JUEGO"
             ]).trim();
+
+        /*
+         * Year.
+         */
 
         const yearValue =
             getColumn(row, [
@@ -325,7 +338,19 @@ function processRows(rows) {
          */
 
         if (gameValue) {
+
             currentGame = gameValue;
+
+            /*
+             * Reset metadata when a new game starts.
+             * This prevents information from one game
+             * from leaking into the next one.
+             */
+
+            currentYear = "";
+            currentGenre = "";
+            currentCoverUrl = "";
+            currentDescription = "";
         }
 
         /*
@@ -337,7 +362,58 @@ function processRows(rows) {
         }
 
         /*
-         * PLATFORM.
+         * Game genre.
+         */
+
+        const genreValue =
+            getColumn(row, [
+                "GENRE",
+                "GENRES",
+                "GÉNERO",
+                "GENERO"
+            ]).trim();
+
+        if (genreValue) {
+            currentGenre = genreValue;
+        }
+
+        /*
+         * Game cover URL.
+         */
+
+        const coverUrlValue =
+            getColumn(row, [
+                "COVER_URL",
+                "COVER URL",
+                "COVER",
+                "IMAGE_URL",
+                "IMAGE URL",
+                "PORTADA"
+            ]).trim();
+
+        if (coverUrlValue) {
+            currentCoverUrl = coverUrlValue;
+        }
+
+        /*
+         * Game description.
+         */
+
+        const descriptionValue =
+            getColumn(row, [
+                "DESCRIPTION",
+                "DESCRIPCIÓN",
+                "DESCRIPCION",
+                "SUMMARY",
+                "SINOPSIS"
+            ]).trim();
+
+        if (descriptionValue) {
+            currentDescription = descriptionValue;
+        }
+
+        /*
+         * Platform.
          */
 
         const platform =
@@ -377,6 +453,10 @@ function processRows(rows) {
                 "URL"
             ]);
 
+        /*
+         * Developer.
+         */
+
         const developer =
             getColumn(row, [
                 "DEVELOPER",
@@ -384,11 +464,19 @@ function processRows(rows) {
                 "DESARROLLADOR"
             ]);
 
+        /*
+         * Version.
+         */
+
         const version =
             getColumn(row, [
                 "VERSION",
                 "VERSIÓN"
             ]);
+
+        /*
+         * Controller support.
+         */
 
         const controller =
             getColumn(row, [
@@ -397,6 +485,10 @@ function processRows(rows) {
                 "GAMEPAD",
                 "MANDO"
             ]);
+
+        /*
+         * Required game files.
+         */
 
         const files =
             getColumn(row, [
@@ -416,6 +508,10 @@ function processRows(rows) {
                 "DATA URL"
             ]);
 
+        /*
+         * Works?
+         */
+
         const works =
             getColumn(row, [
                 "WORKS?",
@@ -423,12 +519,20 @@ function processRows(rows) {
                 "FUNCIONA"
             ]);
 
+        /*
+         * Last update.
+         */
+
         const lastUpdate =
             getColumn(row, [
                 "LAST UPDATE",
                 "LAST UPDATED",
                 "ÚLTIMA ACTUALIZACIÓN"
             ]);
+
+        /*
+         * Notes.
+         */
 
         const notes =
             getColumn(row, [
@@ -440,6 +544,10 @@ function processRows(rows) {
         /*
          * Determine whether this row contains
          * port information.
+         *
+         * Rows containing only game metadata
+         * are retained as context but are not
+         * treated as ports.
          */
 
         const hasPortData =
@@ -463,11 +571,22 @@ function processRows(rows) {
             continue;
         }
 
+        /*
+         * Store the port and the current
+         * game metadata together.
+         */
+
         result.push({
 
             game: currentGame,
 
             year: currentYear,
+
+            genre: currentGenre,
+
+            coverUrl: currentCoverUrl,
+
+            description: currentDescription,
 
             platform: platform.trim(),
 
@@ -617,7 +736,7 @@ async function loadGame() {
         }
 
         /*
-         * Process ports.
+         * Process ports and game metadata.
          */
 
         const processedRows =
@@ -656,13 +775,25 @@ async function loadGame() {
          * Build game object.
          */
 
+        const firstMatchingRow =
+            matchingRows[0];
+
         const game = {
 
             name:
-                matchingRows[0].game,
+                firstMatchingRow.game,
 
             year:
-                matchingRows[0].year,
+                firstMatchingRow.year,
+
+            genre:
+                firstMatchingRow.genre,
+
+            coverUrl:
+                firstMatchingRow.coverUrl,
+
+            description:
+                firstMatchingRow.description,
 
             ports:
                 matchingRows
