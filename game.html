@@ -1,162 +1,224 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
+<!DOCTYPE html><html lang="en"><head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game - Community Android Ports</title>
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Game - The Ports Vault</title>
 
-    <style>
-        /* Make category links look like menu buttons. */
-        #side-menu a.platform-button {
-            display: block;
-            text-decoration: none;
-        }
+<link rel="stylesheet" href="style.css">
 
-        #side-menu a.platform-button:link,
-        #side-menu a.platform-button:visited {
-            color: #c8dad5;
-            text-decoration: none;
-        }
+<style>
+    /* Make category links look like menu buttons. */
+    #side-menu a.platform-button {
+        display: block;
+        text-decoration: none;
+    }
 
-        #side-menu a.platform-button:hover {
-            background: #10312f;
-            text-decoration: none;
-        }
+    #side-menu a.platform-button:link,
+    #side-menu a.platform-button:visited {
+        color: #c8dad5;
+        text-decoration: none;
+    }
 
-        /* Keep the site title clickable. */
-        #home-button {
-            cursor: pointer;
-        }
-    </style>
-</head>
+    #side-menu a.platform-button:hover {
+        background: #10312f;
+        text-decoration: none;
+    }
 
-<body>
+    /* Keep the site title clickable. */
+    #home-button {
+        cursor: pointer;
+    }
 
-<header>
-    <button id="menu-button" type="button" aria-label="Open menu">☰</button>
+    /* Android ports section heading. */
+    .ports-section-title {
+        margin: 30px 0 8px;
+        font-size: 22px;
+        color: #e5f0ec;
+    }
 
-    <h1 id="home-button">Community Android Ports</h1>
+    .ports-section-description {
+        margin: 0 0 12px;
+        color: #8fa7a3;
+        font-size: 14px;
+        line-height: 1.5;
+    }
+</style>
 
+</head><body><header>
     <button
-        id="search-button"
+        id="menu-button"
         type="button"
-        aria-label="Open search"
-        aria-controls="search-container"
-        aria-expanded="false"
+        aria-label="Open menu"
+    >☰</button><h1 id="home-button">The Ports Vault</h1>
+
+<button
+    id="search-button"
+    type="button"
+    aria-label="Open search"
+    aria-controls="search-container"
+    aria-expanded="false"
+>
+    <svg
+        class="search-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
     >
-        <svg
-            class="search-icon"
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-        >
-            <circle cx="11" cy="11" r="7"></circle>
-            <path d="m20 20-4-4"></path>
-        </svg>
-    </button>
-</header>
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-4-4"></path>
+    </svg>
+</button>
 
-<div id="menu-overlay"></div>
+</header><div id="menu-overlay"></div><nav id="side-menu">
+    <button
+        id="menu-close"
+        type="button"
+        aria-label="Close menu"
+    >×</button><h2>Games</h2>
 
-<nav id="side-menu">
-    <button id="menu-close" type="button" aria-label="Close menu">×</button>
+<a class="platform-button" href="index.html">
+    All Games
+</a>
 
-    <h2>Games</h2>
-    <a class="platform-button" href="index.html">All Games</a>
+<h2>Categories</h2>
 
-    <h2>Categories</h2>
-    <div id="platform-list">
-        <a class="platform-button" href="index.html">Multi-game Apps</a>
-        <a class="platform-button" href="index.html">Dual Screen</a>
-
-        <div class="menu-separator">── Nintendo ──</div>
-        <a class="platform-button" href="index.html">NES</a>
-        <a class="platform-button" href="index.html">Super Nintendo</a>
-        <a class="platform-button" href="index.html">Nintendo 64</a>
-        <a class="platform-button" href="index.html">GameCube / Wii</a>
-        <a class="platform-button" href="index.html">Nintendo Wii U</a>
-        <a class="platform-button" href="index.html">Gameboy / Gameboy Color</a>
-        <a class="platform-button" href="index.html">Gameboy Advance</a>
-        <a class="platform-button" href="index.html">Nintendo DS</a>
-        <a class="platform-button" href="index.html">Nintendo 3DS</a>
-
-        <div class="menu-separator">── PlayStation ──</div>
-        <a class="platform-button" href="index.html">Playstation</a>
-        <a class="platform-button" href="index.html">Playstation 2</a>
-        <a class="platform-button" href="index.html">Playstation 4</a>
-        <a class="platform-button" href="index.html">Playstation Portable</a>
-
-        <div class="menu-separator">── Xbox ──</div>
-        <a class="platform-button" href="index.html">Xbox</a>
-        <a class="platform-button" href="index.html">Xbox 360</a>
-
-        <div class="menu-separator">── Others ──</div>
-        <a class="platform-button" href="index.html">Others</a>
-    </div>
-</nav>
-
-<main>
-
-    <div id="search-container" class="search-container" hidden>
-        <input
-            type="text"
-            id="search"
-            placeholder="Search game..."
-            autocomplete="off"
-        >
-        <div id="search-results" class="search-results" hidden></div>
-    </div>
-
-    <a href="index.html" class="back-button" id="back-button">
-        ← Back to list
+<div id="platform-list">
+    <a class="platform-button" href="index.html">
+        Multi-game Apps
     </a>
 
-    <div id="game-header">
-        <div id="game-title">Loading...</div>
-        <div id="game-year"></div>
+    <a class="platform-button" href="index.html">
+        Dual Screen
+    </a>
+
+    <div class="menu-separator">── Nintendo ──</div>
+
+    <a class="platform-button" href="index.html">NES</a>
+    <a class="platform-button" href="index.html">Super Nintendo</a>
+    <a class="platform-button" href="index.html">Nintendo 64</a>
+    <a class="platform-button" href="index.html">GameCube / Wii</a>
+    <a class="platform-button" href="index.html">Nintendo Wii U</a>
+    <a class="platform-button" href="index.html">Gameboy / Gameboy Color</a>
+    <a class="platform-button" href="index.html">Gameboy Advance</a>
+    <a class="platform-button" href="index.html">Nintendo DS</a>
+    <a class="platform-button" href="index.html">Nintendo 3DS</a>
+
+    <div class="menu-separator">── PlayStation ──</div>
+
+    <a class="platform-button" href="index.html">Playstation</a>
+    <a class="platform-button" href="index.html">Playstation 2</a>
+    <a class="platform-button" href="index.html">Playstation 4</a>
+    <a class="platform-button" href="index.html">Playstation Portable</a>
+
+    <div class="menu-separator">── Xbox ──</div>
+
+    <a class="platform-button" href="index.html">Xbox</a>
+    <a class="platform-button" href="index.html">Xbox 360</a>
+
+    <div class="menu-separator">── Others ──</div>
+
+    <a class="platform-button" href="index.html">Others</a>
+</div>
+
+</nav><main><!-- Search -->
+<div
+    id="search-container"
+    class="search-container"
+    hidden
+>
+    <input
+        type="text"
+        id="search"
+        placeholder="Search game..."
+        autocomplete="off"
+    >
+
+    <div
+        id="search-results"
+        class="search-results"
+        hidden
+    ></div>
+</div>
+
+<!-- Navigation -->
+<a
+    href="index.html"
+    class="back-button"
+    id="back-button"
+>
+    ← Back to list
+</a>
+
+<!-- General game information card.
+     game-render.js fills this container dynamically. -->
+<section
+    id="game-header"
+    class="game-summary-card"
+    aria-label="Game information"
+>
+    <div id="game-title">Loading...</div>
+    <div id="game-year"></div>
+</section>
+
+<!-- Community Android ports -->
+<section id="android-ports-section">
+
+    <h2 class="ports-section-title">
+        Android Ports
+    </h2>
+
+    <p class="ports-section-description">
+        Community-made Android ports and projects for this game.
+    </p>
+
+    <div id="status" aria-live="polite">
+        Loading ports...
     </div>
 
-    <div id="status">Loading ports...</div>
     <div id="port-list"></div>
 
+</section>
 
-</main>
-
-<footer>
-    <p>Community Android Ports</p>
-</footer>
-
-<script>
+</main><footer>
+    <p>The Ports Vault</p>
+</footer><script>
     // Return to the home page when clicking the site title.
-    document.getElementById("home-button").addEventListener("click", function() {
-        window.location.href = "index.html";
-    });
+    document
+        .getElementById("home-button")
+        .addEventListener("click", function() {
+            window.location.href = "index.html";
+        });
 
     // Return to the previous page when possible.
-    document.getElementById("back-button").addEventListener("click", function(event) {
-        if (
-            document.referrer &&
-            new URL(document.referrer).origin === location.origin
-        ) {
-            event.preventDefault();
-            history.back();
-        }
-    });
+    document
+        .getElementById("back-button")
+        .addEventListener("click", function(event) {
+            if (
+                document.referrer &&
+                new URL(document.referrer).origin === location.origin
+            ) {
+                event.preventDefault();
+                history.back();
+            }
+        });
 
     // Toggle the side menu.
-    const menuButton = document.getElementById("menu-button");
-    const menuClose = document.getElementById("menu-close");
-    const sideMenu = document.getElementById("side-menu");
-    const menuOverlay = document.getElementById("menu-overlay");
+    const menuButton =
+        document.getElementById("menu-button");
+
+    const menuClose =
+        document.getElementById("menu-close");
+
+    const sideMenu =
+        document.getElementById("side-menu");
+
+    const menuOverlay =
+        document.getElementById("menu-overlay");
 
     menuButton.addEventListener("click", function() {
         sideMenu.classList.add("open");
@@ -172,22 +234,36 @@
     menuOverlay.addEventListener("click", closeMenu);
 
     // Close the menu after selecting a category.
-    document.querySelectorAll("#side-menu a.platform-button").forEach(function(link) {
-        link.addEventListener("click", closeMenu);
-    });
+    document
+        .querySelectorAll("#side-menu a.platform-button")
+        .forEach(function(link) {
+            link.addEventListener("click", closeMenu);
+        });
 
     // Toggle search and show matching game names.
-    const searchButton = document.getElementById("search-button");
-    const searchContainer = document.getElementById("search-container");
-    const searchInput = document.getElementById("search");
-    const searchResults = document.getElementById("search-results");
+    const searchButton =
+        document.getElementById("search-button");
+
+    const searchContainer =
+        document.getElementById("search-container");
+
+    const searchInput =
+        document.getElementById("search");
+
+    const searchResults =
+        document.getElementById("search-results");
 
     let gameNames = [];
 
     searchButton.addEventListener("click", function() {
         const opening = searchContainer.hidden;
+
         searchContainer.hidden = !opening;
-        searchButton.setAttribute("aria-expanded", String(opening));
+
+        searchButton.setAttribute(
+            "aria-expanded",
+            String(opening)
+        );
 
         if (opening) {
             searchInput.focus();
@@ -199,7 +275,9 @@
     });
 
     searchInput.addEventListener("input", function() {
-        const query = searchInput.value.trim().toLowerCase();
+        const query =
+            searchInput.value.trim().toLowerCase();
+
         searchResults.innerHTML = "";
 
         if (!query) {
@@ -208,51 +286,86 @@
         }
 
         const matches = gameNames
-            .filter(game => game.name.toLowerCase().includes(query))
+            .filter(game =>
+                game.name.toLowerCase().includes(query)
+            )
             .sort((a, b) => {
-                const aStarts = a.name.toLowerCase().startsWith(query);
-                const bStarts = b.name.toLowerCase().startsWith(query);
+                const aStarts =
+                    a.name.toLowerCase().startsWith(query);
 
-                if (aStarts !== bStarts) return aStarts ? -1 : 1;
+                const bStarts =
+                    b.name.toLowerCase().startsWith(query);
+
+                if (aStarts !== bStarts) {
+                    return aStarts ? -1 : 1;
+                }
+
                 return a.name.localeCompare(b.name);
             })
             .slice(0, 5);
 
         for (const game of matches) {
-            const link = document.createElement("a");
+            const link =
+                document.createElement("a");
+
             link.className = "search-result";
-            link.href = "game.html?game=" + encodeURIComponent(game.slug);
+
+            link.href =
+                "game.html?game=" +
+                encodeURIComponent(game.slug);
+
             link.textContent = game.name;
+
             searchResults.appendChild(link);
         }
 
-        searchResults.hidden = matches.length === 0;
+        searchResults.hidden =
+            matches.length === 0;
     });
 
-    // Load game names from the same public spreadsheet.
-    fetch("https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv")
+    // Load game names from the public spreadsheet.
+    fetch(
+        "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv"
+    )
         .then(response => {
-            if (!response.ok) throw new Error("Could not load games");
+            if (!response.ok) {
+                throw new Error("Could not load games");
+            }
+
             return response.text();
         })
         .then(csv => {
             const rows = csv.split(/\r?\n/);
-            if (!rows.length) return;
+
+            if (!rows.length) {
+                return;
+            }
 
             const parseLine = line => {
                 const cells = [];
                 let value = "";
                 let quoted = false;
 
-                for (let i = 0; i < line.length; i++) {
+                for (
+                    let i = 0;
+                    i < line.length;
+                    i++
+                ) {
                     const char = line[i];
 
-                    if (char === '"' && quoted && line[i + 1] === '"') {
+                    if (
+                        char === '"' &&
+                        quoted &&
+                        line[i + 1] === '"'
+                    ) {
                         value += '"';
                         i++;
                     } else if (char === '"') {
                         quoted = !quoted;
-                    } else if (char === "," && !quoted) {
+                    } else if (
+                        char === "," &&
+                        !quoted
+                    ) {
                         cells.push(value);
                         value = "";
                     } else {
@@ -261,29 +374,49 @@
                 }
 
                 cells.push(value);
+
                 return cells;
             };
 
-            const headers = parseLine(rows[0]).map(value =>
-                value.replace(/^\uFEFF/, "").trim().toUpperCase()
-            );
+            const headers = parseLine(rows[0])
+                .map(value =>
+                    value
+                        .replace(/^\uFEFF/, "")
+                        .trim()
+                        .toUpperCase()
+                );
 
             const gameIndex = headers.findIndex(header =>
-                ["GAME", "GAME NAME", "NAME", "JUEGO"].includes(header)
+                [
+                    "GAME",
+                    "GAME NAME",
+                    "NAME",
+                    "JUEGO"
+                ].includes(header)
             );
 
-            if (gameIndex < 0) return;
+            if (gameIndex < 0) {
+                return;
+            }
 
             const names = new Map();
 
             for (const row of rows.slice(1)) {
-                if (!row.trim()) continue;
+                if (!row.trim()) {
+                    continue;
+                }
 
                 const cells = parseLine(row);
-                const name = (cells[gameIndex] || "").trim();
-                if (!name) continue;
 
-                const normalized = name.normalize("NFD")
+                const name =
+                    (cells[gameIndex] || "").trim();
+
+                if (!name) {
+                    continue;
+                }
+
+                const normalized = name
+                    .normalize("NFD")
                     .replace(/[\u0300-\u036f]/g, "")
                     .toLowerCase();
 
@@ -292,16 +425,20 @@
                     .replace(/^-+|-+$/g, "");
 
                 if (!names.has(slug)) {
-                    names.set(slug, { name, slug });
+                    names.set(slug, {
+                        name,
+                        slug
+                    });
                 }
             }
 
             gameNames = Array.from(names.values());
         })
-        .catch(error => console.error("Search could not load games:", error));
-</script>
-
-<script type="module" src="game.js"></script>
-
-</body>
+        .catch(error => {
+            console.error(
+                "Search could not load games:",
+                error
+            );
+        });
+</script><script type="module" src="game.js"></script></body>
 </html>
