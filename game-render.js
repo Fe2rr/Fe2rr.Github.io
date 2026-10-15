@@ -44,8 +44,9 @@ function createSlug(name) {
 
 function restoreDescriptionLineBreaks(description) {
     return String(description || "")
-        .replace(/III/g, "\n")
+        .replace(/\s*\|\|\|\s*/g, "\n")
         .trim();
+}
 }
 
 
