@@ -1,3 +1,4 @@
+
 /*
  * GAME RENDER
  *
@@ -39,7 +40,7 @@ function createSlug(name) {
 /*
  * Restore line breaks in game descriptions.
  *
- * Google Sheets uses III as a line-break marker.
+ * Google Sheets uses ||| as a line-break marker.
  */
 
 function restoreDescriptionLineBreaks(description) {
@@ -47,7 +48,6 @@ function restoreDescriptionLineBreaks(description) {
         .replace(/\s*\|\|\|\s*/g, "\n")
         .trim();
 }
-
 
 
 /*
@@ -108,6 +108,89 @@ function createInfoRowWithLinkedValue(label, value, url) {
 
 
 /*
+ * Create the Show more / Show less control
+ * for long descriptions.
+ */
+
+function createExpandableDescription(description) {
+    const container = document.createElement("div");
+    container.className = "game-summary-description-container";
+
+    const text = document.createElement("p");
+    text.className = "game-summary-description";
+    text.textContent = restoreDescriptionLineBreaks(description);
+    text.style.whiteSpace = "pre-line";
+    text.style.overflowWrap = "anywhere";
+
+    const collapsedStyles = {
+        display: "-webkit-box",
+        overflow: "hidden",
+        WebkitBoxOrient: "vertical",
+        WebkitLineClamp: "4"
+    };
+
+    Object.assign(text.style, collapsedStyles);
+
+    container.appendChild(text);
+
+    /*
+     * Measure the text after the browser lays it out.
+     * The button is shown only if the text is actually
+     * longer than the collapsed preview.
+     */
+
+    requestAnimationFrame(() => {
+        const isLong = text.scrollHeight > text.clientHeight + 1;
+
+        if (!isLong) {
+            text.style.display = "block";
+            text.style.overflow = "visible";
+            text.style.webkitLineClamp = "unset";
+            return;
+        }
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "game-description-toggle";
+        button.textContent = "Show more";
+        button.setAttribute("aria-expanded", "false");
+
+        button.style.display = "inline-block";
+        button.style.marginTop = "8px";
+        button.style.padding = "4px 0";
+        button.style.background = "transparent";
+        button.style.border = "none";
+        button.style.color = "var(--accent)";
+        button.style.fontSize = "14px";
+        button.style.cursor = "pointer";
+
+        button.addEventListener("click", () => {
+            const expanded =
+                button.getAttribute("aria-expanded") === "true";
+
+            if (expanded) {
+                Object.assign(text.style, collapsedStyles);
+                button.textContent = "Show more";
+                button.setAttribute("aria-expanded", "false");
+            } else {
+                text.style.display = "block";
+                text.style.overflow = "visible";
+                text.style.webkitLineClamp = "unset";
+                text.style.webkitBoxOrient = "initial";
+
+                button.textContent = "Show less";
+                button.setAttribute("aria-expanded", "true");
+            }
+        });
+
+        container.appendChild(button);
+    });
+
+    return container;
+}
+
+
+/*
  * Build the general information card for a game.
  *
  * Displays:
@@ -115,25 +198,31 @@ function createInfoRowWithLinkedValue(label, value, url) {
  * - Game title
  * - Release year
  * - Genre
- * - Description
+ * - Expandable description
  */
 
 function displayGameSummary(game, parentElement) {
     parentElement.innerHTML = "";
-    parentElement.className =
-        "game-header game-summary-card";
+    parentElement.className = "game-header game-summary-card";
 
     /*
      * Cover image.
+     *
+     * Only use valid HTTP or HTTPS URLs.
+     * If an image fails to load, remove the image
+     * without hiding the rest of the game information.
      */
 
-    if (game.coverUrl) {
+    const coverUrl = String(game.coverUrl || "").trim();
+
+    if (/^https?:\/\/\S+$/i.test(coverUrl)) {
         const cover = document.createElement("img");
 
         cover.className = "game-summary-cover";
-        cover.src = game.coverUrl;
+        cover.src = coverUrl;
         cover.alt = `${game.name} cover`;
         cover.loading = "eager";
+        cover.decoding = "async";
 
         cover.addEventListener(
             "error",
@@ -196,23 +285,13 @@ function displayGameSummary(game, parentElement) {
     }
 
     /*
-     * Game description.
-     *
-     * Restore the line breaks represented by III
-     * and preserve them when displaying the text.
+     * Expandable game description.
      */
 
     if (game.description) {
-        const description = document.createElement("p");
-
-        description.className = "game-summary-description";
-
-        description.textContent =
-            restoreDescriptionLineBreaks(game.description);
-
-        description.style.whiteSpace = "pre-line";
-
-        info.appendChild(description);
+        info.appendChild(
+            createExpandableDescription(game.description)
+        );
     }
 
     parentElement.appendChild(info);
@@ -328,6 +407,23 @@ export function displayGame(game, allRows) {
 
     const statusElement =
         document.getElementById("status");
+
+    /*
+     * Verify that the required page elements exist.
+     */
+
+    if (!gameHeader || !portList || !statusElement) {
+        console.error(
+            "Game page is missing a required element.",
+            {
+                gameHeader: Boolean(gameHeader),
+                portList: Boolean(portList),
+                statusElement: Boolean(statusElement)
+            }
+        );
+
+        return;
+    }
 
     /*
      * Display the general game information card.
