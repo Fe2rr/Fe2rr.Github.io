@@ -1317,3 +1317,115 @@ header #home-button:focus-visible {
     letter-spacing: 0.7px;
   }
 }
+
+/* =========================================
+   GAME DESCRIPTION — SHOW MORE / SHOW LESS
+   ========================================= */
+
+.game-summary-description-container {
+  min-width: 0;
+  width: 100%;
+}
+
+.game-summary-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.game-description-toggle {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  transition: color var(--transition-fast);
+}
+
+.game-description-toggle:hover {
+  color: var(--accent-strong);
+}
+
+.game-description-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* =========================================
+   GAME COVER — IMAGE PRESENTATION
+   ========================================= */
+
+.game-summary-cover {
+  display: block;
+  flex-shrink: 0;
+
+  width: 180px;
+  max-width: 35%;
+  height: auto;
+  align-self: flex-start;
+
+  object-fit: contain;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+/* =========================================
+   RESPONSIVE — MOBILE
+   ========================================= */
+
+@media (max-width: 600px) {
+  #game-header.game-summary-card {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .game-summary-cover {
+    width: 115px;
+    max-width: 38%;
+  }
+
+  .game-summary-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .game-summary-description {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .game-description-toggle {
+    font-size: 13px;
+  }
+}
+
+/* =========================================
+   RESPONSIVE — VERY SMALL SCREENS
+   ========================================= */
+
+@media (max-width: 380px) {
+  #game-header.game-summary-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .game-summary-cover {
+    align-self: center;
+    width: 150px;
+    max-width: 100%;
+  }
+}
