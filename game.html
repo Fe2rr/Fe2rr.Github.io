@@ -24,7 +24,6 @@
     <link rel="stylesheet" href="style.css">
 
     <style>
-        /* Keep the entire page typography consistent with the mockup. */
         body,
         button,
         input,
@@ -33,7 +32,6 @@
             font-family: Inter, system-ui, sans-serif;
         }
 
-        /* Category links in the side menu. */
         #side-menu a.platform-button {
             display: block;
             text-decoration: none;
@@ -50,12 +48,10 @@
             text-decoration: none;
         }
 
-        /* Keep the site title clickable. */
         #home-button {
             cursor: pointer;
         }
 
-        /* Android ports section. */
         .ports-section-title {
             margin: 30px 0 8px;
             font-size: 22px;
@@ -149,17 +145,19 @@
         <a class="platform-button" href="index.html">Nintendo 64</a>
         <a class="platform-button" href="index.html">GameCube / Wii</a>
         <a class="platform-button" href="index.html">Nintendo Wii U</a>
-        <a class="platform-button" href="index.html">Gameboy / Gameboy Color</a>
-        <a class="platform-button" href="index.html">Gameboy Advance</a>
+        <a class="platform-button" href="index.html">Game Boy</a>
+        <a class="platform-button" href="index.html">Game Boy Color</a>
+        <a class="platform-button" href="index.html">Game Boy Advance</a>
         <a class="platform-button" href="index.html">Nintendo DS</a>
         <a class="platform-button" href="index.html">Nintendo 3DS</a>
+        <a class="platform-button" href="index.html">Nintendo Switch</a>
 
         <div class="menu-separator">── PlayStation ──</div>
 
-        <a class="platform-button" href="index.html">PlayStation</a>
-        <a class="platform-button" href="index.html">PlayStation 2</a>
-        <a class="platform-button" href="index.html">PlayStation 4</a>
-        <a class="platform-button" href="index.html">PlayStation Portable</a>
+        <a class="platform-button" href="index.html">Playstation</a>
+        <a class="platform-button" href="index.html">Playstation 2</a>
+        <a class="platform-button" href="index.html">Playstation 4</a>
+        <a class="platform-button" href="index.html">Playstation Portable</a>
 
         <div class="menu-separator">── Xbox ──</div>
 
@@ -176,7 +174,6 @@
 
 <main>
 
-    <!-- Search -->
     <div
         id="search-container"
         class="search-container"
@@ -199,7 +196,6 @@
 
     </div>
 
-    <!-- Back to the game list -->
     <a
         href="index.html"
         class="back-button"
@@ -208,7 +204,6 @@
         ← Back to list
     </a>
 
-    <!-- Game information populated by game.js -->
     <section
         id="game-header"
         class="game-summary-card"
@@ -218,7 +213,6 @@
         <div id="game-year"></div>
     </section>
 
-    <!-- Android ports -->
     <section id="android-ports-section">
 
         <h2 class="ports-section-title">
@@ -244,14 +238,12 @@
 </footer>
 
 <script>
-    // Return to the home page when clicking the site title.
     document
         .getElementById("home-button")
         .addEventListener("click", function () {
             window.location.href = "index.html";
         });
 
-    // Return to the previous page when possible.
     document
         .getElementById("back-button")
         .addEventListener("click", function (event) {
@@ -264,7 +256,7 @@
             }
         });
 
-    // Toggle the side menu.
+    // Side menu.
     const menuButton = document.getElementById("menu-button");
     const menuClose = document.getElementById("menu-close");
     const sideMenu = document.getElementById("side-menu");
@@ -283,14 +275,13 @@
     menuClose.addEventListener("click", closeMenu);
     menuOverlay.addEventListener("click", closeMenu);
 
-    // Close the menu after selecting a category.
     document
         .querySelectorAll("#side-menu a.platform-button")
         .forEach(function (link) {
             link.addEventListener("click", closeMenu);
         });
 
-    // Toggle search and show matching game names.
+    // Search.
     const searchButton = document.getElementById("search-button");
     const searchContainer = document.getElementById("search-container");
     const searchInput = document.getElementById("search");
@@ -378,7 +369,6 @@
                 return;
             }
 
-            // Parse CSV fields, including quoted commas.
             const parseLine = line => {
                 const cells = [];
                 let value = "";
