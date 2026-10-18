@@ -1,203 +1,247 @@
-<!DOCTYPE html><html lang="en"><head>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Game - The Ports Vault</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-<link rel="stylesheet" href="style.css">
+    <title>Game — NAPL</title>
 
-<style>
-    /* Make category links look like menu buttons. */
-    #side-menu a.platform-button {
-        display: block;
-        text-decoration: none;
-    }
+    <link rel="stylesheet" href="style.css">
 
-    #side-menu a.platform-button:link,
-    #side-menu a.platform-button:visited {
-        color: #c8dad5;
-        text-decoration: none;
-    }
+    <style>
+        /* Category links in the side menu. */
+        #side-menu a.platform-button {
+            display: block;
+            text-decoration: none;
+        }
 
-    #side-menu a.platform-button:hover {
-        background: #10312f;
-        text-decoration: none;
-    }
+        #side-menu a.platform-button:link,
+        #side-menu a.platform-button:visited {
+            color: var(--text-secondary, #c0d3cd);
+            text-decoration: none;
+        }
 
-    /* Keep the site title clickable. */
-    #home-button {
-        cursor: pointer;
-    }
+        #side-menu a.platform-button:hover {
+            background: var(--surface-hover, #164039);
+            text-decoration: none;
+        }
 
-    /* Android ports section heading. */
-    .ports-section-title {
-        margin: 30px 0 8px;
-        font-size: 22px;
-        color: #e5f0ec;
-    }
+        /* Keep the site title clickable. */
+        #home-button {
+            cursor: pointer;
+        }
 
-    .ports-section-description {
-        margin: 0 0 12px;
-        color: #8fa7a3;
-        font-size: 14px;
-        line-height: 1.5;
-    }
-</style>
+        /* Android ports section. */
+        .ports-section-title {
+            margin: 30px 0 8px;
+            font-size: 22px;
+            color: var(--text-strong, #f0f7f4);
+        }
 
-</head><body><header>
+        .ports-section-description {
+            margin: 0 0 12px;
+            color: var(--text-muted, #a2bdb5);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+
+<body>
+
+<header>
+
     <button
         id="menu-button"
         type="button"
         aria-label="Open menu"
-    >☰</button><h1 id="home-button">The Ports Vault</h1>
-
-<button
-    id="search-button"
-    type="button"
-    aria-label="Open search"
-    aria-controls="search-container"
-    aria-expanded="false"
->
-    <svg
-        class="search-icon"
-        xmlns="http://www.w3.org/2000/svg"
-        width="22"
-        height="22"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        aria-hidden="true"
     >
-        <circle cx="11" cy="11" r="7"></circle>
-        <path d="m20 20-4-4"></path>
-    </svg>
-</button>
+        ☰
+    </button>
 
-</header><div id="menu-overlay"></div><nav id="side-menu">
+    <h1 id="home-button">NAPL</h1>
+
+    <button
+        id="search-button"
+        type="button"
+        aria-label="Open search"
+        aria-controls="search-container"
+        aria-expanded="false"
+    >
+        <svg
+            class="search-icon"
+            xmlns="http://www.w3.org/2000/svg"
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+        >
+            <circle cx="11" cy="11" r="7"></circle>
+            <path d="m20 20-4-4"></path>
+        </svg>
+    </button>
+
+</header>
+
+
+<div id="menu-overlay"></div>
+
+
+<nav id="side-menu">
+
     <button
         id="menu-close"
         type="button"
         aria-label="Close menu"
-    >×</button><h2>Games</h2>
-
-<a class="platform-button" href="index.html">
-    All Games
-</a>
-
-<h2>Categories</h2>
-
-<div id="platform-list">
-    <a class="platform-button" href="index.html">
-        Multi-game Apps
-    </a>
-
-    <a class="platform-button" href="index.html">
-        Dual Screen
-    </a>
-
-    <div class="menu-separator">── Nintendo ──</div>
-
-    <a class="platform-button" href="index.html">NES</a>
-    <a class="platform-button" href="index.html">Super Nintendo</a>
-    <a class="platform-button" href="index.html">Nintendo 64</a>
-    <a class="platform-button" href="index.html">GameCube / Wii</a>
-    <a class="platform-button" href="index.html">Nintendo Wii U</a>
-    <a class="platform-button" href="index.html">Gameboy / Gameboy Color</a>
-    <a class="platform-button" href="index.html">Gameboy Advance</a>
-    <a class="platform-button" href="index.html">Nintendo DS</a>
-    <a class="platform-button" href="index.html">Nintendo 3DS</a>
-
-    <div class="menu-separator">── PlayStation ──</div>
-
-    <a class="platform-button" href="index.html">Playstation</a>
-    <a class="platform-button" href="index.html">Playstation 2</a>
-    <a class="platform-button" href="index.html">Playstation 4</a>
-    <a class="platform-button" href="index.html">Playstation Portable</a>
-
-    <div class="menu-separator">── Xbox ──</div>
-
-    <a class="platform-button" href="index.html">Xbox</a>
-    <a class="platform-button" href="index.html">Xbox 360</a>
-
-    <div class="menu-separator">── Others ──</div>
-
-    <a class="platform-button" href="index.html">Others</a>
-</div>
-
-</nav><main><!-- Search -->
-<div
-    id="search-container"
-    class="search-container"
-    hidden
->
-    <input
-        type="text"
-        id="search"
-        placeholder="Search game..."
-        autocomplete="off"
     >
+        ×
+    </button>
 
-    <div
-        id="search-results"
-        class="search-results"
-        hidden
-    ></div>
-</div>
+    <h2>Games</h2>
 
-<!-- Navigation -->
-<a
-    href="index.html"
-    class="back-button"
-    id="back-button"
->
-    ← Back to list
-</a>
+    <a class="platform-button" href="index.html">
+        All Games
+    </a>
 
-<!-- General game information card.
-     game-render.js fills this container dynamically. -->
-<section
-    id="game-header"
-    class="game-summary-card"
-    aria-label="Game information"
->
-    <div id="game-title">Loading...</div>
-    <div id="game-year"></div>
-</section>
+    <h2>Categories</h2>
 
-<!-- Community Android ports -->
-<section id="android-ports-section">
+    <div id="platform-list">
 
-    <h2 class="ports-section-title">
-        Android Ports
-    </h2>
+        <a class="platform-button" href="index.html">
+            Multi-game Apps
+        </a>
 
-    <p class="ports-section-description">
-        Community-made Android ports and projects for this game.
-    </p>
+        <a class="platform-button" href="index.html">
+            Dual Screen
+        </a>
 
-    <div id="status" aria-live="polite">
-        Loading ports...
+        <div class="menu-separator">── Nintendo ──</div>
+
+        <a class="platform-button" href="index.html">NES</a>
+        <a class="platform-button" href="index.html">Super Nintendo</a>
+        <a class="platform-button" href="index.html">Nintendo 64</a>
+        <a class="platform-button" href="index.html">GameCube / Wii</a>
+        <a class="platform-button" href="index.html">Nintendo Wii U</a>
+        <a class="platform-button" href="index.html">Gameboy / Gameboy Color</a>
+        <a class="platform-button" href="index.html">Gameboy Advance</a>
+        <a class="platform-button" href="index.html">Nintendo DS</a>
+        <a class="platform-button" href="index.html">Nintendo 3DS</a>
+
+        <div class="menu-separator">── PlayStation ──</div>
+
+        <a class="platform-button" href="index.html">PlayStation</a>
+        <a class="platform-button" href="index.html">PlayStation 2</a>
+        <a class="platform-button" href="index.html">PlayStation 4</a>
+        <a class="platform-button" href="index.html">PlayStation Portable</a>
+
+        <div class="menu-separator">── Xbox ──</div>
+
+        <a class="platform-button" href="index.html">Xbox</a>
+        <a class="platform-button" href="index.html">Xbox 360</a>
+
+        <div class="menu-separator">── Others ──</div>
+
+        <a class="platform-button" href="index.html">Others</a>
+
     </div>
 
-    <div id="port-list"></div>
+</nav>
 
-</section>
 
-</main><footer>
-    <p>The Ports Vault</p>
-</footer><script>
+<main>
+
+    <!-- Search -->
+    <div
+        id="search-container"
+        class="search-container"
+        hidden
+    >
+
+        <input
+            type="text"
+            id="search"
+            placeholder="Search game..."
+            autocomplete="off"
+            aria-label="Search games"
+        >
+
+        <div
+            id="search-results"
+            class="search-results"
+            hidden
+        ></div>
+
+    </div>
+
+
+    <!-- Back to the game list -->
+    <a
+        href="index.html"
+        class="back-button"
+        id="back-button"
+    >
+        ← Back to list
+    </a>
+
+
+    <!-- Game information populated by game.js -->
+    <section
+        id="game-header"
+        class="game-summary-card"
+        aria-label="Game information"
+    >
+        <div id="game-title">Loading...</div>
+        <div id="game-year"></div>
+    </section>
+
+
+    <!-- Android ports -->
+    <section id="android-ports-section">
+
+        <h2 class="ports-section-title">
+            Android Ports
+        </h2>
+
+        <p class="ports-section-description">
+            Community-made Android ports and projects for this game.
+        </p>
+
+        <div id="status" aria-live="polite">
+            Loading ports...
+        </div>
+
+        <div id="port-list"></div>
+
+    </section>
+
+</main>
+
+
+<footer>
+    <p>NAPL — Native Android Port List</p>
+</footer>
+
+
+<script>
     // Return to the home page when clicking the site title.
     document
         .getElementById("home-button")
-        .addEventListener("click", function() {
+        .addEventListener("click", function () {
             window.location.href = "index.html";
         });
+
 
     // Return to the previous page when possible.
     document
         .getElementById("back-button")
-        .addEventListener("click", function(event) {
+        .addEventListener("click", function (event) {
             if (
                 document.referrer &&
                 new URL(document.referrer).origin === location.origin
@@ -207,20 +251,14 @@
             }
         });
 
+
     // Toggle the side menu.
-    const menuButton =
-        document.getElementById("menu-button");
+    const menuButton = document.getElementById("menu-button");
+    const menuClose = document.getElementById("menu-close");
+    const sideMenu = document.getElementById("side-menu");
+    const menuOverlay = document.getElementById("menu-overlay");
 
-    const menuClose =
-        document.getElementById("menu-close");
-
-    const sideMenu =
-        document.getElementById("side-menu");
-
-    const menuOverlay =
-        document.getElementById("menu-overlay");
-
-    menuButton.addEventListener("click", function() {
+    menuButton.addEventListener("click", function () {
         sideMenu.classList.add("open");
         menuOverlay.classList.add("visible");
     });
@@ -236,26 +274,20 @@
     // Close the menu after selecting a category.
     document
         .querySelectorAll("#side-menu a.platform-button")
-        .forEach(function(link) {
+        .forEach(function (link) {
             link.addEventListener("click", closeMenu);
         });
 
+
     // Toggle search and show matching game names.
-    const searchButton =
-        document.getElementById("search-button");
-
-    const searchContainer =
-        document.getElementById("search-container");
-
-    const searchInput =
-        document.getElementById("search");
-
-    const searchResults =
-        document.getElementById("search-results");
+    const searchButton = document.getElementById("search-button");
+    const searchContainer = document.getElementById("search-container");
+    const searchInput = document.getElementById("search");
+    const searchResults = document.getElementById("search-results");
 
     let gameNames = [];
 
-    searchButton.addEventListener("click", function() {
+    searchButton.addEventListener("click", function () {
         const opening = searchContainer.hidden;
 
         searchContainer.hidden = !opening;
@@ -274,9 +306,9 @@
         }
     });
 
-    searchInput.addEventListener("input", function() {
-        const query =
-            searchInput.value.trim().toLowerCase();
+
+    searchInput.addEventListener("input", function () {
+        const query = searchInput.value.trim().toLowerCase();
 
         searchResults.innerHTML = "";
 
@@ -305,23 +337,19 @@
             .slice(0, 5);
 
         for (const game of matches) {
-            const link =
-                document.createElement("a");
+            const link = document.createElement("a");
 
             link.className = "search-result";
-
             link.href =
-                "game.html?game=" +
-                encodeURIComponent(game.slug);
-
+                "game.html?game=" + encodeURIComponent(game.slug);
             link.textContent = game.name;
 
             searchResults.appendChild(link);
         }
 
-        searchResults.hidden =
-            matches.length === 0;
+        searchResults.hidden = matches.length === 0;
     });
+
 
     // Load game names from the public spreadsheet.
     fetch(
@@ -341,16 +369,13 @@
                 return;
             }
 
+            // Parse CSV fields, including quoted commas.
             const parseLine = line => {
                 const cells = [];
                 let value = "";
                 let quoted = false;
 
-                for (
-                    let i = 0;
-                    i < line.length;
-                    i++
-                ) {
+                for (let i = 0; i < line.length; i++) {
                     const char = line[i];
 
                     if (
@@ -362,10 +387,7 @@
                         i++;
                     } else if (char === '"') {
                         quoted = !quoted;
-                    } else if (
-                        char === "," &&
-                        !quoted
-                    ) {
+                    } else if (char === "," && !quoted) {
                         cells.push(value);
                         value = "";
                     } else {
@@ -407,9 +429,7 @@
                 }
 
                 const cells = parseLine(row);
-
-                const name =
-                    (cells[gameIndex] || "").trim();
+                const name = (cells[gameIndex] || "").trim();
 
                 if (!name) {
                     continue;
@@ -440,5 +460,9 @@
                 error
             );
         });
-</script><script type="module" src="game.js"></script></body>
+</script>
+
+<script type="module" src="game.js"></script>
+
+</body>
 </html>
