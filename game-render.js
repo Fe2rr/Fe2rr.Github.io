@@ -47,7 +47,7 @@ function restoreDescriptionLineBreaks(description) {
         .replace(/\s*\|\|\|\s*/g, "\n")
         .trim();
 }
-}
+
 
 
 /*
