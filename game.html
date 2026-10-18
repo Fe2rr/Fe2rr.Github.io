@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 
@@ -6,11 +5,34 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Game — NAPL</title>
+    <title>Game Details — NAPL</title>
+
+    <meta
+        name="description"
+        content="Explore native Android ports, supported versions, compatibility information, and details for your favorite games."
+    >
+    <meta name="theme-color" content="#0a211f">
+
+    <!-- Inter font: matching the NAPL mockup -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet"
+    >
 
     <link rel="stylesheet" href="style.css">
 
     <style>
+        /* Keep the entire page typography consistent with the mockup. */
+        body,
+        button,
+        input,
+        select,
+        textarea {
+            font-family: Inter, system-ui, sans-serif;
+        }
+
         /* Category links in the side menu. */
         #side-menu a.platform-button {
             display: block;
@@ -90,9 +112,7 @@
 
 </header>
 
-
 <div id="menu-overlay"></div>
-
 
 <nav id="side-menu">
 
@@ -154,7 +174,6 @@
 
 </nav>
 
-
 <main>
 
     <!-- Search -->
@@ -180,7 +199,6 @@
 
     </div>
 
-
     <!-- Back to the game list -->
     <a
         href="index.html"
@@ -189,7 +207,6 @@
     >
         ← Back to list
     </a>
-
 
     <!-- Game information populated by game.js -->
     <section
@@ -200,7 +217,6 @@
         <div id="game-title">Loading...</div>
         <div id="game-year"></div>
     </section>
-
 
     <!-- Android ports -->
     <section id="android-ports-section">
@@ -223,11 +239,9 @@
 
 </main>
 
-
 <footer>
     <p>NAPL — Native Android Port List</p>
 </footer>
-
 
 <script>
     // Return to the home page when clicking the site title.
@@ -236,7 +250,6 @@
         .addEventListener("click", function () {
             window.location.href = "index.html";
         });
-
 
     // Return to the previous page when possible.
     document
@@ -250,7 +263,6 @@
                 history.back();
             }
         });
-
 
     // Toggle the side menu.
     const menuButton = document.getElementById("menu-button");
@@ -278,7 +290,6 @@
             link.addEventListener("click", closeMenu);
         });
 
-
     // Toggle search and show matching game names.
     const searchButton = document.getElementById("search-button");
     const searchContainer = document.getElementById("search-container");
@@ -305,7 +316,6 @@
             searchResults.hidden = true;
         }
     });
-
 
     searchInput.addEventListener("input", function () {
         const query = searchInput.value.trim().toLowerCase();
@@ -349,7 +359,6 @@
 
         searchResults.hidden = matches.length === 0;
     });
-
 
     // Load game names from the public spreadsheet.
     fetch(
