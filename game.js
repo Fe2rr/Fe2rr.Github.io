@@ -1,56 +1,19 @@
 
 /*
- * NAPL — GAME MODULE
+ * NAPL — GAME RENDER
  *
- * Loads game data from Google Sheets,
- * processes the CSV and coordinates rendering.
+ * Displays game information and Android port cards.
  */
 
-import { displayGame } from "./game-render.js";
+import {
+    isMultiGameApp,
+    isMultiGameAppPort,
+    findGamesUsingApp
+} from "./game-apps.js";
 
 
 /*
- * GOOGLE SHEETS
- */
-
-const SHEET_URL =
-    "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
-
-
-/*
- * VISIT COUNTER
- */
-
-const VISITS_URL =
-    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
-
-
-/*
- * PAGE ELEMENTS
- */
-
-const gameTitle = document.getElementById("game-title");
-const gameYear = document.getElementById("game-year");
-const portList = document.getElementById("port-list");
-const statusElement = document.getElementById("status");
-
-
-/*
- * NORMALIZE HEADERS
- */
-
-function normalizeHeader(value) {
-    return String(value || "")
-        .replace(/^\uFEFF/, "")
-        .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-}
-
-
-/*
- * NORMALIZE TEXT
+ * TEXT HELPERS
  */
 
 function normalizeText(value) {
@@ -62,10 +25,6 @@ function normalizeText(value) {
 }
 
 
-/*
- * CREATE GAME SLUG
- */
-
 function createSlug(name) {
     return normalizeText(name)
         .replace(/[^a-z0-9]+/g, "-")
@@ -73,462 +32,453 @@ function createSlug(name) {
 }
 
 
+function restoreDescriptionLineBreaks(description) {
+    return String(description || "")
+        .replace(/\s*\|\|\|\s*/g, "\n")
+        .trim();
+}
+
+
 /*
- * REGISTER GAME VISIT
+ * URL VALIDATION
+ *
+ * Allow web links only.
  */
 
-function registerVisit(gameSlug) {
-    if (!gameSlug) {
+function safeWebUrl(value) {
+    const input = String(value || "").trim();
+
+    if (!input) {
+        return "";
+    }
+
+    try {
+        const url = new URL(input);
+
+        if (
+            url.protocol !== "https:" &&
+            url.protocol !== "http:"
+        ) {
+            return "";
+        }
+
+        return url.href;
+    } catch {
+        return "";
+    }
+}
+
+
+/*
+ * STANDARD INFORMATION ROW
+ */
+
+function createInfoRow(label, value) {
+    if (!value) {
+        return null;
+    }
+
+    const row = document.createElement("div");
+    row.className = "port-info-row";
+
+    const labelElement = document.createElement("span");
+    labelElement.className = "port-info-label";
+    labelElement.textContent = label;
+
+    const valueElement = document.createElement("span");
+    valueElement.className = "port-info-value";
+    valueElement.textContent = value;
+
+    row.append(labelElement, valueElement);
+
+    return row;
+}
+
+
+/*
+ * INFORMATION ROW WITH A LINKED VALUE
+ */
+
+function createInfoRowWithLinkedValue(label, value, url) {
+    if (!value) {
+        return null;
+    }
+
+    const safeUrl = safeWebUrl(url);
+
+    if (!safeUrl) {
+        return createInfoRow(label, value);
+    }
+
+    const row = document.createElement("div");
+    row.className = "port-info-row";
+
+    const labelElement = document.createElement("span");
+    labelElement.className = "port-info-label";
+    labelElement.textContent = label;
+
+    const valueElement = document.createElement("a");
+    valueElement.className = "port-info-value";
+    valueElement.href = safeUrl;
+    valueElement.target = "_blank";
+    valueElement.rel = "noopener noreferrer";
+    valueElement.textContent = value;
+
+    row.append(labelElement, valueElement);
+
+    return row;
+}
+
+
+/*
+ * GAME SUMMARY CARD
+ *
+ * Displays the cover, title, year, genre and description.
+ */
+
+function displayGameSummary(game, parentElement) {
+    parentElement.replaceChildren();
+    parentElement.className =
+        "game-header game-summary-card";
+
+    /*
+     * Cover image.
+     */
+
+    const coverUrl = safeWebUrl(game.coverUrl);
+
+    if (coverUrl) {
+        const cover = document.createElement("img");
+
+        cover.className = "game-summary-cover";
+        cover.src = coverUrl;
+        cover.alt = `${game.name} cover`;
+        cover.loading = "eager";
+        cover.decoding = "async";
+
+        cover.addEventListener("error", () => {
+            cover.remove();
+        }, { once: true });
+
+        parentElement.appendChild(cover);
+    }
+
+    /*
+     * Game information.
+     */
+
+    const info = document.createElement("div");
+    info.className = "game-summary-info";
+
+    const title = document.createElement("h1");
+    title.id = "game-title";
+    title.className = "game-summary-title";
+    title.textContent = game.name;
+
+    info.appendChild(title);
+
+    /*
+     * Year and genre.
+     */
+
+    const metadata = document.createElement("div");
+    metadata.className = "game-summary-metadata";
+
+    if (game.year) {
+        const year = document.createElement("span");
+
+        year.id = "game-year";
+        year.className = "game-summary-year";
+        year.textContent = game.year;
+
+        metadata.appendChild(year);
+    }
+
+    if (game.genre) {
+        const genre = document.createElement("span");
+
+        genre.className = "game-summary-genre";
+        genre.textContent = game.genre;
+
+        metadata.appendChild(genre);
+    }
+
+    if (metadata.childElementCount > 0) {
+        info.appendChild(metadata);
+    }
+
+    /*
+     * Description.
+     */
+
+    if (game.description) {
+        const description = document.createElement("p");
+
+        description.className = "game-summary-description";
+        description.textContent =
+            restoreDescriptionLineBreaks(game.description);
+
+        description.style.whiteSpace = "pre-line";
+
+        info.appendChild(description);
+    }
+
+    parentElement.appendChild(info);
+}
+
+
+/*
+ * GAMES THAT USE A MULTI-GAME APP
+ */
+
+function displayGamesUsingApp(
+    appName,
+    allRows,
+    titleText,
+    parentElement
+) {
+    const gamesUsingApp = findGamesUsingApp(
+        appName,
+        allRows
+    );
+
+    if (!gamesUsingApp.length) {
         return;
     }
 
-    const url =
-        `${VISITS_URL}?game=${encodeURIComponent(gameSlug)}`;
+    const section = document.createElement("section");
+    section.className = "games-using-app";
 
-    fetch(url, {
-        method: "GET",
-        mode: "no-cors",
-        keepalive: true
-    }).catch(error => {
-        console.error(
-            "Could not register game visit:",
-            error
+    /*
+     * Collapsible section header.
+     */
+
+    const toggle = document.createElement("button");
+
+    toggle.type = "button";
+    toggle.className = "games-using-app-toggle";
+    toggle.setAttribute("aria-expanded", "false");
+
+    const title = document.createElement("span");
+    title.textContent = titleText;
+
+    const arrow = document.createElement("span");
+    arrow.className = "games-using-app-arrow";
+    arrow.textContent = "▼";
+    arrow.setAttribute("aria-hidden", "true");
+
+    toggle.append(title, arrow);
+
+    /*
+     * Linked game list.
+     */
+
+    const list = document.createElement("div");
+
+    list.className = "games-using-app-list";
+    list.hidden = true;
+
+    for (const game of gamesUsingApp) {
+        const link = document.createElement("a");
+
+        link.className = "games-using-app-item";
+        link.href =
+            `game.html?game=${encodeURIComponent(
+                createSlug(game.name)
+            )}`;
+
+        link.textContent = game.name;
+
+        if (game.year) {
+            const year = document.createElement("span");
+            year.textContent = ` (${game.year})`;
+            link.appendChild(year);
+        }
+
+        list.appendChild(link);
+    }
+
+    /*
+     * Expand / collapse.
+     */
+
+    toggle.addEventListener("click", () => {
+        const isOpen =
+            toggle.getAttribute("aria-expanded") === "true";
+
+        toggle.setAttribute(
+            "aria-expanded",
+            String(!isOpen)
         );
+
+        list.hidden = isOpen;
+        arrow.textContent = isOpen ? "▼" : "▲";
     });
+
+    section.append(toggle, list);
+    parentElement.appendChild(section);
 }
 
 
 /*
- * CSV PARSER
+ * DISPLAY THE SELECTED GAME
  */
 
-function parseCSV(csv) {
-    const rows = [];
+export function displayGame(game, allRows) {
+    const gameHeader = document.getElementById("game-header");
+    const portList = document.getElementById("port-list");
+    const statusElement = document.getElementById("status");
 
-    let row = [];
-    let field = "";
-    let insideQuotes = false;
+    if (!gameHeader || !portList || !statusElement) {
+        console.error("NAPL: required game page elements are missing.");
+        return;
+    }
 
-    for (let i = 0; i < csv.length; i++) {
-        const char = csv[i];
+    /*
+     * Game summary.
+     */
 
-        if (char === '"') {
+    displayGameSummary(game, gameHeader);
+
+    /*
+     * Port count.
+     */
+
+    const portCount = game.ports.length;
+
+    statusElement.textContent =
+        `${portCount} Android port${portCount !== 1 ? "s" : ""}`;
+
+    portList.replaceChildren();
+
+    /*
+     * Render every port.
+     */
+
+    for (let index = 0; index < game.ports.length; index++) {
+        const port = game.ports[index];
+
+        const card = document.createElement("article");
+        card.className = "port";
+
+        /*
+         * Port title.
+         */
+
+        const title = document.createElement("h2");
+        title.className = "port-title";
+        title.textContent = port.project || `Port ${index + 1}`;
+
+        card.appendChild(title);
+
+        /*
+         * Port metadata.
+         */
+
+        const info = document.createElement("div");
+        info.className = "port-info";
+
+        const fields = [
+            ["Developer", port.developer],
+            ["Version", port.version],
+            ["Supported Inputs", port.controller],
+            ["Needs Game Files?", port.files],
+            ["Works?", port.works],
+            ["Last Update", port.lastUpdate]
+        ];
+
+        for (const [label, value] of fields) {
+            let row;
+
             if (
-                insideQuotes &&
-                csv[i + 1] === '"'
+                label === "Needs Game Files?" &&
+                port.dataUrl
             ) {
-                field += '"';
-                i++;
+                row = createInfoRowWithLinkedValue(
+                    label,
+                    value,
+                    port.dataUrl
+                );
             } else {
-                insideQuotes = !insideQuotes;
+                row = createInfoRow(label, value);
             }
 
-            continue;
-        }
-
-        if (char === "," && !insideQuotes) {
-            row.push(field);
-            field = "";
-            continue;
-        }
-
-        if (
-            (char === "\n" || char === "\r") &&
-            !insideQuotes
-        ) {
-            if (
-                char === "\r" &&
-                csv[i + 1] === "\n"
-            ) {
-                i++;
+            if (row) {
+                info.appendChild(row);
             }
-
-            row.push(field);
-            field = "";
-
-            if (row.some(value => value.trim() !== "")) {
-                rows.push(row);
-            }
-
-            row = [];
-            continue;
         }
 
-        field += char;
+        if (info.childElementCount > 0) {
+            card.appendChild(info);
+        }
+
+        /*
+         * Notes.
+         */
+
+        if (port.notes) {
+            const notes = document.createElement("div");
+            notes.className = "port-notes";
+
+            const notesTitle = document.createElement("strong");
+            notesTitle.textContent = "Notes";
+
+            const notesText = document.createElement("p");
+            notesText.textContent = port.notes;
+
+            notes.append(notesTitle, notesText);
+            card.appendChild(notes);
+        }
+
+        /*
+         * Port link.
+         */
+
+        const portUrl = safeWebUrl(port.url);
+
+        if (portUrl) {
+            const link = document.createElement("a");
+
+            link.className = "port-link";
+            link.href = portUrl;
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = port.link || "Open Port →";
+
+            card.appendChild(link);
+        }
+
+        /*
+         * Add card.
+         */
+
+        portList.appendChild(card);
+
+        /*
+         * Other games supported by this app.
+         */
+
+        if (isMultiGameAppPort(port, allRows)) {
+            displayGamesUsingApp(
+                port.project,
+                allRows,
+                "With this port you can also play:",
+                card
+            );
+        }
     }
 
-    // Add the final field and row.
-    if (field.length > 0 || row.length > 0) {
-        row.push(field);
-
-        if (row.some(value => value.trim() !== "")) {
-            rows.push(row);
-        }
-    }
-
-    if (rows.length === 0) {
-        return [];
-    }
-
-    const headers = rows.shift().map(normalizeHeader);
-
-    return rows.map(values => {
-        const rowObject = {};
-
-        headers.forEach((header, index) => {
-            rowObject[header] = (values[index] || "").trim();
-        });
-
-        return rowObject;
-    });
-}
-
-
-/*
- * FIND A COLUMN BY POSSIBLE HEADER NAMES
- */
-
-function getColumn(row, possibleNames) {
-    for (const name of possibleNames) {
-        const key = normalizeHeader(name);
-
-        if (
-            Object.prototype.hasOwnProperty.call(row, key)
-        ) {
-            return row[key];
-        }
-    }
-
-    return "";
-}
-
-
-/*
- * PROCESS SPREADSHEET ROWS
- *
- * Game metadata can be stored on a separate row.
- * Empty metadata cells inherit the latest value
- * for the current game.
- */
-
-function processRows(rows) {
-    let currentGame = "";
-    let currentYear = "";
-    let currentGenre = "";
-    let currentCoverUrl = "";
-    let currentDescription = "";
-
-    const result = [];
-
-    for (const row of rows) {
-        const gameValue = getColumn(row, [
-            "GAME",
-            "GAME NAME",
-            "NAME",
-            "JUEGO"
-        ]).trim();
-
-        const yearValue = getColumn(row, [
-            "YEAR",
-            "ANO",
-            "AÑO"
-        ]).trim();
-
-        if (gameValue) {
-            currentGame = gameValue;
-
-            // Prevent metadata from carrying over to another game.
-            currentYear = "";
-            currentGenre = "";
-            currentCoverUrl = "";
-            currentDescription = "";
-        }
-
-        if (yearValue) {
-            currentYear = yearValue;
-        }
-
-        const genreValue = getColumn(row, [
-            "GENRE",
-            "GENRES",
-            "GÉNERO",
-            "GENERO"
-        ]).trim();
-
-        if (genreValue) {
-            currentGenre = genreValue;
-        }
-
-        const coverUrlValue = getColumn(row, [
-            "COVER_URL",
-            "COVER URL",
-            "COVER",
-            "IMAGE_URL",
-            "IMAGE URL",
-            "PORTADA"
-        ]).trim();
-
-        if (coverUrlValue) {
-            currentCoverUrl = coverUrlValue;
-        }
-
-        const descriptionValue = getColumn(row, [
-            "DESCRIPTION",
-            "DESCRIPCIÓN",
-            "DESCRIPCION",
-            "SUMMARY",
-            "SINOPSIS"
-        ]).trim();
-
-        if (descriptionValue) {
-            currentDescription = descriptionValue;
-        }
-
-        const platform = getColumn(row, [
-            "PLATFORM",
-            "PLATAFORM",
-            "PLATAFORMA"
-        ]);
-
-        const project = getColumn(row, [
-            "PROJECT",
-            "PROYECTO"
-        ]);
-
-        const link = getColumn(row, [
-            "LINK",
-            "PROJECT LINK",
-            "ENLACE"
-        ]);
-
-        const url = getColumn(row, ["URL"]);
-
-        const developer = getColumn(row, [
-            "DEVELOPER",
-            "DEVELOPER/PUBLISHER",
-            "DESARROLLADOR"
-        ]);
-
-        const version = getColumn(row, [
-            "VERSION",
-            "VERSIÓN"
-        ]);
-
-        const controller = getColumn(row, [
-            "CONTROLLER SUPPORT",
-            "CONTROLLER",
-            "GAMEPAD",
-            "MANDO"
-        ]);
-
-        const files = getColumn(row, [
-            "NEEDS GAME FILES?",
-            "NEEDS GAME FILES",
-            "GAME FILES",
-            "NECESITA ARCHIVOS"
-        ]);
-
-        const dataUrl = getColumn(row, ["DATA URL"]);
-
-        const works = getColumn(row, [
-            "WORKS?",
-            "WORKS",
-            "FUNCIONA"
-        ]);
-
-        const lastUpdate = getColumn(row, [
-            "LAST UPDATE",
-            "LAST UPDATED",
-            "ÚLTIMA ACTUALIZACIÓN"
-        ]);
-
-        const notes = getColumn(row, [
-            "NOTES",
-            "NOTE",
-            "NOTAS"
-        ]);
-
-        const hasPortData =
-            project ||
-            link ||
-            url ||
-            developer ||
-            version ||
-            controller ||
-            files ||
-            dataUrl ||
-            works ||
-            lastUpdate ||
-            notes;
-
-        // Metadata-only rows are not rendered as ports.
-        if (!currentGame || !hasPortData) {
-            continue;
-        }
-
-        result.push({
-            game: currentGame,
-            year: currentYear,
-            genre: currentGenre,
-            coverUrl: currentCoverUrl,
-            description: currentDescription,
-            platform: platform.trim(),
-            project: project.trim(),
-            link: link.trim(),
-            url: url.trim(),
-            developer: developer.trim(),
-            version: version.trim(),
-            controller: controller.trim(),
-            files: files.trim(),
-            dataUrl: dataUrl.trim(),
-            works: works.trim(),
-            lastUpdate: lastUpdate.trim(),
-            notes: notes.trim()
-        });
-    }
-
-    return result;
-}
-
-
-/*
- * GET THE REQUESTED GAME FROM THE URL
- */
-
-function getRequestedGame() {
-    const params = new URLSearchParams(window.location.search);
-    return params.get("game") || "";
-}
-
-
-/*
- * DISPLAY A SAFE ERROR MESSAGE
- */
-
-function displayLoadError(error) {
-    console.error("Could not load game:", error);
-
-    gameTitle.textContent = "Error";
-    gameYear.textContent = "";
-    statusElement.textContent = "";
-
-    let message = error?.message || "An unexpected error occurred.";
-
-    if (error?.name === "AbortError") {
-        message = "Google Sheets did not respond within 15 seconds.";
-    }
-
-    const errorContainer = document.createElement("div");
-    errorContainer.className = "error";
-
-    const heading = document.createElement("strong");
-    heading.textContent = "Could not load the game.";
-
-    const details = document.createElement("p");
-    details.textContent = message;
-
-    errorContainer.append(heading, details);
-
-    // Avoid inserting error messages through innerHTML.
-    portList.replaceChildren(errorContainer);
-}
-
-
-/*
- * LOAD THE SELECTED GAME
- */
-
-async function loadGame() {
-    try {
-        const requestedGame = getRequestedGame();
-
-        if (!requestedGame) {
-            throw new Error("No game was specified.");
-        }
-
-        registerVisit(requestedGame);
-
-        statusElement.textContent = "Loading ports...";
-
-        // Abort if Google Sheets does not respond within 15 seconds.
-        const controller = new AbortController();
-
-        const timeout = setTimeout(
-            () => controller.abort(),
-            15000
+    /*
+     * If the selected game is itself a Multi-game App,
+     * show the games that use it.
+     */
+
+    if (isMultiGameApp(game)) {
+        displayGamesUsingApp(
+            game.name,
+            allRows,
+            "Games using this app",
+            portList
         );
-
-        let response;
-
-        try {
-            response = await fetch(SHEET_URL, {
-                signal: controller.signal
-            });
-        } finally {
-            clearTimeout(timeout);
-        }
-
-        if (!response.ok) {
-            throw new Error(`HTTP error ${response.status}`);
-        }
-
-        const csv = await response.text();
-
-        if (!csv || !csv.trim()) {
-            throw new Error(
-                "Google Sheets returned an empty response."
-            );
-        }
-
-        const rows = parseCSV(csv);
-
-        if (rows.length === 0) {
-            throw new Error(
-                "The Google Sheet contains no data."
-            );
-        }
-
-        const processedRows = processRows(rows);
-
-        if (processedRows.length === 0) {
-            throw new Error(
-                "No ports were found in the Google Sheet."
-            );
-        }
-
-        const matchingRows = processedRows.filter(
-            row => createSlug(row.game) === requestedGame
-        );
-
-        if (matchingRows.length === 0) {
-            throw new Error(`Game not found: ${requestedGame}`);
-        }
-
-        const firstMatchingRow = matchingRows[0];
-
-        const game = {
-            name: firstMatchingRow.game,
-            year: firstMatchingRow.year,
-            genre: firstMatchingRow.genre,
-            coverUrl: firstMatchingRow.coverUrl,
-            description: firstMatchingRow.description,
-            ports: matchingRows
-        };
-
-        // NAPL browser tab title.
-        document.title = `${game.name} — NAPL`;
-
-        displayGame(game, processedRows);
-
-    } catch (error) {
-        displayLoadError(error);
     }
 }
-
-
-/*
- * START
- */
-
-loadGame();
-            
