@@ -1,734 +1,438 @@
+
 /*
- * Group ports by game.
+ * NAPL — MULTI-GAME APPS
+ *
+ * Groups games, detects shared projects and renders
+ * the Multi-game Apps category.
+ *
+ * Uses shared helpers and state defined by the main
+ * application scripts.
+ */
+
+
+/*
+ * GROUP PORTS BY GAME
  */
 
 function groupGames(rows) {
-
     const grouped = new Map();
 
+    if (!Array.isArray(rows)) {
+        return [];
+    }
 
     for (const port of rows) {
-
-        const key =
-            normalizeText(port.game);
-
-
-        if (!grouped.has(key)) {
-
-            grouped.set(
-                key,
-                {
-                    name: port.game,
-                    year: port.year,
-                    slug: createSlug(port.game),
-                    ports: [],
-                    platforms: new Set()
-                }
-            );
+        if (!port || !port.game) {
+            continue;
         }
 
+        const key = normalizeText(port.game);
 
-        const game =
-            grouped.get(key);
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                name: port.game,
+                year: port.year || "",
+                slug: createSlug(port.game),
+                ports: [],
+                platforms: new Set()
+            });
+        }
 
+        const game = grouped.get(key);
 
-        if (
-            !game.year &&
-            port.year
-        ) {
-
+        if (!game.year && port.year) {
             game.year = port.year;
         }
 
-
         if (port.platform) {
-
-            game.platforms.add(
-                port.platform
-            );
+            game.platforms.add(port.platform);
         }
-
 
         game.ports.push(port);
     }
 
-
-    return Array.from(
-        grouped.values()
-    ).map(game => {
-
-        game.platforms =
-            Array.from(
-                game.platforms
-            );
-
-        return game;
-    });
-
+    return Array.from(grouped.values()).map(game => ({
+        ...game,
+        platforms: Array.from(game.platforms)
+    }));
 }
 
+
 /*
- * Check Dual Screen.
+ * CHECK DUAL SCREEN
  */
 
 function isDualScreen(game) {
+    if (!game || !Array.isArray(game.ports)) {
+        return false;
+    }
 
-    return game.ports.some(
-        port =>
-            normalizeText(port.project)
-                .includes("dual screen")
+    return game.ports.some(port =>
+        normalizeText(port?.project).includes("dual screen")
     );
-
 }
 
+
 /*
- * Build Multi-game Apps.
+ * BUILD MULTI-GAME APPS
  *
- * Reuses the same relationship used by
- * "You can also play":
- *
- * GAME -> PROJECT
- *
- * A project becomes a Multi-game App when:
- *
- * 1. It is associated with more than one game.
- *
- * OR
- *
- * 2. It already has PLATFORM = Multi-game Apps.
+ * An app qualifies when it is explicitly marked as
+ * Multi-game Apps or its project is used by more
+ * than one distinct game.
  */
 
 function getMultiGameApps() {
+    if (!Array.isArray(games)) {
+        return [];
+    }
 
     const projects = new Map();
 
-
     for (const game of games) {
+        if (!game || !Array.isArray(game.ports)) {
+            continue;
+        }
 
         for (const port of game.ports) {
+            if (!port) {
+                continue;
+            }
 
-            const projectName =
-                port.project.trim();
-
-            /*
-             * Ignore generic project types.
-             * These are not Multi-game Apps.
-             */
+            const projectName = String(
+                port.project ?? ""
+            ).trim();
 
             const normalizedProject =
                 normalizeText(projectName);
 
+            const isMarkedAsApp = [
+                "multi-game apps",
+                "multi game apps"
+            ].includes(normalizeText(port.platform));
+
+            /*
+             * Ignore generic project types.
+             */
 
             if (
-                normalizedProject ===
-                    "unofficial port" ||
-                normalizedProject ===
-                    "android port"
+                normalizedProject === "unofficial port" ||
+                normalizedProject === "android port"
             ) {
-
                 continue;
             }
 
-
-            const isMarkedAsApp =
-                normalizeText(
-                    port.platform
-                ) === "multi-game apps" ||
-                normalizeText(
-                    port.platform
-                ) === "multi game apps";
-
-
             /*
-             * A row explicitly marked as
-             * Multi-game Apps uses GAME as
-             * the app name.
-             *
-             * This allows existing Multi-game
-             * Apps to appear even when they
-             * do not have multiple PROJECT
-             * references.
+             * Explicit app entries use GAME as the app name.
+             * Normal entries use PROJECT as the app name.
              */
 
-            const appName =
-                isMarkedAsApp
-                    ? game.name
-                    : projectName;
-
+            const appName = isMarkedAsApp
+                ? String(game.name ?? "").trim()
+                : projectName;
 
             if (!appName) {
-
                 continue;
             }
 
-
-            const key =
-                normalizeText(appName);
-
+            const key = normalizeText(appName);
 
             if (!projects.has(key)) {
-
-                projects.set(
-                    key,
-                    {
-                        name: appName,
-                        games: new Map(),
-                        latestUpdate: null,
-                        visits: 0
-                    }
-                );
+                projects.set(key, {
+                    name: appName,
+                    games: new Map(),
+                    latestUpdate: null,
+                    visits: 0,
+                    explicitlyMarked: false
+                });
             }
 
+            const app = projects.get(key);
 
-            const app =
-                projects.get(key);
+            if (isMarkedAsApp) {
+                app.explicitlyMarked = true;
+            } else if (projectName && game.name) {
+                const gameKey = normalizeText(game.name);
 
-
-            /*
-             * A normal port belongs to the
-             * project when PROJECT matches.
-             */
-
-            if (
-                projectName &&
-                !isMarkedAsApp
-            ) {
-
-                const gameKey =
-                    normalizeText(game.name);
-
-
-                if (
-                    !app.games.has(gameKey)
-                ) {
-
-                    app.games.set(
-                        gameKey,
-                        {
-                            name: game.name,
-                            year: game.year
-                        }
-                    );
+                if (!app.games.has(gameKey)) {
+                    app.games.set(gameKey, {
+                        name: game.name,
+                        year: game.year || ""
+                    });
                 }
             }
 
-
             /*
-             * Keep the most recent update
-             * associated with the app.
+             * Keep the latest update associated with the app.
              */
 
-            const updateDate =
-                parseLastUpdate(
+            if (port.lastUpdate) {
+                const updateDate = parseLastUpdate(
                     port.lastUpdate
                 );
 
-
-            if (
-                updateDate &&
-                (
-                    !app.latestUpdate ||
-                    updateDate > app.latestUpdate
-                )
-            ) {
-
-                app.latestUpdate =
-                    updateDate;
+                if (
+                    updateDate &&
+                    (
+                        !app.latestUpdate ||
+                        updateDate > app.latestUpdate
+                    )
+                ) {
+                    app.latestUpdate = updateDate;
+                }
             }
         }
     }
 
-
     /*
-     * Remove projects that are not actually
-     * Multi-game Apps.
-     *
-     * Explicitly marked apps are kept even
-     * when they have only one associated game.
+     * Keep actual multi-game apps and explicitly
+     * marked apps, even if they have one game.
      */
 
     const result = [];
 
-
     for (const app of projects.values()) {
-
-        let explicitlyMarked = false;
-
-
-        for (const game of games) {
-
-            for (const port of game.ports) {
-
-                const projectName =
-                    port.project.trim();
-
-
-                const normalizedProject =
-                    normalizeText(projectName);
-
-
-                if (
-                    normalizedProject ===
-                        "unofficial port" ||
-                    normalizedProject ===
-                        "android port"
-                ) {
-
-                    continue;
-                }
-
-
-                if (
-                    normalizeText(port.platform) ===
-                        "multi-game apps" &&
-                    normalizeText(game.name) ===
-                        normalizeText(app.name)
-                ) {
-
-                    explicitlyMarked = true;
-
-                    break;
-                }
-
-
-                if (
-                    normalizeText(port.platform) ===
-                        "multi game apps" &&
-                    normalizeText(game.name) ===
-                        normalizeText(app.name)
-                ) {
-
-                    explicitlyMarked = true;
-
-                    break;
-                }
-            }
-
-
-            if (explicitlyMarked) {
-
-                break;
-            }
-        }
-
-
         if (
-            app.games.size > 1 ||
-            explicitlyMarked
+            app.games.size <= 1 &&
+            !app.explicitlyMarked
         ) {
-
-            app.games =
-                Array.from(
-                    app.games.values()
-                ).sort(
-                    (a, b) =>
-                        a.name.localeCompare(
-                            b.name,
-                            "en",
-                            {
-                                sensitivity: "base"
-                            }
-                        )
-                );
-
-
-            app.slug =
-                createSlug(app.name);
-
-
-            app.gameCount =
-                app.games.length;
-
-
-            /*
-             * Use the popularity of the
-             * associated games.
-             */
-
-            let totalVisits = 0;
-
-
-            for (
-                const compatibleGame
-                of app.games
-            ) {
-
-                totalVisits +=
-                    allTimePopular.get(
-                        createSlug(
-                            compatibleGame.name
-                        )
-                    ) || 0;
-            }
-
-
-            app.visits =
-                totalVisits;
-
-
-            result.push(app);
+            continue;
         }
+
+        app.games = Array.from(
+            app.games.values()
+        ).sort((a, b) =>
+            a.name.localeCompare(
+                b.name,
+                "en",
+                { sensitivity: "base" }
+            )
+        );
+
+        app.slug = createSlug(app.name);
+        app.gameCount = app.games.length;
+
+        /*
+         * Sum the popularity of compatible games.
+         */
+
+        let totalVisits = 0;
+
+        for (const compatibleGame of app.games) {
+            const visits = allTimePopular.get(
+                createSlug(compatibleGame.name)
+            ) || 0;
+
+            totalVisits += Number(visits) || 0;
+        }
+
+        app.visits = totalVisits;
+
+        /*
+         * Internal detection flag is no longer needed.
+         */
+
+        delete app.explicitlyMarked;
+
+        result.push(app);
     }
 
-
     return result;
-
 }
 
+
 /*
- * Sort Multi-game Apps.
+ * SORT MULTI-GAME APPS
  */
 
 function sortMultiGameApps(list) {
-
-    const sorted =
-        [...list];
-
+    const sorted = Array.isArray(list)
+        ? [...list]
+        : [];
 
     switch (selectedCategorySort) {
-
         case "updated":
-
-            sorted.sort(
-                (a, b) => {
-
-                    if (
-                        !a.latestUpdate &&
-                        !b.latestUpdate
-                    ) {
-
-                        return 0;
-                    }
-
-                    if (!a.latestUpdate) {
-
-                        return 1;
-                    }
-
-                    if (!b.latestUpdate) {
-
-                        return -1;
-                    }
-
-
-                    const result =
-                        b.latestUpdate -
-                        a.latestUpdate;
-
-
-                    return categorySortDescending
-                        ? -result
-                        : result;
+            sorted.sort((a, b) => {
+                if (!a.latestUpdate && !b.latestUpdate) {
+                    return 0;
                 }
-            );
 
+                if (!a.latestUpdate) {
+                    return 1;
+                }
+
+                if (!b.latestUpdate) {
+                    return -1;
+                }
+
+                const result =
+                    b.latestUpdate - a.latestUpdate;
+
+                return categorySortDescending
+                    ? -result
+                    : result;
+            });
             break;
-
 
         case "name":
+            sorted.sort((a, b) => {
+                const result = a.name.localeCompare(
+                    b.name,
+                    "en",
+                    { sensitivity: "base" }
+                );
 
-            sorted.sort(
-                (a, b) => {
+                return categorySortDescending
+                    ? -result
+                    : result;
+            });
+            break;
 
-                    const result =
-                        a.name.localeCompare(
-                            b.name,
-                            "en",
-                            {
-                                sensitivity: "base"
-                            }
-                        );
+        case "popular":
+            sorted.sort((a, b) => {
+                const result =
+                    (Number(b.visits) || 0) -
+                    (Number(a.visits) || 0);
 
-
+                if (result !== 0) {
                     return categorySortDescending
                         ? -result
                         : result;
                 }
-            );
 
-            break;
-
-
-        case "popular":
-
-            sorted.sort(
-                (a, b) => {
-
-                    const result =
-                        b.visits -
-                        a.visits;
-
-
-                    if (result !== 0) {
-
-                        return categorySortDescending
-                            ? -result
-                            : result;
-                    }
-
-
-                    return a.name.localeCompare(
-                        b.name,
-                        "en",
-                        {
-                            sensitivity: "base"
-                        }
-                    );
-                }
-            );
-
+                return a.name.localeCompare(
+                    b.name,
+                    "en",
+                    { sensitivity: "base" }
+                );
+            });
             break;
     }
 
-
     return sorted;
-
 }
 
+
 /*
- * Display a Multi-game App.
- *
- * Uses the same visual structure as
- * "You can also play".
+ * DISPLAY A MULTI-GAME APP'S COMPATIBLE GAMES
  */
 
-function displayMultiGameApp(
-    app,
-    parentElement
-) {
+function displayMultiGameApp(app, parentElement) {
+    const section = document.createElement("section");
+    section.className = "games-using-app";
 
-    const section =
-        document.createElement("section");
+    const toggle = document.createElement("button");
+    toggle.type = "button";
+    toggle.className = "games-using-app-toggle";
+    toggle.setAttribute("aria-expanded", "false");
 
+    const title = document.createElement("span");
+    title.textContent = "You can also play:";
 
-    section.className =
-        "games-using-app";
+    const arrow = document.createElement("span");
+    arrow.className = "games-using-app-arrow";
+    arrow.textContent = "▼";
+    arrow.setAttribute("aria-hidden", "true");
 
+    toggle.append(title, arrow);
 
-    const toggle =
-        document.createElement("button");
-
-
-    toggle.type =
-        "button";
-
-
-    toggle.className =
-        "games-using-app-toggle";
-
-
-    toggle.setAttribute(
-        "aria-expanded",
-        "false"
-    );
-
-
-    const title =
-        document.createElement("span");
-
-
-    title.textContent =
-        "You can also play:";
-
-
-    const arrow =
-        document.createElement("span");
-
-
-    arrow.className =
-        "games-using-app-arrow";
-
-
-    arrow.textContent =
-        "▼";
-
-
-    toggle.appendChild(title);
-    toggle.appendChild(arrow);
-
-
-    const list =
-        document.createElement("div");
-
-
-    list.className =
-        "games-using-app-list";
-
-
+    const list = document.createElement("div");
+    list.className = "games-using-app-list";
     list.hidden = true;
 
+    for (const game of app.games) {
+        const link = document.createElement("a");
 
-    for (
-        const game
-        of app.games
-    ) {
-
-        const link =
-            document.createElement("a");
-
-
-        link.className =
-            "games-using-app-item";
-
-
+        link.className = "games-using-app-item";
         link.href =
             `game.html?game=${encodeURIComponent(
                 createSlug(game.name)
             )}`;
 
-
-        link.textContent =
-            game.name;
-
+        link.textContent = game.name;
 
         if (game.year) {
-
-            const year =
-                document.createElement("span");
-
-
-            year.textContent =
-                ` (${game.year})`;
-
-
+            const year = document.createElement("span");
+            year.textContent = ` (${game.year})`;
             link.appendChild(year);
         }
-
 
         list.appendChild(link);
     }
 
+    toggle.addEventListener("click", () => {
+        const isOpen =
+            toggle.getAttribute("aria-expanded") === "true";
 
-    toggle.addEventListener(
-        "click",
-        () => {
+        toggle.setAttribute(
+            "aria-expanded",
+            String(!isOpen)
+        );
 
-            const isOpen =
-                toggle.getAttribute(
-                    "aria-expanded"
-                ) === "true";
+        list.hidden = isOpen;
+        arrow.textContent = isOpen ? "▼" : "▲";
+    });
 
-
-            toggle.setAttribute(
-                "aria-expanded",
-                String(!isOpen)
-            );
-
-
-            list.hidden =
-                isOpen;
-
-
-            arrow.textContent =
-                isOpen
-                    ? "▼"
-                    : "▲";
-        }
-    );
-
-
-    section.appendChild(toggle);
-
-    section.appendChild(list);
-
+    section.append(toggle, list);
     parentElement.appendChild(section);
-
 }
 
+
 /*
- * Display Multi-game Apps list.
+ * DISPLAY THE MULTI-GAME APPS CATEGORY
  */
 
 function displayMultiGameApps(list) {
+    if (!gameList || !statusElement) {
+        console.error(
+            "NAPL: Multi-game Apps elements are missing."
+        );
+        return;
+    }
 
     gameList.hidden = false;
+    gameList.replaceChildren();
 
-    gameList.innerHTML = "";
+    const apps = Array.isArray(list) ? list : [];
 
+    if (apps.length === 0) {
+        const message = document.createElement("div");
 
-    if (list.length === 0) {
+        message.className = "no-results";
+        message.textContent = "No Multi-game Apps found.";
 
-        gameList.innerHTML = `
-            <div class="no-results">
-                No Multi-game Apps found.
-            </div>
-        `;
-
-
-        statusElement.textContent =
-            "0 Multi-game Apps";
-
+        gameList.appendChild(message);
+        statusElement.textContent = "0 Multi-game Apps";
 
         return;
     }
 
-
     statusElement.textContent =
-        `${list.length} Multi-game App${list.length !== 1 ? "s" : ""}`;
+        `${apps.length} Multi-game App${apps.length !== 1 ? "s" : ""}`;
 
+    const fragment = document.createDocumentFragment();
 
-    const fragment =
-        document.createDocumentFragment();
+    for (const app of apps) {
+        const element = document.createElement("div");
+        element.className = "game";
 
+        const name = document.createElement("h2");
+        name.className = "game-name";
+        name.textContent = app.name;
 
-    for (const app of list) {
+        const info = document.createElement("div");
+        info.className = "game-info";
 
-        const element =
-            document.createElement("div");
-
-
-        element.className =
-            "game";
-
-
-        const name =
-            document.createElement("h2");
-
-
-        name.className =
-            "game-name";
-
-
-        name.textContent =
-            app.name;
-
-
-        const info =
-            document.createElement("div");
-
-
-        info.className =
-            "game-info";
-
-
-        const count =
-            document.createElement("span");
-
-
+        const count = document.createElement("span");
         count.textContent =
             `${app.gameCount} game${app.gameCount !== 1 ? "s" : ""}`;
 
-
         info.appendChild(count);
+        element.append(name, info);
 
-
-        element.appendChild(name);
-
-        element.appendChild(info);
-
-
-        displayMultiGameApp(
-            app,
-            element
-        );
-
+        displayMultiGameApp(app, element);
 
         fragment.appendChild(element);
     }
 
-
-    gameList.appendChild(
-        fragment
-    );
-
+    gameList.appendChild(fragment);
 }
