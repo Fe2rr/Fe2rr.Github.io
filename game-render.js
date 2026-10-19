@@ -1,9 +1,10 @@
 
 /*
- * GAME RENDER
+ * NAPL — GAME RENDER
  *
- * Handles the visual presentation of game
- * information and port cards.
+ * Renders game information and Android port cards.
+ * Preserves existing navigation, links, notes,
+ * expandable descriptions and Multi-Game App support.
  */
 
 import {
@@ -13,9 +14,9 @@ import {
 } from "./game-apps.js";
 
 
-/*
- * Normalize text for slug creation.
- */
+/* ==================================================
+   TEXT HELPERS
+   ================================================== */
 
 function normalizeText(value) {
     return String(value || "")
@@ -26,22 +27,12 @@ function normalizeText(value) {
 }
 
 
-/*
- * Create the same slug used by app.js.
- */
-
 function createSlug(name) {
     return normalizeText(name)
         .replace(/[^a-z0-9]+/g, "-")
         .replace(/^-+|-+$/g, "");
 }
 
-
-/*
- * Restore line breaks in game descriptions.
- *
- * Google Sheets uses ||| as a line-break marker.
- */
 
 function restoreDescriptionLineBreaks(description) {
     return String(description || "")
@@ -50,67 +41,48 @@ function restoreDescriptionLineBreaks(description) {
 }
 
 
-/*
- * Display a standard information row.
- */
+/* ==================================================
+   PORT INFORMATION
+   ================================================== */
 
-function createInfoRow(label, value) {
-    if (!value) {
+/*
+ * Creates a detail field.
+ * When url is supplied, the value remains clickable.
+ */
+function createPortDetail(label, value, url = "") {
+    if (!String(value || "").trim()) {
         return null;
     }
 
-    const row = document.createElement("div");
-    row.className = "port-info-row";
+    const detail = document.createElement("div");
+    detail.className = "port-detail";
 
     const labelElement = document.createElement("span");
-    labelElement.className = "port-info-label";
+    labelElement.className = "port-detail-label";
     labelElement.textContent = label;
 
-    const valueElement = document.createElement("span");
-    valueElement.className = "port-info-value";
+    const valueElement = url
+        ? document.createElement("a")
+        : document.createElement("div");
+
+    valueElement.className = "port-detail-value";
     valueElement.textContent = value;
 
-    row.appendChild(labelElement);
-    row.appendChild(valueElement);
-
-    return row;
-}
-
-
-/*
- * Display an information row with a linked value.
- */
-
-function createInfoRowWithLinkedValue(label, value, url) {
-    if (!value) {
-        return null;
+    if (url) {
+        valueElement.href = url;
+        valueElement.target = "_blank";
+        valueElement.rel = "noopener noreferrer";
     }
 
-    const row = document.createElement("div");
-    row.className = "port-info-row";
+    detail.append(labelElement, valueElement);
 
-    const labelElement = document.createElement("span");
-    labelElement.className = "port-info-label";
-    labelElement.textContent = label;
-
-    const valueElement = document.createElement("a");
-    valueElement.className = "port-info-value";
-    valueElement.href = url;
-    valueElement.target = "_blank";
-    valueElement.rel = "noopener noreferrer";
-    valueElement.textContent = value;
-
-    row.appendChild(labelElement);
-    row.appendChild(valueElement);
-
-    return row;
+    return detail;
 }
 
 
-/*
- * Create the Show more / Show less control
- * for long descriptions.
- */
+/* ==================================================
+   EXPANDABLE GAME DESCRIPTION
+   ================================================== */
 
 function createExpandableDescription(description) {
     const container = document.createElement("div");
@@ -119,8 +91,6 @@ function createExpandableDescription(description) {
     const text = document.createElement("p");
     text.className = "game-summary-description";
     text.textContent = restoreDescriptionLineBreaks(description);
-    text.style.whiteSpace = "pre-line";
-    text.style.overflowWrap = "anywhere";
 
     const collapsedStyles = {
         display: "-webkit-box",
@@ -130,17 +100,11 @@ function createExpandableDescription(description) {
     };
 
     Object.assign(text.style, collapsedStyles);
-
     container.appendChild(text);
 
-    /*
-     * Measure the text after the browser lays it out.
-     * The button is shown only if the text is actually
-     * longer than the collapsed preview.
-     */
-
     requestAnimationFrame(() => {
-        const isLong = text.scrollHeight > text.clientHeight + 1;
+        const isLong =
+            text.scrollHeight > text.clientHeight + 1;
 
         if (!isLong) {
             text.style.display = "block";
@@ -150,19 +114,11 @@ function createExpandableDescription(description) {
         }
 
         const button = document.createElement("button");
+
         button.type = "button";
         button.className = "game-description-toggle";
         button.textContent = "Show more";
         button.setAttribute("aria-expanded", "false");
-
-        button.style.display = "inline-block";
-        button.style.marginTop = "8px";
-        button.style.padding = "4px 0";
-        button.style.background = "transparent";
-        button.style.border = "none";
-        button.style.color = "var(--accent)";
-        button.style.fontSize = "14px";
-        button.style.cursor = "pointer";
 
         button.addEventListener("click", () => {
             const expanded =
@@ -190,28 +146,14 @@ function createExpandableDescription(description) {
 }
 
 
-/*
- * Build the general information card for a game.
- *
- * Displays:
- * - Cover image
- * - Game title
- * - Release year
- * - Genre
- * - Expandable description
- */
+/* ==================================================
+   GAME SUMMARY
+   ================================================== */
 
 function displayGameSummary(game, parentElement) {
-    parentElement.innerHTML = "";
-    parentElement.className = "game-header game-summary-card";
-
-    /*
-     * Cover image.
-     *
-     * Only use valid HTTP or HTTPS URLs.
-     * If an image fails to load, remove the image
-     * without hiding the rest of the game information.
-     */
+    parentElement.replaceChildren();
+    parentElement.className =
+        "game-header game-summary-card";
 
     const coverUrl = String(game.coverUrl || "").trim();
 
@@ -226,67 +168,50 @@ function displayGameSummary(game, parentElement) {
 
         cover.addEventListener(
             "error",
-            () => {
-                cover.remove();
-            },
+            () => cover.remove(),
             { once: true }
         );
 
         parentElement.appendChild(cover);
     }
 
-    /*
-     * Game information container.
-     */
-
     const info = document.createElement("div");
     info.className = "game-summary-info";
 
-    /*
-     * Game title.
-     */
+    const eyebrow = document.createElement("div");
+    eyebrow.className = "game-summary-eyebrow";
+    eyebrow.textContent = "Featured port";
 
     const title = document.createElement("h1");
-
     title.id = "game-title";
     title.className = "game-summary-title";
     title.textContent = game.name;
 
-    info.appendChild(title);
-
-    /*
-     * Year and genre.
-     */
+    info.append(eyebrow, title);
 
     const metadata = document.createElement("div");
     metadata.className = "game-summary-metadata";
 
     if (game.year) {
         const year = document.createElement("span");
-
-        year.id = "game-year";
         year.className = "game-summary-year";
         year.textContent = game.year;
-
         metadata.appendChild(year);
     }
 
     if (game.genre) {
         const genre = document.createElement("span");
-
         genre.className = "game-summary-genre";
         genre.textContent = game.genre;
-
         metadata.appendChild(genre);
     }
 
-    if (metadata.childElementCount > 0) {
-        info.appendChild(metadata);
-    }
+    const android = document.createElement("span");
+    android.className = "game-summary-genre";
+    android.textContent = "Android";
+    metadata.appendChild(android);
 
-    /*
-     * Expandable game description.
-     */
+    info.appendChild(metadata);
 
     if (game.description) {
         info.appendChild(
@@ -298,10 +223,9 @@ function displayGameSummary(game, parentElement) {
 }
 
 
-/*
- * Display the list of games that use
- * a Multi-game App.
- */
+/* ==================================================
+   MULTI-GAME APP SUPPORT
+   ================================================== */
 
 function displayGamesUsingApp(
     appName,
@@ -321,10 +245,6 @@ function displayGamesUsingApp(
     const section = document.createElement("section");
     section.className = "games-using-app";
 
-    /*
-     * Collapsible header.
-     */
-
     const toggle = document.createElement("button");
 
     toggle.type = "button";
@@ -338,15 +258,9 @@ function displayGamesUsingApp(
     arrow.className = "games-using-app-arrow";
     arrow.textContent = "▼";
 
-    toggle.appendChild(title);
-    toggle.appendChild(arrow);
-
-    /*
-     * Game list.
-     */
+    toggle.append(title, arrow);
 
     const list = document.createElement("div");
-
     list.className = "games-using-app-list";
     list.hidden = true;
 
@@ -370,10 +284,6 @@ function displayGamesUsingApp(
         list.appendChild(link);
     }
 
-    /*
-     * Toggle open / closed.
-     */
-
     toggle.addEventListener("click", () => {
         const isOpen =
             toggle.getAttribute("aria-expanded") === "true";
@@ -387,16 +297,121 @@ function displayGamesUsingApp(
         arrow.textContent = isOpen ? "▼" : "▲";
     });
 
-    section.appendChild(toggle);
-    section.appendChild(list);
-
+    section.append(toggle, list);
     parentElement.appendChild(section);
 }
 
 
-/*
- * Display the selected game.
- */
+/* ==================================================
+   PORT CARD
+   ================================================== */
+
+function displayPortCard(port, index, allRows) {
+    const card = document.createElement("article");
+    card.className = "port port-card";
+
+    /* Port heading */
+
+    const top = document.createElement("div");
+    top.className = "port-top";
+
+    const title = document.createElement("h3");
+    title.className = "port-title";
+    title.textContent = port.project || `Port ${index + 1}`;
+
+    top.appendChild(title);
+    card.appendChild(top);
+
+    /* Port details */
+
+    const details = document.createElement("div");
+    details.className = "port-details";
+
+    const fields = [
+        ["Version", port.version, ""],
+        ["Developer", port.developer, ""],
+        [
+            "Need files?",
+            port.files,
+            port.dataUrl
+        ],
+        ["Port type", port.platform, ""],
+        ["Supported inputs", port.controller, ""],
+        ["Works?", port.works, ""],
+        ["Last update", port.lastUpdate, ""]
+    ];
+
+    for (const [label, value, url] of fields) {
+        const detail = createPortDetail(
+            label,
+            value,
+            url
+        );
+
+        if (detail) {
+            details.appendChild(detail);
+        }
+    }
+
+    if (details.childElementCount > 0) {
+        card.appendChild(details);
+    }
+
+    /* Notes */
+
+    if (port.notes) {
+        const notes = document.createElement("div");
+        notes.className = "port-notes";
+
+        const label = document.createElement("div");
+        label.className = "port-notes-label";
+        label.textContent = "Notes";
+
+        const text = document.createElement("p");
+        text.className = "port-notes-text";
+        text.textContent = port.notes;
+
+        notes.append(label, text);
+        card.appendChild(notes);
+    }
+
+    /* Download / port link */
+
+    if (port.url) {
+        const link = document.createElement("a");
+
+        link.className = "port-link";
+        link.href = port.url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = port.link || "Download / View Port";
+
+        const arrow = document.createElement("span");
+        arrow.setAttribute("aria-hidden", "true");
+        arrow.textContent = "↗";
+
+        link.appendChild(arrow);
+        card.appendChild(link);
+    }
+
+    /* Multi-game app information */
+
+    if (isMultiGameAppPort(port, allRows)) {
+        displayGamesUsingApp(
+            port.project,
+            allRows,
+            "With this port you can also play:",
+            card
+        );
+    }
+
+    return card;
+}
+
+
+/* ==================================================
+   DISPLAY SELECTED GAME
+   ================================================== */
 
 export function displayGame(game, allRows) {
     const gameHeader =
@@ -407,10 +422,6 @@ export function displayGame(game, allRows) {
 
     const statusElement =
         document.getElementById("status");
-
-    /*
-     * Verify that the required page elements exist.
-     */
 
     if (!gameHeader || !portList || !statusElement) {
         console.error(
@@ -425,152 +436,30 @@ export function displayGame(game, allRows) {
         return;
     }
 
-    /*
-     * Display the general game information card.
-     */
+    /* Game information */
 
     displayGameSummary(game, gameHeader);
 
-    /*
-     * Update the port count.
-     */
+    /* Port count */
 
     statusElement.textContent =
-        `${game.ports.length} port${game.ports.length !== 1 ? "s" : ""}`;
+        `${game.ports.length} port${
+            game.ports.length !== 1 ? "s" : ""
+        }`;
 
-    portList.innerHTML = "";
+    portList.replaceChildren();
 
-    /*
-     * Display each port.
-     */
+    /* Render every port */
 
-    for (
-        let index = 0;
-        index < game.ports.length;
-        index++
-    ) {
+    for (let index = 0; index < game.ports.length; index++) {
         const port = game.ports[index];
 
-        const card = document.createElement("div");
-        card.className = "port";
-
-        /*
-         * Port title.
-         */
-
-        const title = document.createElement("h2");
-
-        title.className = "port-title";
-        title.textContent =
-            port.project || `Port ${index + 1}`;
-
-        card.appendChild(title);
-
-        /*
-         * Port information.
-         */
-
-        const info = document.createElement("div");
-        info.className = "port-info";
-
-        const fields = [
-            ["Developer", port.developer],
-            ["Version", port.version],
-            ["Supported Inputs", port.controller],
-            ["Needs Game Files?", port.files],
-            ["Works?", port.works],
-            ["Last Update", port.lastUpdate]
-        ];
-
-        for (const [label, value] of fields) {
-            let row;
-
-            /*
-             * Link the value to DATA URL
-             * when a destination is available.
-             */
-
-            if (
-                label === "Needs Game Files?" &&
-                port.dataUrl
-            ) {
-                row = createInfoRowWithLinkedValue(
-                    label,
-                    value,
-                    port.dataUrl
-                );
-            } else {
-                row = createInfoRow(label, value);
-            }
-
-            if (row) {
-                info.appendChild(row);
-            }
-        }
-
-        card.appendChild(info);
-
-        /*
-         * Notes.
-         */
-
-        if (port.notes) {
-            const notes = document.createElement("div");
-            notes.className = "port-notes";
-
-            const notesTitle = document.createElement("strong");
-            notesTitle.textContent = "Notes";
-
-            const notesText = document.createElement("p");
-            notesText.textContent = port.notes;
-
-            notes.appendChild(notesTitle);
-            notes.appendChild(notesText);
-
-            card.appendChild(notes);
-        }
-
-        /*
-         * Port link.
-         */
-
-        if (port.url) {
-            const link = document.createElement("a");
-
-            link.className = "port-link";
-            link.href = port.url;
-            link.target = "_blank";
-            link.rel = "noopener noreferrer";
-            link.textContent = port.link || "Open Port →";
-
-            card.appendChild(link);
-        }
-
-        /*
-         * Add the port card to the page.
-         */
-
-        portList.appendChild(card);
-
-        /*
-         * If this port uses a Multi-game App,
-         * display the other games supported by it.
-         */
-
-        if (isMultiGameAppPort(port, allRows)) {
-            displayGamesUsingApp(
-                port.project,
-                allRows,
-                "With this port you can also play:",
-                card
-            );
-        }
+        portList.appendChild(
+            displayPortCard(port, index, allRows)
+        );
     }
 
-    /*
-     * If this is a Multi-game App,
-     * display the games that use it.
-     */
+    /* Games using this Multi-Game App */
 
     if (isMultiGameApp(game)) {
         displayGamesUsingApp(
