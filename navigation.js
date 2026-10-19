@@ -202,7 +202,8 @@
   }
   
    for (const rawPlatform of game.platforms) {
-     const platform = normalizePlatformLabel(rawPlatform);
+     const platform =
+         normalizePlatformLabel(rawPlatform);
 
      if (!platform) {
          continue;
@@ -242,9 +243,7 @@
 
 * Grouping affects presentation only.
 
-* Filtering still uses the exact platform label
-
-* from the spreadsheet.
+* Filtering still uses the platform label from the spreadsheet.
   */
   function getPlatformGroup(platform) {
   const normalized = normalizeText(platform);
@@ -318,7 +317,9 @@
   */
   function displayPlatformMenu() {
   if (!platformList) {
-  console.error("NAPL: platform menu element was not found.");
+  console.error(
+  "NAPL: platform menu element was not found."
+  );
   return;
   }
   
@@ -374,7 +375,8 @@
   * in the spreadsheet.
     */
     for (const group of groupOrder) {
-    const groupPlatforms = groupedPlatforms.get(group) || [];
+    const groupPlatforms =
+    groupedPlatforms.get(group) || [];
     
     if (groupPlatforms.length === 0) {
     continue;
@@ -452,12 +454,16 @@
   */
   function displayGames(list) {
   gameList.hidden = false;
-  gameList.innerHTML = "";
+  gameList.replaceChildren();
   
   if (list.length === 0) {
-  gameList.innerHTML = "<div class="no-results"> No games found. </div>";
+  const message = document.createElement("div");
   
-   statusElement.textContent = "0 games";
+   message.className = "no-results";
+ message.textContent = "No games found.";
+
+ gameList.appendChild(message);
+ statusElement.textContent = "0 games";
 
  return;
   
@@ -515,7 +521,7 @@
   function searchGames() {
   const query = normalizeText(searchInput.value);
   
-  searchResults.innerHTML = "";
+  searchResults.replaceChildren();
   
   if (!query) {
   searchResults.hidden = true;
