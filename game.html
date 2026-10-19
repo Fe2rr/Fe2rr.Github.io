@@ -1,243 +1,201 @@
-<!DOCTYPE html>
-<html lang="en">
-
-<head>
+<!DOCTYPE html><html lang="en"><head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>Game Details — NAPL</title>
 
-    <title>Game Details — NAPL</title>
+<meta
+    name="description"
+    content="Explore native Android ports, supported versions, compatibility information, and details for your favorite games."
+>
+<meta name="theme-color" content="#0a211f">
 
-    <meta
-        name="description"
-        content="Explore native Android ports, supported versions, compatibility information, and details for your favorite games."
-    >
-    <meta name="theme-color" content="#0a211f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet"
+>
 
-    <!-- Inter font: matching the NAPL mockup -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
-        rel="stylesheet"
-    >
+<link rel="stylesheet" href="style.css">
 
-    <link rel="stylesheet" href="style.css">
+<style>
+    body,
+    button,
+    input,
+    select,
+    textarea {
+        font-family: Inter, system-ui, sans-serif;
+    }
 
-    <style>
-        body,
-        button,
-        input,
-        select,
-        textarea {
-            font-family: Inter, system-ui, sans-serif;
-        }
+    #side-menu a.platform-button {
+        display: block;
+        text-decoration: none;
+    }
 
-        #side-menu a.platform-button {
-            display: block;
-            text-decoration: none;
-        }
+    #side-menu a.platform-button:link,
+    #side-menu a.platform-button:visited {
+        color: var(--text-secondary, #c0d3cd);
+        text-decoration: none;
+    }
 
-        #side-menu a.platform-button:link,
-        #side-menu a.platform-button:visited {
-            color: var(--text-secondary, #c0d3cd);
-            text-decoration: none;
-        }
+    #side-menu a.platform-button:hover {
+        background: var(--surface-hover, #164039);
+        text-decoration: none;
+    }
 
-        #side-menu a.platform-button:hover {
-            background: var(--surface-hover, #164039);
-            text-decoration: none;
-        }
+    #home-button {
+        cursor: pointer;
+    }
 
-        #home-button {
-            cursor: pointer;
-        }
+    .ports-section-title {
+        margin: 30px 0 8px;
+        font-size: 22px;
+        color: var(--text-strong, #f0f7f4);
+    }
 
-        .ports-section-title {
-            margin: 30px 0 8px;
-            font-size: 22px;
-            color: var(--text-strong, #f0f7f4);
-        }
+    .ports-section-description {
+        margin: 0 0 12px;
+        color: var(--text-muted, #a2bdb5);
+        font-size: 14px;
+        line-height: 1.5;
+    }
+</style>
 
-        .ports-section-description {
-            margin: 0 0 12px;
-            color: var(--text-muted, #a2bdb5);
-            font-size: 14px;
-            line-height: 1.5;
-        }
-    </style>
-</head>
-
-<body>
-
-<header>
-
+</head><body><header>
     <button
         id="menu-button"
         type="button"
         aria-label="Open menu"
+    >☰</button><h1 id="home-button">NAPL</h1>
+
+<button
+    id="search-button"
+    type="button"
+    aria-label="Open search"
+    aria-controls="search-container"
+    aria-expanded="false"
+>
+    <svg
+        class="search-icon"
+        xmlns="http://www.w3.org/2000/svg"
+        width="22"
+        height="22"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="2"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
     >
-        ☰
-    </button>
+        <circle cx="11" cy="11" r="7"></circle>
+        <path d="m20 20-4-4"></path>
+    </svg>
+</button>
 
-    <h1 id="home-button">NAPL</h1>
-
-    <button
-        id="search-button"
-        type="button"
-        aria-label="Open search"
-        aria-controls="search-container"
-        aria-expanded="false"
-    >
-        <svg
-            class="search-icon"
-            xmlns="http://www.w3.org/2000/svg"
-            width="22"
-            height="22"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            aria-hidden="true"
-        >
-            <circle cx="11" cy="11" r="7"></circle>
-            <path d="m20 20-4-4"></path>
-        </svg>
-    </button>
-
-</header>
-
-<div id="menu-overlay"></div>
-
-<nav id="side-menu">
-
+</header><div id="menu-overlay"></div><nav id="side-menu">
     <button
         id="menu-close"
         type="button"
         aria-label="Close menu"
-    >
-        ×
-    </button>
+    >×</button><h2>Games</h2>
 
-    <h2>Games</h2>
+<a class="platform-button" href="index.html?view=all-games">
+    All Games
+</a>
 
-    <a class="platform-button" href="index.html">
-        All Games
+<h2>Categories</h2>
+
+<div id="platform-list">
+    <a class="platform-button" href="index.html?category=multi-game-apps">
+        Multi-game Apps
     </a>
 
-    <h2>Categories</h2>
+    <a class="platform-button" href="index.html?category=dual-screen">
+        Dual Screen
+    </a>
 
-    <div id="platform-list">
+    <div class="menu-separator">── Nintendo ──</div>
 
-        <a class="platform-button" href="index.html">
-            Multi-game Apps
-        </a>
+    <a class="platform-button" href="index.html?platform=NES">NES</a>
+    <a class="platform-button" href="index.html?platform=Super%20Nintendo">Super Nintendo</a>
+    <a class="platform-button" href="index.html?platform=Nintendo%2064">Nintendo 64</a>
+    <a class="platform-button" href="index.html?platform=GameCube%20%2F%20Wii">GameCube / Wii</a>
+    <a class="platform-button" href="index.html?platform=Nintendo%20Wii%20U">Nintendo Wii U</a>
+    <a class="platform-button" href="index.html?platform=Game%20Boy">Game Boy</a>
+    <a class="platform-button" href="index.html?platform=Game%20Boy%20Color">Game Boy Color</a>
+    <a class="platform-button" href="index.html?platform=Game%20Boy%20Advance">Game Boy Advance</a>
+    <a class="platform-button" href="index.html?platform=Nintendo%20DS">Nintendo DS</a>
+    <a class="platform-button" href="index.html?platform=Nintendo%203DS">Nintendo 3DS</a>
+    <a class="platform-button" href="index.html?platform=Nintendo%20Switch">Nintendo Switch</a>
 
-        <a class="platform-button" href="index.html">
-            Dual Screen
-        </a>
+    <div class="menu-separator">── PlayStation ──</div>
 
-        <div class="menu-separator">── Nintendo ──</div>
+    <a class="platform-button" href="index.html?platform=Playstation">Playstation</a>
+    <a class="platform-button" href="index.html?platform=Playstation%202">Playstation 2</a>
+    <a class="platform-button" href="index.html?platform=Playstation%204">Playstation 4</a>
+    <a class="platform-button" href="index.html?platform=Playstation%20Portable">Playstation Portable</a>
 
-        <a class="platform-button" href="index.html">NES</a>
-        <a class="platform-button" href="index.html">Super Nintendo</a>
-        <a class="platform-button" href="index.html">Nintendo 64</a>
-        <a class="platform-button" href="index.html">GameCube / Wii</a>
-        <a class="platform-button" href="index.html">Nintendo Wii U</a>
-        <a class="platform-button" href="index.html">Game Boy</a>
-        <a class="platform-button" href="index.html">Game Boy Color</a>
-        <a class="platform-button" href="index.html">Game Boy Advance</a>
-        <a class="platform-button" href="index.html">Nintendo DS</a>
-        <a class="platform-button" href="index.html">Nintendo 3DS</a>
-        <a class="platform-button" href="index.html">Nintendo Switch</a>
+    <div class="menu-separator">── Xbox ──</div>
 
-        <div class="menu-separator">── PlayStation ──</div>
+    <a class="platform-button" href="index.html?platform=Xbox">Xbox</a>
+    <a class="platform-button" href="index.html?platform=Xbox%20360">Xbox 360</a>
 
-        <a class="platform-button" href="index.html">Playstation</a>
-        <a class="platform-button" href="index.html">Playstation 2</a>
-        <a class="platform-button" href="index.html">Playstation 4</a>
-        <a class="platform-button" href="index.html">Playstation Portable</a>
+    <div class="menu-separator">── Others ──</div>
 
-        <div class="menu-separator">── Xbox ──</div>
+    <a class="platform-button" href="index.html?platform=Others">Others</a>
+</div>
 
-        <a class="platform-button" href="index.html">Xbox</a>
-        <a class="platform-button" href="index.html">Xbox 360</a>
-
-        <div class="menu-separator">── Others ──</div>
-
-        <a class="platform-button" href="index.html">Others</a>
-
-    </div>
-
-</nav>
-
-<main>
-
+</nav><main>
     <div
         id="search-container"
         class="search-container"
         hidden
     >
-
         <input
             type="text"
             id="search"
             placeholder="Search game..."
             autocomplete="off"
             aria-label="Search games"
-        >
+        >    <div
+        id="search-results"
+        class="search-results"
+        hidden
+    ></div>
+</div>
 
-        <div
-            id="search-results"
-            class="search-results"
-            hidden
-        ></div>
+<a
+    href="index.html"
+    class="back-button"
+    id="back-button"
+>← Back to list</a>
 
+<section
+    id="game-header"
+    class="game-summary-card"
+    aria-label="Game information"
+>
+    <div id="game-title">Loading...</div>
+    <div id="game-year"></div>
+</section>
+
+<section id="android-ports-section">
+    <h2 class="ports-section-title">Android Ports</h2>
+
+    <p class="ports-section-description">
+        Community-made Android ports and projects for this game.
+    </p>
+
+    <div id="status" aria-live="polite">
+        Loading ports...
     </div>
 
-    <a
-        href="index.html"
-        class="back-button"
-        id="back-button"
-    >
-        ← Back to list
-    </a>
+    <div id="port-list"></div>
+</section>
 
-    <section
-        id="game-header"
-        class="game-summary-card"
-        aria-label="Game information"
-    >
-        <div id="game-title">Loading...</div>
-        <div id="game-year"></div>
-    </section>
-
-    <section id="android-ports-section">
-
-        <h2 class="ports-section-title">
-            Android Ports
-        </h2>
-
-        <p class="ports-section-description">
-            Community-made Android ports and projects for this game.
-        </p>
-
-        <div id="status" aria-live="polite">
-            Loading ports...
-        </div>
-
-        <div id="port-list"></div>
-
-    </section>
-
-</main>
-
-<footer>
+</main><footer>
     <p>NAPL — Native Android Port List</p>
-</footer>
-
-<script>
+</footer><script>
     document
         .getElementById("home-button")
         .addEventListener("click", function () {
@@ -262,15 +220,15 @@
     const sideMenu = document.getElementById("side-menu");
     const menuOverlay = document.getElementById("menu-overlay");
 
-    menuButton.addEventListener("click", function () {
-        sideMenu.classList.add("open");
-        menuOverlay.classList.add("visible");
-    });
-
     function closeMenu() {
         sideMenu.classList.remove("open");
         menuOverlay.classList.remove("visible");
     }
+
+    menuButton.addEventListener("click", function () {
+        sideMenu.classList.add("open");
+        menuOverlay.classList.add("visible");
+    });
 
     menuClose.addEventListener("click", closeMenu);
     menuOverlay.addEventListener("click", closeMenu);
@@ -395,7 +353,6 @@
                 }
 
                 cells.push(value);
-
                 return cells;
             };
 
@@ -459,9 +416,5 @@
                 error
             );
         });
-</script>
-
-<script type="module" src="game.js"></script>
-
-</body>
+</script><script type="module" src="game.js"></script></body>
 </html>
