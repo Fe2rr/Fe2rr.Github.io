@@ -2095,3 +2095,34 @@ a {
 .games-using-app-list:not([hidden]) {
   display: flex;
 }
+/* =========================================================
+   FICHA DEL JUEGO — DISEÑO SIN CAJA
+   ========================================================= */
+
+/* Quitar la etiqueta sobre el título */
+
+.game-summary-eyebrow {
+    display: none !important;
+}
+
+/* Eliminar la caja que rodea la información del juego */
+
+#game-header.game-summary-card {
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+}
+
+/* La portada mantiene su propia presencia visual */
+
+.game-summary-cover {
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.28);
+}
+
+/* Ajustar el título tras quitar la etiqueta superior */
+
+#game-header .game-summary-title {
+    margin-top: 0;
+}
