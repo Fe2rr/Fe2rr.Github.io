@@ -1631,3 +1631,335 @@ body {
     max-width: 100%;
   }
 }
+
+/* ==================================================
+   NAPL — PORT CARDS REDESIGN
+   Based on the supplied mockup.
+   Ratings and AI indicator intentionally omitted.
+   ================================================== */
+
+:root {
+  --port-card: #10312e;
+  --port-card-highlight: #123a35;
+  --port-border: #31534c;
+  --port-border-light: #42685f;
+  --port-text: #e2eeea;
+  --port-text-bright: #f0f7f4;
+  --port-text-secondary: #c0d3cd;
+  --port-muted: #a2bdb5;
+  --port-accent: #8fd3c3;
+  --port-accent-hover: #b8f0df;
+  --port-accent-border: #58a994;
+  --port-button: #236957;
+  --port-button-hover: #2b806a;
+}
+
+/* Port list */
+
+#port-list,
+.port-list {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+}
+
+/* Main card */
+
+#port-list .port,
+#port-list .port-card {
+  min-width: 0;
+  padding: 16px;
+  margin: 0;
+
+  background: var(--port-card);
+  border: 1px solid var(--port-border);
+  border-radius: 12px;
+
+  color: var(--port-text);
+  box-shadow: none;
+}
+
+/* Port heading */
+
+#port-list .port-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  margin-bottom: 15px;
+}
+
+#port-list .port-title,
+#port-list .port-top .port-title {
+  min-width: 0;
+  margin: 0;
+
+  color: var(--port-text-bright);
+  font-size: 16px;
+  font-weight: 750;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+
+  overflow-wrap: anywhere;
+}
+
+/* Details grid */
+
+#port-list .port-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+
+  min-width: 0;
+}
+
+/* Individual detail */
+
+#port-list .port-detail {
+  min-width: 0;
+}
+
+#port-list .port-detail-label {
+  display: block;
+  margin-bottom: 5px;
+
+  color: var(--port-muted);
+  font-size: 10px;
+  font-weight: 400;
+  line-height: 1.4;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+#port-list .port-detail-value {
+  display: block;
+  min-width: 0;
+
+  color: var(--port-text);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+/* Clickable game-files URL */
+
+#port-list a.port-detail-value {
+  color: var(--port-accent);
+  text-decoration: underline;
+  text-decoration-color: var(--port-accent-border);
+  text-underline-offset: 3px;
+}
+
+#port-list a.port-detail-value:hover {
+  color: var(--port-accent-hover);
+}
+
+/* Notes */
+
+#port-list .port-notes {
+  min-width: 0;
+  margin-top: 15px;
+  padding: 10px;
+
+  background: var(--port-card-highlight);
+  border: 1px solid var(--port-border);
+  border-radius: 8px;
+
+  color: var(--port-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+#port-list .port-notes-label {
+  margin-bottom: 5px;
+
+  color: var(--port-muted);
+  font-size: 10px;
+  font-weight: 400;
+  text-transform: uppercase;
+}
+
+#port-list .port-notes-text {
+  margin: 0;
+
+  color: var(--port-text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Download / view port button */
+
+#port-list a.port-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  width: 100%;
+  min-height: 44px;
+  margin-top: 16px;
+  padding: 12px;
+
+  background: var(--port-button);
+  border: 1px solid var(--port-accent-border);
+  border-radius: 9px;
+
+  color: var(--port-text-bright);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+
+  overflow-wrap: anywhere;
+
+  transition:
+    background-color 0.16s ease,
+    border-color 0.16s ease,
+    color 0.16s ease;
+}
+
+#port-list a.port-link span {
+  flex-shrink: 0;
+  font-size: 15px;
+}
+
+#port-list a.port-link:hover {
+  background: var(--port-button-hover);
+  border-color: var(--port-accent);
+  color: var(--port-text-bright);
+}
+
+#port-list a.port-link:focus-visible {
+  outline: 2px solid var(--port-accent);
+  outline-offset: 3px;
+}
+
+/* Multi-game app section */
+
+#port-list .games-using-app {
+  min-width: 0;
+  margin-top: 15px;
+  padding: 10px;
+
+  background: var(--port-card-highlight);
+  border: 1px solid var(--port-border);
+  border-radius: 8px;
+}
+
+#port-list .games-using-app-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  width: 100%;
+  padding: 5px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--port-text-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+#port-list .games-using-app-toggle:hover {
+  color: var(--port-accent-hover);
+}
+
+#port-list .games-using-app-arrow {
+  flex-shrink: 0;
+  color: var(--port-muted);
+  font-size: 10px;
+}
+
+#port-list .games-using-app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  margin-top: 8px;
+  padding: 0;
+}
+
+#port-list .games-using-app-item {
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+
+  background: var(--port-card);
+  border: 1px solid var(--port-border);
+  border-radius: 6px;
+
+  color: var(--port-accent);
+  font-size: 12px;
+  line-height: 1.5;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+#port-list .games-using-app-item:hover {
+  background: var(--port-card-highlight);
+  border-color: var(--port-border-light);
+  color: var(--port-accent-hover);
+}
+
+/* Desktop: four columns for port details */
+
+@media (min-width: 620px) {
+  #port-list .port,
+  #port-list .port-card {
+    padding: 20px;
+  }
+
+  #port-list .port-details {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px 12px;
+  }
+
+  #port-list .port-detail-value {
+    font-size: 12px;
+  }
+
+  #port-list .port-notes {
+    padding: 10px;
+  }
+}
+
+/* Mobile: two columns, including narrow devices */
+
+@media (max-width: 380px) {
+  #port-list .port,
+  #port-list .port-card {
+    padding: 13px;
+  }
+
+  #port-list .port-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px 9px;
+  }
+
+  #port-list .port-title,
+  #port-list .port-top .port-title {
+    font-size: 15px;
+  }
+
+  #port-list .port-detail-value {
+    font-size: 12px;
+  }
+
+  #port-list a.port-link {
+    padding: 11px 8px;
+  }
+}
