@@ -148,8 +148,10 @@ function normalizePlatformLabel(value) {
 
 /*
  * GET UNIQUE PLATFORMS FROM LOADED SHEET DATA
+ *
  * Uses game.platforms, populated from the PLATFORM column.
- * Preserves the order of first appearance in the loaded data.
+ * Preserves the order of first appearance.
+ * Removes duplicates without sorting alphabetically.
  */
 function getAvailablePlatforms() {
     const uniquePlatforms = new Map();
@@ -172,7 +174,7 @@ function getAvailablePlatforms() {
 
             const key = normalizeText(platform);
 
-            // Multi-Game Apps has its own category button.
+            // These categories have dedicated menu buttons.
             if (
                 key === "multi-game apps" ||
                 key === "multi game apps"
@@ -180,7 +182,7 @@ function getAvailablePlatforms() {
                 continue;
             }
 
-            // Remove duplicates without changing the original order.
+            // Keep the first spelling and position encountered.
             if (!uniquePlatforms.has(key)) {
                 uniquePlatforms.set(key, platform);
             }
@@ -190,7 +192,7 @@ function getAvailablePlatforms() {
     return Array.from(uniquePlatforms.values());
 }
 
-/* GROUP PLATFORMS */
+/* GROUP PLATFORMS BY FAMILY */
 function getPlatformGroup(platform) {
     const normalized = normalizeText(platform);
 
@@ -264,22 +266,21 @@ function displayPlatformMenu() {
 
     platformList.replaceChildren();
 
-    // Special category: Multi-Game Apps.
+    // Special categories always appear first.
     addCategoryButton(
         "Multi-Game Apps",
         "multi-game-apps"
     );
 
-    // Special category: Dual Screen.
     addCategoryButton(
         "Dual Screen",
         "dual-screen"
     );
 
+    // Obtain platforms in their original data order.
     const platforms = getAvailablePlatforms();
 
-    // Group headings remain in this order.
-    // Platforms inside each group retain their Sheet order.
+    // Family order is intentional and remains fixed.
     const groupOrder = [
         "Nintendo",
         "PlayStation",
@@ -288,34 +289,37 @@ function displayPlatformMenu() {
         "Other Platforms"
     ];
 
-    const groupedPlatforms = new Map();
+    const groupedPlatforms = new Map(
+        groupOrder.map(group => [group, []])
+    );
 
-    for (const group of groupOrder) {
-        groupedPlatforms.set(group, []);
-    }
-
-    // Group platforms without sorting them.
+    /*
+     * IMPORTANT:
+     * Iterate through platforms in their original order.
+     * Do not sort these arrays alphabetically.
+     */
     for (const platform of platforms) {
         const group = getPlatformGroup(platform);
 
         if (!groupedPlatforms.has(group)) {
             groupedPlatforms.set(group, []);
+            groupOrder.push(group);
         }
 
         groupedPlatforms.get(group).push(platform);
     }
 
-    // Render groups that contain platforms.
+    // Render each family in the configured order.
     for (const group of groupOrder) {
-        const groupPlatforms =
-            groupedPlatforms.get(group) || [];
+        const groupPlatforms = groupedPlatforms.get(group);
 
-        if (groupPlatforms.length === 0) {
+        if (!groupPlatforms || groupPlatforms.length === 0) {
             continue;
         }
 
         addMenuSeparator(group);
 
+        // Keep first-appearance order within each family.
         for (const platform of groupPlatforms) {
             addPlatformButton(platform);
         }
