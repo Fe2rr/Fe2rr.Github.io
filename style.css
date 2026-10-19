@@ -1,1314 +1,1633 @@
+/* ==================================================
+   THE PORTS VAULT — GLOBAL STYLES
+   Main stylesheet
+   ================================================== */
+
+/* =========================
+   COLOR PALETTE
+   ========================= */
+
+:root {
+  color-scheme: dark;
+
+  --page-bg: #061513;
+  --header-bg: #0a211f;
+  --surface: #10312e;
+  --surface-raised: #123a35;
+  --surface-hover: #164039;
+
+  --line: #31534c;
+  --line-soft: #254740;
+
+  --text-main: #e2eeea;
+  --text-strong: #f0f7f4;
+  --text-secondary: #c0d3cd;
+  --text-muted: #a2bdb5;
+
+  --accent: #8fd3c3;
+  --accent-strong: #b8f0df;
+  --accent-border: #58a994;
+
+  --button-bg: #236957;
+  --button-hover: #2b806a;
+
+  --error-bg: #351b1b;
+  --error-border: #7a4141;
+  --error-text: #f0c4c4;
+
+  --radius-small: 6px;
+  --radius-medium: 8px;
+  --radius-large: 10px;
+
+  --transition-fast: 0.15s ease;
+  --transition-menu: 0.2s ease;
+}
+
+/* =========================
+   RESET AND BASE
+   ========================= */
+
 * {
   box-sizing: border-box;
-  }
+}
+
+html {
+  min-height: 100%;
+  background: var(--page-bg);
+  scroll-behavior: smooth;
+  scrollbar-color: var(--line) var(--page-bg);
+}
 
 body {
-margin: 0;
-background: #071918;
-color: #d7e4e1;
-font-family: Arial, sans-serif;
+  min-height: 100vh;
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--text-main);
+  font-family: Arial, sans-serif;
+  line-height: 1.5;
 }
 
-/* =========================
-HEADER
-========================= */
-
-header {
-height: 64px;
-background: #0b2423;
-border-bottom: 1px solid #163c39;
-
-display: flex;
-align-items: center;
-
-padding: 0 16px;
-gap: 12px;
-
-position: sticky;
-top: 0;
-z-index: 100;
-}
-
-header h1 {
-margin: 0;
-font-size: 20px;
-flex: 1;
-}
-
-header button {
-background: none;
-border: none;
-color: #d7e4e1;
-
-font-size: 22px;
-
-cursor: pointer;
-
-padding: 8px;
-}
-
-header button:hover {
-color: #ffffff;
-}
-
-/* =========================
-MAIN
-========================= */
-
-main {
-max-width: 900px;
-margin: auto;
-padding: 20px 16px 40px;
-}
-
-/* =========================
-SEARCH
-========================= */
-
-.search-container {
-margin-bottom: 20px;
-}
-
-#search {
-width: 100%;
-
-background: #0a2928;
-border: 1px solid #1c4743;
-border-radius: 8px;
-
-color: #d7e4e1;
-
-padding: 12px 14px;
-
-font-size: 16px;
-}
-
-#search:focus {
-outline: none;
-border-color: #32756e;
-}
-
-.search-results {
-margin-top: 6px;
-background: #0a2928;
-border: 1px solid #1c4743;
-border-radius: 8px;
-overflow: hidden;
-}
-
-.search-results[hidden] {
-display: none;
-}
-
-.search-result {
-display: block;
-padding: 12px 16px;
-border-bottom: 1px solid #173b38;
-color: #c8dad5;
-text-decoration: none;
-font-size: 15px;
-}
-
-.search-result:last-child {
-border-bottom: none;
-}
-
-.search-result:hover {
-background: #123a37;
-color: #e5f0ec;
-}
-
-/* =========================
-CATEGORY CONTROLS
-========================= */
-
-.category-controls {
-display: flex;
-flex-direction: column;
-gap: 10px;
-
-margin-bottom: 20px;
-}
-
-#category-search {
-width: 100%;
-
-background: #0a2928;
-border: 1px solid #1c4743;
-border-radius: 8px;
-
-color: #d7e4e1;
-
-padding: 12px 14px;
-
-font-size: 16px;
-}
-
-#category-search:focus {
-outline: none;
-border-color: #32756e;
-}
-
-/* =========================
-CATEGORY SORT
-========================= */
-
-.category-sort {
-display: flex;
-align-items: center;
-
-width: fit-content;
-
-background: #0a2928;
-
-border: 1px solid #173f3c;
-
-border-radius: 7px;
-
-padding: 3px;
-
-gap: 4px;
-}
-
-.category-sort-option {
-background: none;
-
-border: none;
-
-color: #819a96;
-
-padding: 6px 9px;
-
-border-radius: 5px;
-
-cursor: pointer;
-
-font-size: 12px;
-}
-
-.category-sort-option:hover {
-color: #c8dad5;
-}
-
-.category-sort-option.active {
-background: #173f3c;
-
-color: #d7e4e1;
-}
-
-.category-sort-direction {
-background: none;
-
-border: none;
-
-color: #819a96;
-
-padding: 6px 8px;
-
-border-radius: 5px;
-
-cursor: pointer;
-
-font-size: 13px;
-
-min-width: 28px;
-}
-
-.category-sort-direction:hover {
-color: #c8dad5;
-}
-
-/* =========================
-STATUS
-========================= */
-
-#status {
-margin: 15px 0;
-
-color: #8fa7a3;
-
-font-size: 14px;
-}
-
-/* =========================
-GAME LIST
-========================= */
-
-#game-list {
-display: grid;
-gap: 12px;
-}
-
-/* =========================
-GAME CARD
-========================= */
-
-.game {
-display: block;
-
-background: #0a2928;
-
-border: 1px solid #173f3c;
-border-radius: 10px;
-
-padding: 15px;
-
-color: inherit;
-text-decoration: none;
-
-transition:
-background 0.15s,
-border-color 0.15s;
-}
-
-.game:hover {
-background: #0d302e;
-border-color: #24534f;
-}
-
-.game-name {
-margin: 0 0 6px;
-
-font-size: 18px;
-color: #e1ece9;
-}
-
-.game-info {
-font-size: 13px;
-color: #8fa7a3;
-}
-
-.game-info span {
-margin-right: 10px;
-}
-
-/* =========================
-BACK BUTTON
-========================= */
-
-.back-button {
-display: inline-block;
-
-margin-bottom: 20px;
-
-color: #9fc8c2;
-text-decoration: none;
-
-font-size: 14px;
-}
-
-.back-button:hover {
-color: #ffffff;
-}
-
-/* =========================
-GAME HEADER
-========================= */
-
-.game-header {
-margin-bottom: 25px;
-}
-
-.game-header h2 {
-margin: 0 0 8px;
-
-font-size: 26px;
-}
-
-.game-meta {
-color: #8fa7a3;
-font-size: 14px;
-}
-
-/* =========================
-PORT LIST
-========================= */
-
-.port-list {
-display: grid;
-gap: 12px;
-}
-
-/* =========================
-PORT CARD
-========================= */
-
-.port-card {
-background: #0a2928;
-
-border: 1px solid #173f3c;
-border-radius: 10px;
-
-padding: 15px;
-}
-
-.port-card h3 {
-margin: 0 0 8px;
-
-font-size: 17px;
-}
-
-.port-info {
-color: #91aaa5;
-font-size: 13px;
-
-margin-bottom: 10px;
-}
-
-/* =========================
-PORT INFO
-========================= */
-
-.port-info span {
-margin-right: 10px;
-}
-
-/* =========================
-NOTES
-========================= */
-
-.notes {
-margin-top: 20px;
-
-background: #0a2928;
-
-border-left: 3px solid #32756e;
-
-padding: 12px 15px;
-
-border-radius: 6px;
-
-color: #b7c9c5;
-
-line-height: 1.5;
-}
-
-/* =========================
-PORT LINK
-========================= */
-
-.port-link {
-display: inline-block;
-
-margin-top: 8px;
-
-color: #75b9b1;
-
-text-decoration: none;
-
-font-size: 14px;
-}
-
-.port-link:hover {
-color: #b4e1dc;
-}
-
-/* =========================
-NO RESULTS
-========================= */
-
-.no-results {
-padding: 25px 10px;
-
-text-align: center;
-
-color: #829a96;
-}
-
-/* =========================
-ERROR
-========================= */
-
-.error {
-padding: 15px;
-
-background: #351b1b;
-
-border: 1px solid #5c2929;
-
-border-radius: 8px;
-
-color: #e3b4b4;
-}
-
-/* =========================
-FOOTER
-========================= */
-
-footer {
-border-top: 1px solid #163c39;
-
-padding: 25px 16px;
-
-text-align: center;
-
-color: #6f8783;
-
-font-size: 13px;
-}
-
-/* =========================
-MOBILE
-========================= */
-
-@media (max-width: 600px) {
-
-header {
-padding: 0 10px;
-}
-
-header h1 {
-font-size: 18px;
-}
-
-main {
-padding: 16px 12px 30px;
-}
-
-.category-sort {
-width: 100%;
-}
-
-.category-sort-option {
-flex: 1;
-}
-
-.category-sort-direction {
-flex-shrink: 0;
-}
-}
-
-/* =========================
-SIDE MENU
-========================= */
-
-#side-menu {
-position: fixed;
-
-top: 0;
-left: 0;
-
-width: 280px;
-max-width: 85vw;
-
-height: 100vh;
-
-background: #081f1e;
-
-border-right: 1px solid #163c39;
-
-padding: 20px;
-
-transform: translateX(-100%);
-
-transition: transform 0.2s ease;
-
-z-index: 200;
-
-overflow-y: auto;
-}
-
-#side-menu.open {
-transform: translateX(0);
-}
-
-#menu-close {
-display: block;
-
-margin-left: auto;
-
-background: none;
-border: none;
-
-color: #c8dad5;
-
-font-size: 28px;
-
-cursor: pointer;
-}
-
-#side-menu h2 {
-margin: 25px 0 10px;
-
-font-size: 15px;
-
-color: #7f9995;
-
-text-transform: uppercase;
-}
-
-/* =========================
-MENU OVERLAY
-========================= */
-
-#menu-overlay {
-position: fixed;
-
-inset: 0;
-
-background: rgba(0, 0, 0, 0.55);
-
-opacity: 0;
-
-pointer-events: none;
-
-transition: opacity 0.2s ease;
-
-z-index: 150;
-}
-
-#menu-overlay.visible {
-opacity: 1;
-
-pointer-events: auto;
-}
-
-/* =========================
-PLATFORM LIST
-========================= */
-
-#platform-list {
-display: flex;
-flex-direction: column;
-
-gap: 4px;
-}
-
-.platform-button {
-width: 100%;
-
-background: none;
-
-border: none;
-
-color: #c8dad5;
-
-text-align: left;
-
-padding: 10px 8px;
-
-border-radius: 6px;
-
-cursor: pointer;
-
-font-size: 15px;
-}
-
-.platform-button:hover {
-background: #10312f;
-}
-
-/* =========================
-MENU SEPARATORS
-========================= */
-
-.menu-separator {
-margin-top: 15px;
-
-margin-bottom: 5px;
-
-padding:
-8px 12px;
-
-color: #71908a;
-
-font-size: 12px;
-
-font-weight: bold;
-
-text-align: left;
-
-border-top:
-1px solid #1c4743;
-}
-
-/* =========================
-GAMES USING APP
-========================= */
-
-.games-using-app {
-margin-top: 20px;
-
-padding: 14px;
-
-background: #0b2524;
-
-border: 1px solid #1d4743;
-
-border-radius: 8px;
-}
-
-.games-using-app h3 {
-margin: 0 0 10px;
-
-font-size: 14px;
-
-color: #8fa7a3;
-}
-
-/* =========================
-GAMES USING APP TOGGLE
-========================= */
-
-.games-using-app-toggle {
-width: 100%;
-
-display: flex;
-
-align-items: center;
-
-justify-content: space-between;
-
-gap: 10px;
-
-background: none;
-
-border: none;
-
-padding: 8px 0;
-
-color: #8fa7a3;
-
-text-align: left;
-
-font-size: 14px;
-
-cursor: pointer;
-}
-
-.games-using-app-toggle:hover {
-color: #c8dad5;
-}
-
-.games-using-app-toggle:focus {
-outline: none;
-}
-
-.games-using-app-toggle:focus-visible {
-outline: 1px solid #32756e;
-
-outline-offset: 4px;
-
-border-radius: 4px;
-}
-
-/* =========================
-GAMES USING APP ARROW
-========================= */
-
-.games-using-app-arrow {
-flex-shrink: 0;
-
-color: #71908a;
-
-font-size: 11px;
-
-transition:
-transform 0.15s ease;
-}
-
-/* =========================
-GAMES USING APP LIST
-========================= */
-
-.games-using-app-list {
-display: flex;
-
-flex-direction: column;
-
-gap: 4px;
-
-margin-top: 6px;
-
-padding-left: 4px;
-}
-
-/* =========================
-GAMES USING APP ITEM
-========================= */
-
-.games-using-app-item {
-display: block;
-
-padding: 8px 10px;
-
-background: #0a2928;
-
-border: 1px solid #173f3c;
-
-border-radius: 6px;
-
-color: #9fc8c2;
-
-text-decoration: none;
-
-font-size: 13px;
-
-transition:
-background 0.15s,
-border-color 0.15s,
-color 0.15s;
-}
-
-.games-using-app-item:hover {
-background: #10312f;
-
-border-color: #24534f;
-
-color: #d7e4e1;
-}
-
-/* =========================
-GAME FILES LINK
-========================= */
-
-.game-files-link {
-margin-top: 35px;
-
-text-align: center;
-
-color: #708984;
-
-font-size: 13px;
-}
-
-.game-files-link a {
-color: #79aaa4;
-
-text-decoration: none;
-}
-
-.game-files-link a:hover {
-color: #a8d2cc;
-}
-
-/* =========================
-CLICKABLE HEADER
-========================= */
-
-#home-button {
-cursor: pointer;
-}
-
-/* =========================
-HOME SECTIONS
-========================= */
-
-.home-section {
-margin-bottom: 30px;
-}
-
-.home-section h2 {
-margin: 0 0 12px;
-
-font-size: 20px;
-}
-
-/* =========================
-HOME GAME LIST
-========================= */
-
-.home-game-list {
-display: grid;
-
-gap: 8px;
-}
-
-.home-game {
-display: block;
-
-padding: 12px 14px;
-
-background: #0a2928;
-
-border: 1px solid #173f3c;
-
-border-radius: 8px;
-
-color: #c8dad5;
-
-text-decoration: none;
-
-transition:
-background 0.15s,
-border-color 0.15s;
-}
-
-.home-game:hover {
-background: #0d302e;
-
-border-color: #24534f;
-}
-
-.home-game-title {
-font-size: 15px;
-}
-
-.home-game-meta {
-margin-top: 4px;
-
-font-size: 12px;
-
-color: #809995;
-}
-
-/* =========================
-HOME VIEW MORE
-========================= */
-
-.home-view-more {
-margin-top: 12px;
-
-background: none;
-
-border: none;
-
-color: #79aaa4;
-
-font-size: 14px;
-
-cursor: pointer;
-
-padding: 6px 0;
-}
-
-.home-view-more:hover {
-color: #a8d2cc;
-}
-
-/* =========================
-POPULAR HEADER
-========================= */
-
-.home-section-header {
-display: flex;
-
-align-items: center;
-
-justify-content: space-between;
-
-gap: 12px;
-
-margin-bottom: 12px;
-}
-
-/* =========================
-POPULAR TABS
-========================= */
-
-.popular-tabs {
-display: flex;
-
-gap: 4px;
-
-background: #0a2928;
-
-border: 1px solid #173f3c;
-
-border-radius: 7px;
-
-padding: 3px;
-}
-
-.popular-tab {
-background: none;
-
-border: none;
-
-color: #819a96;
-
-padding: 6px 9px;
-
-border-radius: 5px;
-
-cursor: pointer;
-
-font-size: 12px;
-}
-
-.popular-tab:hover {
-color: #c8dad5;
-}
-
-.popular-tab.active {
-background: #173f3c;
-
-color: #d7e4e1;
-}
-
-/* =========================
-POPULAR LIST
-========================= */
-
-#popular-list {
-display: grid;
-
-gap: 8px;
+button,
+input {
+  font: inherit;
 }
 
-/* =========================
-POPULAR ITEM
-========================= */
-
-.popular-game {
-display: flex;
-
-align-items: center;
-
-gap: 12px;
-
-padding: 11px 14px;
-
-background: #0a2928;
-
-border: 1px solid #173f3c;
-
-border-radius: 8px;
-
-color: #c8dad5;
-
-text-decoration: none;
-}
-
-.popular-game:hover {
-background: #0d302e;
-
-border-color: #24534f;
-}
-
-.popular-rank {
-width: 24px;
-
-flex-shrink: 0;
-
-color: #66817c;
-
-font-size: 13px;
-
-text-align: center;
-}
-
-.popular-game-info {
-min-width: 0;
-
-flex: 1;
+button {
+  color: inherit;
 }
-
-.popular-game-title {
-font-size: 15px;
-
-white-space: nowrap;
 
-overflow: hidden;
-
-text-overflow: ellipsis;
+a {
+  color: var(--accent);
 }
-
-.popular-game-visits {
-margin-top: 3px;
 
-color: #718a86;
-
-font-size: 12px;
+button:focus-visible,
+a:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
-
-/* =========================
-HIDDEN
-========================= */
 
 [hidden] {
-display: none !important;
+  display: none !important;
 }
-
-/* =========================================================
-GAME PAGE COMPATIBILITY
-Recuperado de main para game.html / game.js
-========================================================= */
 
 /* =========================
-CLICKABLE HEADER
-========================= */
+   HEADER
+   ========================= */
 
-.header-link {
-display: block;
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
 
-color: #e5f0ec;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 
-text-decoration: none;
+  height: 64px;
+  padding: 0 16px;
+
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--line);
 }
 
-.header-link:hover {
-color: #e5f0ec;
-
-text-decoration: none;
+header h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 20px;
+  line-height: 1.3;
 }
 
-.header-link:visited {
-color: #e5f0ec;
-
-text-decoration: none;
+#home-button {
+  cursor: pointer;
 }
 
+.header-link,
+.header-link:link,
+.header-link:visited,
+.header-link:hover,
 .header-link:active {
-color: #e5f0ec;
-
-text-decoration: none;
+  display: block;
+  color: var(--text-strong);
+  text-decoration: none;
 }
 
 .header-link h1 {
-color: #e5f0ec;
+  color: inherit;
+}
 
-text-decoration: none;
+header button {
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 22px;
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+header button:hover {
+  color: var(--text-strong);
 }
 
 /* =========================
-GAME HEADER
-========================= */
-
-#game-header {
-margin-bottom: 25px;
-
-padding-bottom: 20px;
-
-border-bottom:
-1px solid #1c4743;
-}
-
-#game-title {
-margin-bottom: 8px;
-
-font-size: 32px;
-
-font-weight: bold;
-
-color: #e5f0ec;
-}
-
-#game-year {
-color: #91aaa3;
-
-font-size: 16px;
-}
-
-/* =========================
-PORT LIST
-========================= */
-
-#port-list {
-display: flex;
-
-flex-direction: column;
-
-gap: 15px;
-}
-
-/* =========================
-PORT
-========================= */
-
-#port-list .port {
-padding: 20px;
-
-background: #0d302e;
-
-border:
-1px solid #1c4743;
-
-border-radius: 8px;
-}
-
-/* =========================
-PORT TITLE
-========================= */
-
-#port-list .port-title {
-margin:
-0 0 18px;
-
-font-size: 21px;
-
-color: #e5f0ec;
-}
-
-/* =========================
-PORT INFO
-========================= */
-
-#port-list .port-info {
-display: flex;
-
-flex-direction: column;
-
-gap: 8px;
-
-margin-bottom: 18px;
-
-color: #91aaa3;
-
-font-size: 14px;
-}
-
-#port-list .port-info-row {
-display: flex;
-
-flex-wrap: wrap;
-
-gap:
-5px 10px;
-
-font-size: 14px;
-}
-
-#port-list .port-info-label {
-color: #91aaa3;
-
-min-width: 190px;
-
-text-transform: uppercase;
-}
-
-#port-list .port-info-value {
-color: #c8dad5;
-}
-
-/* =========================
-PORT NOTES
-========================= */
-
-#port-list .port-notes {
-margin-top: 15px;
-
-padding-top: 15px;
-
-border-top:
-1px solid #1c4743;
-
-color: #a9c0ba;
-
-font-size: 14px;
-
-line-height: 1.5;
-}
-
-#port-list .port-notes p {
-margin:
-7px 0 0;
-}
-
-/* =========================
-PORT LINK
-========================= */
-
-#port-list .port-link {
-display: inline-block;
-
-margin-top: 18px;
-
-padding:
-10px 15px;
-
-background: #123a37;
-
-border:
-1px solid #2c7465;
-
-border-radius: 6px;
-
-color: #e5f0ec;
-
-text-decoration: none;
-
-font-size: 14px;
-
-transition:
-background 0.15s,
-border-color 0.15s;
-}
-
-#port-list .port-link:hover {
-background: #2c7465;
-
-border-color: #8fc7b5;
-
-color: #ffffff;
-}
-
-/* =========================
-MOBILE GAME PAGE
-========================= */
-
-@media (max-width: 600px) {
-
-#game-title {
-font-size: 25px;
-}
-
-#port-list .port {
-padding: 16px;
-}
-
-#port-list .port-info-label {
-min-width: 100%;
-
-margin-bottom: 2px;
-
-}
-
-.games-using-app-item {
-padding: 9px 10px;
-}
-
-}
-
-/* =========================
-SEARCH BUTTON
-========================= */
+   SEARCH BUTTON
+   ========================= */
 
 #search-button {
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
 
-    width: 42px;
-    height: 42px;
-    flex-shrink: 0;
+  width: 42px;
+  height: 42px;
+  padding: 0;
 
-    padding: 0;
+  background: var(--header-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
 
-    background: #0B2423;
-    border: 1px solid #24534D;
-    border-radius: 10px;
+  color: var(--accent);
+  cursor: pointer;
 
-    color: #6ECFC0;
-
-    cursor: pointer;
-
-    transition:
-        background-color 0.18s ease,
-        border-color 0.18s ease,
-        color 0.18s ease,
-        box-shadow 0.18s ease;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
 }
 
 #search-button .search-icon {
-    display: block;
-    width: 21px;
-    height: 21px;
+  display: block;
+  width: 21px;
+  height: 21px;
 }
 
 #search-button:hover {
-    background: #10312F;
-    border-color: #39796F;
-    color: #8AE5D5;
-
-    box-shadow: 0 0 10px rgba(110, 207, 192, 0.08);
+  background: var(--surface);
+  border-color: var(--accent-border);
+  color: var(--accent-strong);
 }
 
 #search-button:active {
-    background: #153A36;
+  background: var(--surface-raised);
 }
 
-#search-button:focus-visible {
-    outline: 2px solid #6ECFC0;
-    outline-offset: 3px;
+/* =========================
+   MAIN CONTENT
+   ========================= */
+
+main {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px 16px 40px;
+}
+
+/* =========================
+   SEARCH
+   ========================= */
+
+.search-container {
+  margin-bottom: 20px;
+}
+
+#search,
+#category-search {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+
+  color: var(--text-strong);
+  font-size: 16px;
+
+  transition: border-color var(--transition-fast);
+}
+
+#search::placeholder,
+#category-search::placeholder {
+  color: var(--text-muted);
+  opacity: 1;
+}
+
+#search:focus,
+#category-search:focus {
+  border-color: var(--accent-border);
+  outline: none;
+}
+
+.search-results {
+  margin-top: 6px;
+  overflow: hidden;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+.search-result {
+  display: block;
+  padding: 12px 16px;
+
+  border-bottom: 1px solid var(--line-soft);
+
+  color: var(--text-secondary);
+  font-size: 15px;
+  text-decoration: none;
+
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.search-result:last-child {
+  border-bottom: none;
+}
+
+.search-result:hover {
+  background: var(--surface-hover);
+  color: var(--text-strong);
+}
+
+/* =========================
+   CATEGORY CONTROLS
+   ========================= */
+
+.category-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.category-sort,
+.popular-tabs {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  width: fit-content;
+  padding: 3px;
+
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+}
+
+.category-sort-option,
+.category-sort-direction,
+.popular-tab {
+  padding: 6px 9px;
+
+  background: transparent;
+  border: none;
+  border-radius: 5px;
+
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.category-sort-direction {
+  min-width: 30px;
+  font-size: 13px;
+}
+
+.category-sort-option:hover,
+.category-sort-direction:hover,
+.popular-tab:hover {
+  color: var(--text-strong);
+}
+
+.category-sort-option.active,
+.popular-tab.active {
+  background: var(--surface-raised);
+  color: var(--text-strong);
+}
+
+/* =========================
+   STATUS AND FEEDBACK
+   ========================= */
+
+#status {
+  margin: 15px 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.no-results {
+  padding: 25px 10px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.error {
+  padding: 15px;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  border-radius: var(--radius-medium);
+  color: var(--error-text);
+}
+
+/* =========================
+   GAME LISTS AND CARDS
+   ========================= */
+
+#game-list,
+.home-game-list,
+#popular-list {
+  display: grid;
+  gap: 10px;
+}
+
+.game,
+.home-game,
+.popular-game,
+.games-using-app-item {
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-medium);
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.game {
+  display: block;
+  padding: 15px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.game:hover,
+.home-game:hover,
+.popular-game:hover,
+.games-using-app-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--line);
+}
+
+.game-name {
+  margin: 0 0 6px;
+  color: var(--text-strong);
+  font-size: 18px;
+}
+
+.game-info {
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.game-info span {
+  margin-right: 10px;
+}
+
+/* =========================
+   HOME SECTIONS
+   ========================= */
+
+.home-section {
+  margin-bottom: 30px;
+}
+
+.home-section h2 {
+  margin: 0 0 12px;
+  color: var(--text-strong);
+  font-size: 20px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.home-section-header h2 {
+  margin-bottom: 0;
+}
+
+.home-game {
+  display: block;
+  padding: 12px 14px;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.home-game-title {
+  color: var(--text-main);
+  font-size: 15px;
+}
+
+.home-game-meta {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.home-view-more {
+  margin-top: 12px;
+  padding: 6px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--accent);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.home-view-more:hover {
+  color: var(--accent-strong);
+}
+
+/* =========================
+   POPULAR GAMES
+   ========================= */
+
+.popular-game {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 14px;
+
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.popular-rank {
+  flex-shrink: 0;
+  width: 24px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.popular-game-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.popular-game-title {
+  overflow: hidden;
+  color: var(--text-main);
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.popular-game-visits {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+/* =========================
+   BACK BUTTON
+   ========================= */
+
+.back-button {
+  display: inline-block;
+  margin-bottom: 20px;
+  color: var(--accent);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.back-button:hover {
+  color: var(--accent-strong);
+}
+
+/* =========================
+   GAME SUMMARY
+   ========================= */
+
+#game-header.game-summary-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+
+  margin-bottom: 25px;
+  padding: 20px;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+
+.game-summary-cover {
+  display: block;
+  flex-shrink: 0;
+
+  width: 180px;
+  max-width: 35%;
+  height: auto;
+
+  object-fit: contain;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+.game-summary-info {
+  flex: 1;
+  min-width: 0;
+}
+
+#game-header .game-summary-title {
+  margin: 0 0 12px;
+  color: var(--text-strong);
+  font-size: 30px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+
+.game-summary-metadata {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.game-summary-year,
+.game-summary-genre {
+  display: inline-block;
+  padding: 5px 9px;
+
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.game-summary-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Compatibility with older game header markup. */
+
+.game-header {
+  margin-bottom: 25px;
+}
+
+.game-header h2 {
+  margin: 0 0 8px;
+  color: var(--text-strong);
+  font-size: 26px;
+}
+
+.game-meta {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* =========================
+   PORT LIST AND CARDS
+   ========================= */
+
+.port-list,
+#port-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.port-card,
+#port-list .port {
+  padding: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+.port-card h3 {
+  margin: 0 0 8px;
+  color: var(--text-strong);
+  font-size: 17px;
+}
+
+#port-list .port-title {
+  margin: 0 0 18px;
+  color: var(--text-strong);
+  font-size: 21px;
+}
+
+/* =========================
+   PORT INFORMATION
+   ========================= */
+
+.port-info {
+  margin-bottom: 10px;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.port-info span {
+  margin-right: 10px;
+}
+
+#port-list .port-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+
+  margin-bottom: 18px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+#port-list .port-info-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  font-size: 14px;
+}
+
+#port-list .port-info-label {
+  min-width: 190px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+#port-list .port-info-value {
+  color: var(--text-secondary);
+  overflow-wrap: anywhere;
+}
+
+#port-list a.port-info-value {
+  text-decoration: underline;
+  text-decoration-color: var(--accent-border);
+  text-underline-offset: 3px;
+}
+
+#port-list a.port-info-value:hover {
+  color: var(--accent-strong);
+}
+
+/* =========================
+   PORT NOTES
+   ========================= */
+
+#port-list .port-notes {
+  margin-top: 15px;
+  padding-top: 15px;
+
+  border-top: 1px solid var(--line);
+
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#port-list .port-notes p {
+  margin: 7px 0 0;
+}
+
+.notes {
+  margin-top: 20px;
+  padding: 12px 15px;
+
+  background: var(--surface);
+  border-left: 3px solid var(--accent-border);
+  border-radius: var(--radius-small);
+
+  color: var(--text-secondary);
+  line-height: 1.6;
+}
+
+/* =========================
+   PORT LINKS
+   ========================= */
+
+.port-link {
+  display: inline-block;
+  margin-top: 8px;
+  color: var(--accent);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.port-link:hover {
+  color: var(--accent-strong);
+}
+
+#port-list .port-link {
+  display: inline-block;
+  margin-top: 18px;
+  padding: 10px 15px;
+
+  background: var(--button-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: var(--radius-small);
+
+  color: var(--text-strong);
+  font-size: 14px;
+  text-decoration: none;
+
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+#port-list .port-link:hover {
+  background: var(--button-hover);
+  border-color: var(--accent);
+}
+
+/* =========================
+   ANDROID PORTS SECTION
+   ========================= */
+
+.ports-section-title {
+  margin: 30px 0 8px;
+  color: var(--text-strong);
+  font-size: 22px;
+}
+
+.ports-section-description {
+  margin: 0 0 12px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* =========================
+   SIDE MENU
+   ========================= */
+
+#side-menu {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 200;
+
+  width: 280px;
+  max-width: 85vw;
+  height: 100vh;
+  height: 100dvh;
+  padding: 20px;
+
+  overflow-y: auto;
+
+  background: var(--header-bg);
+  border-right: 1px solid var(--line);
+
+  transform: translateX(-100%);
+  transition: transform var(--transition-menu);
+}
+
+#side-menu.open {
+  transform: translateX(0);
+}
+
+#menu-close {
+  display: block;
+  margin-left: auto;
+  padding: 0 4px;
+
+  background: transparent;
+  border: none;
+
+  color: var(--text-secondary);
+  font-size: 28px;
+  cursor: pointer;
+}
+
+#menu-close:hover {
+  color: var(--text-strong);
+}
+
+#side-menu h2 {
+  margin: 25px 0 10px;
+  color: var(--text-muted);
+  font-size: 15px;
+  text-transform: uppercase;
+}
+
+/* =========================
+   MENU OVERLAY
+   ========================= */
+
+#menu-overlay {
+  position: fixed;
+  z-index: 150;
+  inset: 0;
+
+  background: rgba(0, 0, 0, 0.62);
+
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--transition-menu);
+}
+
+#menu-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* =========================
+   PLATFORM LIST
+   ========================= */
+
+#platform-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.platform-button {
+  display: block;
+  width: 100%;
+  padding: 10px 8px;
+
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-small);
+
+  color: var(--text-secondary);
+  font-size: 15px;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+
+  transition:
+    background-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.platform-button:link,
+.platform-button:visited {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+.platform-button:hover {
+  background: var(--surface);
+  color: var(--text-strong);
+  text-decoration: none;
+}
+
+.menu-separator {
+  margin: 15px 0 5px;
+  padding: 8px 12px;
+
+  border-top: 1px solid var(--line);
+
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: bold;
+  text-align: left;
+}
+
+/* =========================
+   GAMES USING APP
+   ========================= */
+
+.games-using-app {
+  margin-top: 20px;
+  padding: 14px;
+
+  background: var(--header-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+.games-using-app h3 {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.games-using-app-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  width: 100%;
+  padding: 8px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.games-using-app-toggle:hover {
+  color: var(--text-strong);
+}
+
+.games-using-app-toggle:focus {
+  outline: none;
+}
+
+.games-using-app-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.games-using-app-arrow {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: transform var(--transition-fast);
+}
+
+.games-using-app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  margin-top: 6px;
+  padding-left: 4px;
+}
+
+.games-using-app-item {
+  display: block;
+  padding: 8px 10px;
+
+  color: var(--accent);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.games-using-app-item:hover {
+  color: var(--text-strong);
+}
+
+/* =========================
+   GAME FILES LINK
+   ========================= */
+
+.game-files-link {
+  margin-top: 35px;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.game-files-link a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.game-files-link a:hover {
+  color: var(--accent-strong);
+}
+
+/* =========================
+   FOOTER
+   ========================= */
+
+footer {
+  padding: 25px 16px;
+  border-top: 1px solid var(--line);
+
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+/* =========================
+   RESPONSIVE: TABLETS / MOBILE
+   ========================= */
+
+@media (max-width: 600px) {
+  header {
+    padding: 0 10px;
+  }
+
+  header h1 {
+    font-size: 18px;
+  }
+
+  main {
+    padding: 18px 12px 30px;
+  }
+
+  .category-sort {
+    width: 100%;
+  }
+
+  .category-sort-option {
+    flex: 1;
+  }
+
+  .category-sort-direction {
+    flex-shrink: 0;
+  }
+
+  .home-section-header {
+    flex-wrap: wrap;
+  }
+
+  .popular-tabs {
+    max-width: 100%;
+  }
+
+  .popular-tab {
+    padding: 6px 8px;
+  }
+
+  #game-header.game-summary-card {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .game-summary-cover {
+    width: 115px;
+    max-width: 38%;
+  }
+
+  #game-header .game-summary-title {
+    margin-bottom: 10px;
+    font-size: 22px;
+  }
+
+  .game-summary-metadata {
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+
+  .game-summary-year,
+  .game-summary-genre {
+    padding: 4px 7px;
+    font-size: 12px;
+  }
+
+  .game-summary-description {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  #port-list .port {
+    padding: 16px;
+  }
+
+  #port-list .port-info-label {
+    min-width: 100%;
+    margin-bottom: 2px;
+  }
+
+  .games-using-app-item {
+    padding: 9px 10px;
+  }
+}
+
+/* =========================
+   RESPONSIVE: SMALL SCREENS
+   ========================= */
+
+@media (max-width: 380px) {
+  #game-header.game-summary-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .game-summary-cover {
+    align-self: center;
+    width: 150px;
+    max-width: 100%;
+  }
+
+  #game-header .game-summary-title {
+    font-size: 24px;
+  }
+
+  .home-section-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .popular-tabs {
+    width: 100%;
+  }
+
+  .popular-tab {
+    flex: 1;
+  }
+}
+
+/* =========================
+   REDUCED MOTION
+   ========================= */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* ==================================================
+   NAPL HEADER — NEW DESIGN
+   Preserves existing navigation and search controls
+   ================================================== */
+
+header {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 12px;
+
+  min-height: 70px;
+  height: auto;
+  padding: 12px 16px;
+
+  background: var(--header-bg);
+  border-bottom: 1px solid var(--line);
+}
+
+/* Centered NAPL branding, keeping the original clickable H1. */
+
+header #home-button {
+  grid-column: 2;
+  grid-row: 1;
+
+  min-width: 0;
+  margin: 0;
+
+  color: var(--text-strong);
+  font-size: 0;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+}
+
+header #home-button::before {
+  content: "NAPL";
+  display: block;
+
+  color: var(--text-strong);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  line-height: 1.2;
+}
+
+header #home-button::after {
+  content: "NATIVE ANDROID PORT LIST";
+  display: block;
+
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 1.1px;
+  line-height: 1.4;
+}
+
+/* Menu button on the left. */
+
+header #menu-button {
+  grid-column: 1;
+  grid-row: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 39px;
+  height: 39px;
+  padding: 0;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+
+  color: var(--text-main);
+  font-size: 20px;
+  cursor: pointer;
+
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+header #menu-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-border);
+  color: var(--text-strong);
+}
+
+/* Search button on the right. */
+
+header #search-button {
+  grid-column: 3;
+  grid-row: 1;
+
+  width: 39px;
+  height: 39px;
+  padding: 0;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+
+  color: var(--text-main);
+}
+
+header #search-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-border);
+  color: var(--text-strong);
+}
+
+header #search-button .search-icon {
+  width: 21px;
+  height: 21px;
+}
+
+/* Keyboard accessibility. */
+
+header #menu-button:focus-visible,
+header #search-button:focus-visible,
+header #home-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Compact header on narrow screens. */
+
+@media (max-width: 380px) {
+  header {
+    grid-template-columns: 39px minmax(0, 1fr) 39px;
+    gap: 8px;
+    padding: 10px;
+  }
+
+  header #home-button::before {
+    font-size: 19px;
+    letter-spacing: 2.5px;
+  }
+
+  header #home-button::after {
+    font-size: 8px;
+    letter-spacing: 0.7px;
+  }
+}
+
+/* =========================================
+   GAME DESCRIPTION — SHOW MORE / SHOW LESS
+   ========================================= */
+
+.game-summary-description-container {
+  min-width: 0;
+  width: 100%;
+}
+
+.game-summary-description {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+.game-description-toggle {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+
+  transition: color var(--transition-fast);
+}
+
+.game-description-toggle:hover {
+  color: var(--accent-strong);
+}
+
+.game-description-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* =========================================
+   GAME COVER — IMAGE PRESENTATION
+   ========================================= */
+
+.game-summary-cover {
+  display: block;
+  flex-shrink: 0;
+
+  width: 180px;
+  max-width: 35%;
+  height: auto;
+  align-self: flex-start;
+
+  object-fit: contain;
+  background: var(--page-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+/* =========================================
+   RESPONSIVE — MOBILE
+   ========================================= */
+
+@media (max-width: 600px) {
+  #game-header.game-summary-card {
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .game-summary-cover {
+    width: 115px;
+    max-width: 38%;
+  }
+
+  .game-summary-info {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .game-summary-description {
+    font-size: 13px;
+    line-height: 1.55;
+  }
+
+  .game-description-toggle {
+    font-size: 13px;
+  }
+}
+
+/* =========================================
+   RESPONSIVE — VERY SMALL SCREENS
+   ========================================= */
+
+@media (max-width: 380px) {
+  #game-header.game-summary-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .game-summary-cover {
+    align-self: center;
+    width: 150px;
+    max-width: 100%;
+  }
+}
+
+/* =========================================
+   NAPL — GAME PAGE REDESIGN
+   Remove the game information box and
+   modernize typography.
+   ========================================= */
+
+/* Modern system typography across the page */
+
+body {
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  font-weight: 400;
+  letter-spacing: -0.01em;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove the box surrounding the game information */
+
+#game-header.game-summary-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 22px;
+
+  margin: 0 0 32px;
+  padding: 0;
+
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* Game title — typography matching the mockup */
+
+#game-header .game-summary-title {
+  margin: 0 0 10px;
+
+  color: var(--text-strong);
+  font-family: Inter, system-ui, sans-serif;
+  font-size: clamp(25px, 5vw, 36px);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+
+  overflow-wrap: anywhere;
+}
+
+/* Release year and genre */
+
+.game-summary-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+
+  margin: 0 0 18px;
+
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+/* Game description */
+
+.game-summary-description {
+  margin: 0;
+
+  color: var(--text-secondary);
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.8;
+
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+
+/* Show more / Show less */
+
+.game-description-toggle {
+  margin-top: 8px;
+  padding: 5px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0;
+
+  cursor: pointer;
+}
+
+/* Cover without the card surrounding it */
+
+.game-summary-cover {
+  flex-shrink: 0;
+
+  width: 180px;
+  max-width: 35%;
+  height: auto;
+
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+
+  object-fit: contain;
+}
+
+/* Android ports section */
+
+.ports-section-title {
+  margin: 30px 0 8px;
+
+  color: var(--text-strong);
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.ports-section-description {
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* Port titles */
+
+.port-title {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
+}
+
+/* Port details */
+
+.port-info,
+.port-notes {
+  font-size: 14px;
+  line-height: 1.7;
+  letter-spacing: 0;
+}
+
+/* Mobile adjustments */
+
+@media (max-width: 600px) {
+  #game-header.game-summary-card {
+    gap: 14px;
+    margin-bottom: 28px;
+  }
+
+  .game-summary-cover {
+    width: 115px;
+    max-width: 38%;
+  }
+
+  #game-header .game-summary-title {
+    font-size: clamp(25px, 5vw, 36px);
+  }
+
+  .game-summary-description {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .ports-section-title {
+    font-size: 21px;
+  }
+}
+
+/* Very narrow screens */
+
+@media (max-width: 380px) {
+  #game-header.game-summary-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  #game-header .game-summary-title {
+    font-size: 28px;
+  }
+
+  .game-summary-cover {
+    align-self: flex-start;
+    width: 145px;
+    max-width: 100%;
+  }
 }

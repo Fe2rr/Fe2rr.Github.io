@@ -1,53 +1,45 @@
+
 /*
- * GAME MODULE
+ * NAPL — GAME DATA
  *
- * Loads game data from Google Sheets,
- * processes the CSV and coordinates rendering.
+ * Loads the selected game from Google Sheets,
+ * groups its Android ports and sends the data
+ * to game-render.js.
  */
 
 import { displayGame } from "./game-render.js";
 
 
 /*
- * GOOGLE SHEETS
+ * CONFIGURATION
  */
 
-const SHEET_URL =
+const GAME_SHEET_URL =
     "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 
 
 /*
- * VISIT COUNTER
+ * TEXT HELPERS
  */
 
-const VISITS_URL =
-    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
+function normalizeText(value) {
+    return String(value || "")
+        .trim()
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
+}
 
 
-/*
- * PAGE ELEMENTS
- */
-
-const gameTitle =
-    document.getElementById("game-title");
-
-const gameYear =
-    document.getElementById("game-year");
-
-const portList =
-    document.getElementById("port-list");
-
-const statusElement =
-    document.getElementById("status");
+function createSlug(name) {
+    return normalizeText(name)
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+}
 
 
-/*
- * Normalize headers.
- */
-
-function normalizeHeader(value) {
-
-    return value
+function normalizeGameHeader(value) {
+    return String(value || "")
         .replace(/^\uFEFF/, "")
         .trim()
         .toUpperCase()
@@ -57,125 +49,42 @@ function normalizeHeader(value) {
 
 
 /*
- * Normalize text.
+ * CSV PARSER
+ *
+ * Supports quoted fields, commas and line breaks
+ * inside quoted values.
  */
 
-function normalizeText(value) {
-
-    return String(value || "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-}
-
-
-/*
- * Create the same slug used by app.js.
- */
-
-function createSlug(name) {
-
-    return normalizeText(name)
-        .replace(/[^a-z0-9]+/g, "-")
-        .replace(/^-+|-+$/g, "");
-}
-
-
-/*
- * Register a game visit.
- */
-
-function registerVisit(gameSlug) {
-
-    if (!gameSlug) {
-        return;
-    }
-
-    const url =
-        `${VISITS_URL}?game=${encodeURIComponent(gameSlug)}`;
-
-    fetch(
-        url,
-        {
-            method: "GET",
-            mode: "no-cors",
-            keepalive: true
-        }
-    ).catch(
-        error => {
-            console.error(
-                "Could not register game visit:",
-                error
-            );
-        }
-    );
-}
-
-
-/*
- * CSV parser.
- */
-
-function parseCSV(csv) {
-
+function parseGameCSV(csv) {
     const rows = [];
-
     let row = [];
     let field = "";
-    let insideQuotes = false;
+    let quoted = false;
 
     for (let i = 0; i < csv.length; i++) {
-
         const char = csv[i];
 
-        /*
-         * Quotes.
-         */
-
         if (char === '"') {
-
-            if (
-                insideQuotes &&
-                csv[i + 1] === '"'
-            ) {
-
+            if (quoted && csv[i + 1] === '"') {
                 field += '"';
                 i++;
-
             } else {
-
-                insideQuotes =
-                    !insideQuotes;
+                quoted = !quoted;
             }
 
             continue;
         }
 
-        /*
-         * Comma outside quotes.
-         */
-
-        if (
-            char === "," &&
-            !insideQuotes
-        ) {
-
+        if (char === "," && !quoted) {
             row.push(field);
             field = "";
-
             continue;
         }
 
-        /*
-         * End of row.
-         */
-
         if (
             (char === "\n" || char === "\r") &&
-            !insideQuotes
+            !quoted
         ) {
-
             if (
                 char === "\r" &&
                 csv[i + 1] === "\n"
@@ -184,93 +93,65 @@ function parseCSV(csv) {
             }
 
             row.push(field);
-            field = "";
 
             if (
-                row.some(
-                    value =>
-                        value.trim() !== ""
+                row.some(value =>
+                    value.trim() !== ""
                 )
             ) {
-
                 rows.push(row);
             }
 
             row = [];
-
+            field = "";
             continue;
         }
 
         field += char;
     }
 
-    /*
-     * Last field.
-     */
-
-    if (
-        field.length > 0 ||
-        row.length > 0
-    ) {
-
+    if (field.length > 0 || row.length > 0) {
         row.push(field);
 
         if (
-            row.some(
-                value =>
-                    value.trim() !== ""
+            row.some(value =>
+                value.trim() !== ""
             )
         ) {
-
             rows.push(row);
         }
     }
 
-    if (rows.length === 0) {
+    if (rows.length < 2) {
         return [];
     }
 
-    /*
-     * First row = headers.
-     */
-
-    const headers =
-        rows.shift().map(
-            normalizeHeader
-        );
-
-    /*
-     * Convert rows into objects.
-     */
+    const headers = rows
+        .shift()
+        .map(normalizeGameHeader);
 
     return rows.map(values => {
+        const result = {};
 
-        const rowObject = {};
-
-        headers.forEach(
-            (header, index) => {
-
-                rowObject[header] =
-                    (values[index] || "").trim();
-
+        headers.forEach((header, index) => {
+            if (header) {
+                result[header] =
+                    String(values[index] || "").trim();
             }
-        );
+        });
 
-        return rowObject;
+        return result;
     });
 }
 
 
 /*
- * Find a column.
+ * COLUMN LOOKUP
  */
 
-function getColumn(row, possibleNames) {
-
-    for (const name of possibleNames) {
-
-        const key =
-            normalizeHeader(name);
+function getGameColumn(row, aliases) {
+    for (const alias of aliases) {
+        const key = normalizeGameHeader(alias);
 
         if (
             Object.prototype.hasOwnProperty.call(
@@ -278,8 +159,7 @@ function getColumn(row, possibleNames) {
                 key
             )
         ) {
-
-            return row[key];
+            return String(row[key] || "").trim();
         }
     }
 
@@ -288,453 +168,379 @@ function getColumn(row, possibleNames) {
 
 
 /*
- * Process rows.
+ * GROUP GAME DATA
  *
- * GAME and YEAR can be merged in Google Sheets.
+ * Reads game information even when a row contains
+ * no Android port data.
  *
- * If GAME is empty, the game from the
- * previous row is inherited.
+ * Only creates a port card when the row actually
+ * contains port information.
  */
 
-function processRows(rows) {
+function groupGameRows(rows) {
+    const grouped = new Map();
 
     let currentGame = "";
     let currentYear = "";
 
-    const result = [];
-
     for (const row of rows) {
+        const gameValue = getGameColumn(row, [
+            "GAME",
+            "GAME NAME",
+            "NAME",
+            "JUEGO"
+        ]);
 
-        const gameValue =
-            getColumn(row, [
-                "GAME",
-                "GAME NAME",
-                "NAME",
-                "JUEGO"
-            ]).trim();
-
-        const yearValue =
-            getColumn(row, [
-                "YEAR",
-                "ANO",
-                "AÑO"
-            ]).trim();
-
-        /*
-         * Update current game.
-         */
+        const yearValue = getGameColumn(row, [
+            "YEAR",
+            "AÑO",
+            "ANO"
+        ]);
 
         if (gameValue) {
             currentGame = gameValue;
         }
 
-        /*
-         * Update current year.
-         */
-
         if (yearValue) {
             currentYear = yearValue;
         }
 
-        /*
-         * PLATFORM.
-         */
-
-        const platform =
-            getColumn(row, [
-                "PLATFORM",
-                "PLATAFORM",
-                "PLATAFORMA"
-            ]);
-
-        /*
-         * Project name.
-         */
-
-        const project =
-            getColumn(row, [
-                "PROJECT",
-                "PROYECTO"
-            ]);
-
-        /*
-         * LINK = text displayed on the button.
-         */
-
-        const link =
-            getColumn(row, [
-                "LINK",
-                "PROJECT LINK",
-                "ENLACE"
-            ]);
-
-        /*
-         * URL = actual destination.
-         */
-
-        const url =
-            getColumn(row, [
-                "URL"
-            ]);
-
-        const developer =
-            getColumn(row, [
-                "DEVELOPER",
-                "DEVELOPER/PUBLISHER",
-                "DESARROLLADOR"
-            ]);
-
-        const version =
-            getColumn(row, [
-                "VERSION",
-                "VERSIÓN"
-            ]);
-
-        const controller =
-            getColumn(row, [
-                "CONTROLLER SUPPORT",
-                "CONTROLLER",
-                "GAMEPAD",
-                "MANDO"
-            ]);
-
-        const files =
-            getColumn(row, [
-                "NEEDS GAME FILES?",
-                "NEEDS GAME FILES",
-                "GAME FILES",
-                "NECESITA ARCHIVOS"
-            ]);
-
-        /*
-         * DATA URL = destination for the
-         * value of "Needs Game Files?".
-         */
-
-        const dataUrl =
-            getColumn(row, [
-                "DATA URL"
-            ]);
-
-        const works =
-            getColumn(row, [
-                "WORKS?",
-                "WORKS",
-                "FUNCIONA"
-            ]);
-
-        const lastUpdate =
-            getColumn(row, [
-                "LAST UPDATE",
-                "LAST UPDATED",
-                "ÚLTIMA ACTUALIZACIÓN"
-            ]);
-
-        const notes =
-            getColumn(row, [
-                "NOTES",
-                "NOTE",
-                "NOTAS"
-            ]);
-
-        /*
-         * Determine whether this row contains
-         * port information.
-         */
-
-        const hasPortData =
-            project ||
-            link ||
-            url ||
-            developer ||
-            version ||
-            controller ||
-            files ||
-            dataUrl ||
-            works ||
-            lastUpdate ||
-            notes;
-
-        if (
-            !currentGame ||
-            !hasPortData
-        ) {
-
+        if (!currentGame) {
             continue;
         }
 
-        result.push({
+        const key = createSlug(currentGame);
 
+        if (!key) {
+            continue;
+        }
+
+        const platform = getGameColumn(row, [
+            "PLATFORM",
+            "PLATAFORM",
+            "PLATAFORMA"
+        ]);
+
+        const project = getGameColumn(row, [
+            "PROJECT",
+            "PROYECTO"
+        ]);
+
+        const link = getGameColumn(row, [
+            "LINK",
+            "PROJECT LINK",
+            "ENLACE"
+        ]);
+
+        const url = getGameColumn(row, [
+            "URL",
+            "PORT URL",
+            "PORT LINK"
+        ]);
+
+        const dataUrl = getGameColumn(row, [
+            "DATA URL",
+            "DATA LINK",
+            "GAME FILES URL"
+        ]);
+
+        const developer = getGameColumn(row, [
+            "DEVELOPER",
+            "DEVELOPER/PUBLISHER",
+            "DESARROLLADOR"
+        ]);
+
+        const version = getGameColumn(row, [
+            "VERSION",
+            "VERSIÓN"
+        ]);
+
+        const controller = getGameColumn(row, [
+            "CONTROLLER SUPPORT",
+            "CONTROLLER",
+            "GAMEPAD",
+            "MANDO"
+        ]);
+
+        const files = getGameColumn(row, [
+            "NEEDS GAME FILES?",
+            "NEEDS GAME FILES",
+            "GAME FILES",
+            "NECESITA ARCHIVOS"
+        ]);
+
+        const works = getGameColumn(row, [
+            "WORKS?",
+            "WORKS",
+            "FUNCIONA"
+        ]);
+
+        const lastUpdate = getGameColumn(row, [
+            "LAST UPDATE",
+            "LAST UPDATED",
+            "ÚLTIMA ACTUALIZACIÓN"
+        ]);
+
+        const notes = getGameColumn(row, [
+            "NOTES",
+            "NOTE",
+            "NOTAS"
+        ]);
+
+        /*
+         * General game information.
+         *
+         * Keep COVER_URL with its underscore.
+         */
+
+        const coverUrl = getGameColumn(row, [
+            "COVER_URL",
+            "COVER URL",
+            "COVER",
+            "COVER IMAGE",
+            "IMAGE URL",
+            "PORTADA"
+        ]);
+
+        const genre = getGameColumn(row, [
+            "GENRE",
+            "GÉNERO",
+            "GENERO"
+        ]);
+
+        const description = getGameColumn(row, [
+            "DESCRIPTION",
+            "DESCRIPCIÓN",
+            "DESCRIPCION"
+        ]);
+
+        /*
+         * Create the game even if this row only
+         * contains general information.
+         */
+
+        if (!grouped.has(key)) {
+            grouped.set(key, {
+                name: currentGame,
+                slug: key,
+                year: currentYear,
+                genre: "",
+                description: "",
+                coverUrl: "",
+                ports: [],
+                platforms: []
+            });
+        }
+
+        const game = grouped.get(key);
+
+        /*
+         * Fill missing general information.
+         */
+
+        if (!game.year && currentYear) {
+            game.year = currentYear;
+        }
+
+        if (!game.genre && genre) {
+            game.genre = genre;
+        }
+
+        if (!game.description && description) {
+            game.description = description;
+        }
+
+        if (!game.coverUrl && coverUrl) {
+            game.coverUrl = coverUrl;
+        }
+
+        if (
+            platform &&
+            !game.platforms.includes(platform)
+        ) {
+            game.platforms.push(platform);
+        }
+
+        /*
+         * Skip rows without port information.
+         */
+
+        const hasPortData = [
+            project,
+            link,
+            url,
+            dataUrl,
+            developer,
+            version,
+            controller,
+            files,
+            works,
+            lastUpdate,
+            notes
+        ].some(value =>
+            String(value || "").trim() !== ""
+        );
+
+        if (!hasPortData) {
+            continue;
+        }
+
+        game.ports.push({
             game: currentGame,
-
             year: currentYear,
-
-            platform: platform.trim(),
-
-            project: project.trim(),
-
-            link: link.trim(),
-
-            url: url.trim(),
-
-            developer: developer.trim(),
-
-            version: version.trim(),
-
-            controller: controller.trim(),
-
-            files: files.trim(),
-
-            dataUrl: dataUrl.trim(),
-
-            works: works.trim(),
-
-            lastUpdate: lastUpdate.trim(),
-
-            notes: notes.trim()
-
+            platform,
+            project,
+            link,
+            url,
+            dataUrl,
+            developer,
+            version,
+            controller,
+            files,
+            works,
+            lastUpdate,
+            notes
         });
     }
 
-    return result;
+    return Array.from(grouped.values());
 }
 
 
 /*
- * Get the requested game from the URL.
+ * LOAD THE SELECTED GAME
  */
 
-function getRequestedGame() {
+async function loadSelectedGame() {
+    const gameHeader =
+        document.getElementById("game-header");
+
+    const portList =
+        document.getElementById("port-list");
+
+    const status =
+        document.getElementById("status");
+
+    if (!gameHeader || !portList || !status) {
+        console.error(
+            "NAPL: required game page elements are missing."
+        );
+        return;
+    }
 
     const params =
-        new URLSearchParams(
-            window.location.search
-        );
+        new URLSearchParams(window.location.search);
 
-    return params.get("game") || "";
-}
+    const requestedSlug = params.get("game");
 
+    if (!requestedSlug) {
+        gameHeader.textContent = "No game selected.";
+        status.textContent =
+            "Return to the list and select a game.";
+        portList.replaceChildren();
+        return;
+    }
 
-/*
- * Load the selected game.
- */
-
-async function loadGame() {
+    status.textContent = "Loading ports...";
+    portList.replaceChildren();
 
     try {
-
-        const requestedGame =
-            getRequestedGame();
-
-        /*
-         * Make sure a game was specified.
-         */
-
-        if (!requestedGame) {
-
-            throw new Error(
-                "No game was specified."
-            );
-        }
-
-        /*
-         * Register the visit.
-         */
-
-        registerVisit(requestedGame);
-
-        statusElement.textContent =
-            "Loading ports...";
-
-        /*
-         * Abort the request if Google Sheets
-         * does not respond within 15 seconds.
-         */
-
-        const controller =
-            new AbortController();
-
-        const timeout =
-            setTimeout(
-                () => controller.abort(),
-                15000
-            );
-
-        let response;
-
-        try {
-
-            response =
-                await fetch(
-                    SHEET_URL,
-                    {
-                        signal:
-                            controller.signal
-                    }
-                );
-
-        } finally {
-
-            clearTimeout(timeout);
-        }
+        const response = await fetch(GAME_SHEET_URL, {
+            method: "GET",
+            cache: "no-store"
+        });
 
         if (!response.ok) {
-
             throw new Error(
-                `HTTP error ${response.status}`
+                `The spreadsheet returned HTTP ${response.status}.`
             );
         }
 
-        /*
-         * Read CSV.
-         */
+        const csv = await response.text();
 
-        const csv =
-            await response.text();
-
-        if (
-            !csv ||
-            !csv.trim()
-        ) {
-
+        if (!csv.trim()) {
             throw new Error(
-                "Google Sheets returned an empty response."
+                "The spreadsheet returned no data."
             );
         }
 
-        /*
-         * Parse CSV.
-         */
+        const rows = parseGameCSV(csv);
 
-        const rows =
-            parseCSV(csv);
-
-        if (rows.length === 0) {
-
+        if (!rows.length) {
             throw new Error(
-                "The Google Sheet contains no data."
+                "No valid rows were found in the spreadsheet."
             );
         }
 
-        /*
-         * Process ports.
-         */
+        const games = groupGameRows(rows);
 
-        const processedRows =
-            processRows(rows);
-
-        if (
-            processedRows.length === 0
-        ) {
-
-            throw new Error(
-                "No ports were found in the Google Sheet."
-            );
-        }
-
-        /*
-         * Find the requested game.
-         */
-
-        const matchingRows =
-            processedRows.filter(
-                row =>
-                    createSlug(row.game) ===
-                    requestedGame
-            );
-
-        if (
-            matchingRows.length === 0
-        ) {
-
-            throw new Error(
-                `Game not found: ${requestedGame}`
-            );
-        }
-
-        /*
-         * Build game object.
-         */
-
-        const game = {
-
-            name:
-                matchingRows[0].game,
-
-            year:
-                matchingRows[0].year,
-
-            ports:
-                matchingRows
-
-        };
-
-        /*
-         * Update browser title.
-         */
-
-        document.title =
-            `${game.name} - Community Android Ports`;
-
-        /*
-         * Display game using game-render.js.
-         */
-
-        displayGame(
-            game,
-            processedRows
+        const game = games.find(
+            item =>
+                item.slug === createSlug(requestedSlug)
         );
 
-    } catch (error) {
+        if (!game) {
+            gameHeader.textContent = "Game not found.";
+            status.textContent =
+                "This game could not be found in the spreadsheet.";
+            portList.replaceChildren();
 
+            console.error(
+                "NAPL: game slug not found:",
+                requestedSlug
+            );
+
+            return;
+        }
+
+        document.title = `${game.name} — NAPL`;
+
+        const allRows = rows.map(row => ({
+            game: getGameColumn(row, [
+                "GAME",
+                "GAME NAME",
+                "NAME",
+                "JUEGO"
+            ]),
+            year: getGameColumn(row, [
+                "YEAR",
+                "AÑO",
+                "ANO"
+            ]),
+            platform: getGameColumn(row, [
+                "PLATFORM",
+                "PLATAFORM",
+                "PLATAFORMA"
+            ]),
+            project: getGameColumn(row, [
+                "PROJECT",
+                "PROYECTO"
+            ])
+        }));
+
+        displayGame(game, allRows);
+
+    } catch (error) {
         console.error(
-            "Could not load game:",
+            "NAPL: could not load selected game.",
             error
         );
 
-        gameTitle.textContent =
-            "Error";
+        gameHeader.textContent =
+            "Could not load this game.";
 
-        gameYear.textContent =
-            "";
+        status.textContent =
+            error instanceof Error
+                ? error.message
+                : "An unexpected error occurred.";
 
-        statusElement.textContent =
-            "";
-
-        let message =
-            error.message;
-
-        /*
-         * Special message for a timeout.
-         */
-
-        if (
-            error.name === "AbortError"
-        ) {
-
-            message =
-                "Google Sheets did not respond within 15 seconds.";
-        }
-
-        portList.innerHTML = `
-            <div class="error">
-
-                <strong>
-                    Could not load the game.
-                </strong>
-
-                <br><br>
-
-                ${message}
-
-            </div>
-        `;
+        portList.replaceChildren();
     }
 }
 
 
 /*
- * Start.
+ * START
  */
 
-loadGame();
+loadSelectedGame();

@@ -1,18 +1,21 @@
+
 /*
- * MULTI-GAME APPS
+ * NAPL — MULTI-GAME APPS
  *
- * Handles the detection of Multi-game Apps
- * and the games compatible with each app.
+ * Detects multi-game apps and finds the games
+ * compatible with each app.
  */
 
 
 /*
- * Normalize text for comparisons.
+ * NORMALIZE TEXT
+ *
+ * Makes comparisons case-insensitive and ignores
+ * accents and surrounding whitespace.
  */
 
 function normalizeText(value) {
-
-    return String(value || "")
+    return String(value ?? "")
         .trim()
         .toLowerCase()
         .normalize("NFD")
@@ -21,114 +24,118 @@ function normalizeText(value) {
 
 
 /*
- * Check whether the selected entry is
- * a Multi-game App.
+ * CHECK WHETHER AN ENTRY IS A MULTI-GAME APP
  */
 
 export function isMultiGameApp(game) {
-
-    return game.ports.some(
-        port =>
-            normalizeText(port.platform) ===
-            "multi-game apps"
-    );
-}
-
-
-/*
- * Check whether a specific port uses
- * a Multi-game App.
- */
-
-export function isMultiGameAppPort(
-    port,
-    allRows
-) {
-
-    if (!port.project) {
+    if (!game || !Array.isArray(game.ports)) {
         return false;
     }
 
-    const projectName =
-        normalizeText(port.project);
-
-    return allRows.some(
-        row =>
-            normalizeText(row.platform) ===
-            "multi-game apps" &&
-            normalizeText(row.game) ===
-            projectName
-    );
+    return game.ports.some(port => {
+        return (
+            normalizeText(port?.platform) ===
+            "multi-game apps"
+        );
+    });
 }
 
 
 /*
- * Find games that use this Multi-game App.
+ * CHECK WHETHER A PORT IS A MULTI-GAME APP
  *
- * A game uses the app when its PROJECT
- * matches the app name.
+ * A port is recognized as a multi-game app when
+ * its project name matches an entry in the
+ * Multi-game Apps platform.
  */
 
-export function findGamesUsingApp(
-    appName,
-    allRows
-) {
+export function isMultiGameAppPort(port, allRows) {
+    if (
+        !port ||
+        !port.project ||
+        !Array.isArray(allRows)
+    ) {
+        return false;
+    }
 
-    const appNameNormalized =
-        normalizeText(appName);
+    const projectName = normalizeText(port.project);
 
-    const gamesUsingApp =
-        new Map();
+    return allRows.some(row => {
+        if (!row) {
+            return false;
+        }
+
+        return (
+            normalizeText(row.platform) ===
+                "multi-game apps" &&
+            normalizeText(row.game) === projectName
+        );
+    });
+}
+
+
+/*
+ * FIND GAMES THAT USE A MULTI-GAME APP
+ *
+ * A game is associated with an app when its
+ * PROJECT column matches the app name.
+ *
+ * Duplicate games are removed, and results are
+ * sorted alphabetically.
+ */
+
+export function findGamesUsingApp(appName, allRows) {
+    const appNameNormalized = normalizeText(appName);
+
+    if (
+        !appNameNormalized ||
+        !Array.isArray(allRows)
+    ) {
+        return [];
+    }
+
+    const gamesUsingApp = new Map();
 
     for (const row of allRows) {
-
         if (
+            !row ||
             !row.game ||
             !row.project
         ) {
             continue;
         }
 
+        const gameName = String(row.game).trim();
+        const projectName = normalizeText(row.project);
+        const normalizedGameName = normalizeText(gameName);
+
         /*
          * Do not include the app itself.
          */
 
-        if (
-            normalizeText(row.game) ===
-            appNameNormalized
-        ) {
+        if (normalizedGameName === appNameNormalized) {
             continue;
         }
 
         /*
-         * PROJECT must match the app name.
+         * The PROJECT column must match the app name.
          */
 
-        if (
-            normalizeText(row.project) !==
-            appNameNormalized
-        ) {
+        if (projectName !== appNameNormalized) {
             continue;
         }
 
-        const key =
-            normalizeText(row.game);
-
         /*
-         * Avoid duplicate games.
+         * Avoid duplicate games, ignoring case and accents.
          */
 
-        if (
-            !gamesUsingApp.has(key)
-        ) {
+        if (!gamesUsingApp.has(normalizedGameName)) {
+            const year = String(row.year ?? "").trim();
 
-            gamesUsingApp.set(
-                key,
-                {
-                    name: row.game,
-                    year: row.year
-                }
-            );
+            gamesUsingApp.set(normalizedGameName, {
+                name: gameName,
+                year: year
+            });
         }
     }
 
@@ -136,16 +143,12 @@ export function findGamesUsingApp(
      * Return games in alphabetical order.
      */
 
-    return Array.from(
-        gamesUsingApp.values()
-    ).sort(
+    return Array.from(gamesUsingApp.values()).sort(
         (a, b) =>
             a.name.localeCompare(
                 b.name,
                 "en",
-                {
-                    sensitivity: "base"
-                }
+                { sensitivity: "base" }
             )
     );
 }
