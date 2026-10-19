@@ -149,6 +149,7 @@ function normalizePlatformLabel(value) {
 /*
  * GET UNIQUE PLATFORMS FROM LOADED SHEET DATA
  * Uses game.platforms, populated from the PLATFORM column.
+ * Preserves the order of first appearance in the loaded data.
  */
 function getAvailablePlatforms() {
     const uniquePlatforms = new Map();
@@ -179,7 +180,7 @@ function getAvailablePlatforms() {
                 continue;
             }
 
-            // Remove duplicates while preserving the original label.
+            // Remove duplicates without changing the original order.
             if (!uniquePlatforms.has(key)) {
                 uniquePlatforms.set(key, platform);
             }
@@ -269,8 +270,16 @@ function displayPlatformMenu() {
         "multi-game-apps"
     );
 
+    // Special category: Dual Screen.
+    addCategoryButton(
+        "Dual Screen",
+        "dual-screen"
+    );
+
     const platforms = getAvailablePlatforms();
 
+    // Group headings remain in this order.
+    // Platforms inside each group retain their Sheet order.
     const groupOrder = [
         "Nintendo",
         "PlayStation",
@@ -285,6 +294,7 @@ function displayPlatformMenu() {
         groupedPlatforms.set(group, []);
     }
 
+    // Group platforms without sorting them.
     for (const platform of platforms) {
         const group = getPlatformGroup(platform);
 
@@ -379,7 +389,6 @@ function displayGames(list) {
         return;
     }
 
-    // Backticks are required for JavaScript template literals.
     statusElement.textContent =
         `${list.length} game${list.length !== 1 ? "s" : ""}`;
 
