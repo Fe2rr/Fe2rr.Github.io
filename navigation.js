@@ -1,467 +1,634 @@
 /*
- * Open menu.
- */
-function openMenu() {
-    closeSearch();
-    sideMenu.classList.add("open");
-    menuOverlay.classList.add("visible");
-}
+
+* NAPL — NAVIGATION
+* 
+* Builds the platform menu dynamically from the
+* PLATFORM values loaded from Google Sheets.
+* 
+* Keep this file on the Nuevo-Formato branch.
+  */
 
 /*
- * Close menu.
- */
-function closeMenu() {
-    sideMenu.classList.remove("open");
-    menuOverlay.classList.remove("visible");
-}
+
+* OPEN MENU
+  */
+  function openMenu() {
+  closeSearch();
+  sideMenu.classList.add("open");
+  menuOverlay.classList.add("visible");
+  }
 
 /*
- * Toggle search.
- */
-function toggleSearch() {
-    const isHidden = searchContainer.hasAttribute("hidden");
 
-    if (isHidden) {
-        searchContainer.removeAttribute("hidden");
-        searchInput.focus();
-    } else {
-        closeSearch();
+* CLOSE MENU
+  */
+  function closeMenu() {
+  sideMenu.classList.remove("open");
+  menuOverlay.classList.remove("visible");
+  }
+
+/*
+
+* TOGGLE SEARCH
+  */
+  function toggleSearch() {
+  const isHidden = searchContainer.hasAttribute("hidden");
+  
+  if (isHidden) {
+  searchContainer.removeAttribute("hidden");
+  searchButton.setAttribute("aria-expanded", "true");
+  searchInput.focus();
+  } else {
+  closeSearch();
+  }
+  }
+
+/*
+
+* CLOSE SEARCH
+  */
+  function closeSearch() {
+  if (searchContainer.hasAttribute("hidden")) {
+  return;
+  }
+  
+  searchContainer.setAttribute("hidden", "");
+  searchButton.setAttribute("aria-expanded", "false");
+  
+  searchInput.value = "";
+  searchResults.innerHTML = "";
+  searchResults.hidden = true;
+  
+  if (currentView === "category") {
+  displayFilteredGames();
+  } else {
+  gameList.innerHTML = "";
+  gameList.hidden = true;
+  statusElement.textContent = "";
+  }
+  }
+
+/*
+
+* CLOSE SEARCH WHEN CLICKING OUTSIDE
+  */
+  document.addEventListener("click", event => {
+  if (searchContainer.hasAttribute("hidden")) {
+  return;
+  }
+  
+  const clickedInsideSearch =
+  searchContainer.contains(event.target);
+  
+  const clickedSearchButton =
+  searchButton.contains(event.target);
+  
+  if (!clickedInsideSearch && !clickedSearchButton) {
+  closeSearch();
+  }
+  });
+
+/*
+
+* CLOSE SEARCH ON SCROLL
+  */
+  window.addEventListener(
+  "scroll",
+  () => {
+  closeSearch();
+  },
+  {
+  passive: true
+  }
+  );
+
+/*
+
+* RETURN HOME
+  */
+  function goHome() {
+  currentView = "home";
+  selectedPlatform = "";
+  selectedCategory = "";
+  
+  searchInput.value = "";
+  searchResults.innerHTML = "";
+  searchResults.hidden = true;
+  
+  categorySearchInput.value = "";
+  selectedCategorySort = "updated";
+  categorySortDescending = false;
+  
+  updateCategorySortDirection();
+  
+  categorySortOptions.forEach(option => {
+  option.classList.toggle(
+  "active",
+  option.dataset.sort === selectedCategorySort
+  );
+  });
+  
+  gameList.innerHTML = "";
+  gameList.hidden = true;
+  statusElement.textContent = "";
+  
+  searchContainer.setAttribute("hidden", "");
+  searchButton.setAttribute("aria-expanded", "false");
+  
+  showHomeSections();
+  closeMenu();
+  }
+
+/*
+
+* SHOW ALL GAMES
+  */
+  function showAllGames() {
+  currentView = "category";
+  selectedPlatform = "";
+  selectedCategory = "all-games";
+  
+  resetCategoryControls();
+  
+  searchInput.value = "";
+  searchResults.innerHTML = "";
+  searchResults.hidden = true;
+  
+  searchContainer.setAttribute("hidden", "");
+  searchButton.setAttribute("aria-expanded", "false");
+  
+  showCategoryView();
+  
+  gameList.hidden = false;
+  
+  displayFilteredGames();
+  
+  closeMenu();
+  }
+
+/*
+
+* NORMALIZE PLATFORM LABELS
+* 
+* Removes extra whitespace and makes comparisons
+* case-insensitive without changing displayed names.
+  */
+  function normalizePlatformLabel(value) {
+  return String(value || "")
+  .trim()
+  .replace(/\s+/g, " ");
+  }
+
+/*
+
+* GET UNIQUE PLATFORMS FROM LOADED SHEET DATA
+
+* 
+
+* The source of truth is game.platforms, populated
+
+* from the PLATFORM column by processRows() and groupGames().
+  */
+  function getAvailablePlatforms() {
+  const uniquePlatforms = new Map();
+  
+  if (!Array.isArray(games)) {
+  return [];
+  }
+  
+  for (const game of games) {
+  if (!Array.isArray(game.platforms)) {
+  continue;
+  }
+  
+   for (const rawPlatform of game.platforms) {
+     const platform = normalizePlatformLabel(rawPlatform);
+
+     if (!platform) {
+         continue;
+     }
+
+     const key = normalizeText(platform);
+
+     /*
+      * Multi-Game Apps has its own category button.
+      * Do not display it a second time as a platform.
+      */
+     if (
+         key === "multi-game apps" ||
+         key === "multi game apps"
+     ) {
+         continue;
+     }
+
+     /*
+      * Keep the first spelling encountered in the Sheet.
+      */
+     if (!uniquePlatforms.has(key)) {
+         uniquePlatforms.set(key, platform);
+     }
+ }
+  
+  }
+  
+  return Array.from(uniquePlatforms.values());
+  }
+
+/*
+
+* GROUP PLATFORMS
+
+* 
+
+* Grouping affects presentation only.
+
+* Filtering still uses the exact platform label
+
+* from the spreadsheet.
+  */
+  function getPlatformGroup(platform) {
+  const normalized = normalizeText(platform);
+  
+  if (
+  normalized === "others" ||
+  normalized === "other"
+  ) {
+  return "Others";
+  }
+  
+  if (normalized.includes("playstation")) {
+  return "PlayStation";
+  }
+  
+  if (normalized.startsWith("xbox")) {
+  return "Xbox";
+  }
+  
+  if (
+  normalized.includes("nintendo") ||
+  normalized.includes("game boy") ||
+  normalized.includes("gameboy") ||
+  normalized.includes("gamecube") ||
+  normalized === "nes"
+  ) {
+  return "Nintendo";
+  }
+  
+  return "Other Platforms";
+  }
+
+/*
+
+* CREATE CATEGORY BUTTON
+  */
+  function addCategoryButton(label, category) {
+  const button = document.createElement("button");
+  
+  button.type = "button";
+  button.className = "platform-button";
+  button.textContent = label;
+  
+  button.addEventListener("click", () => {
+  currentView = "category";
+  selectedPlatform = "";
+  selectedCategory = category;
+  
+   resetCategoryControls();
+
+ searchInput.value = "";
+ searchResults.innerHTML = "";
+ searchResults.hidden = true;
+
+ searchContainer.setAttribute("hidden", "");
+ searchButton.setAttribute("aria-expanded", "false");
+
+ showCategoryView();
+ displayFilteredGames();
+
+ closeMenu();
+  
+  });
+  
+  platformList.appendChild(button);
+  }
+
+/*
+
+* CREATE THE PLATFORM MENU DYNAMICALLY
+  */
+  function displayPlatformMenu() {
+  if (!platformList) {
+  console.error("NAPL: platform menu element was not found.");
+  return;
+  }
+  
+  platformList.replaceChildren();
+  
+  /*
+  
+  * Special category: Multi-Game Apps.
+    */
+    addCategoryButton(
+    "Multi-Game Apps",
+    "multi-game-apps"
+    );
+  
+  /*
+  
+  * Collect unique platform labels directly from
+  * the loaded PLATFORM values.
+    */
+    const platforms = getAvailablePlatforms();
+  
+  const groupOrder = [
+  "Nintendo",
+  "PlayStation",
+  "Xbox",
+  "Others",
+  "Other Platforms"
+  ];
+  
+  const groupedPlatforms = new Map();
+  
+  for (const group of groupOrder) {
+  groupedPlatforms.set(group, []);
+  }
+  
+  for (const platform of platforms) {
+  const group = getPlatformGroup(platform);
+  
+   if (!groupedPlatforms.has(group)) {
+     groupedPlatforms.set(group, []);
+ }
+
+ groupedPlatforms.get(group).push(platform);
+  
+  }
+  
+  /*
+  
+  * Render only groups containing platforms.
+  
+  * Platform order follows the first occurrence
+  
+  * in the spreadsheet.
+    */
+    for (const group of groupOrder) {
+    const groupPlatforms = groupedPlatforms.get(group) || [];
+    
+    if (groupPlatforms.length === 0) {
+    continue;
     }
-}
-
-/*
- * Close search.
- */
-function closeSearch() {
-    if (searchContainer.hasAttribute("hidden")) {
-        return;
+    
+    addMenuSeparator(group);
+    
+    for (const platform of groupPlatforms) {
+    addPlatformButton(platform);
     }
-
-    searchContainer.setAttribute("hidden", "");
-
-    searchInput.value = "";
-    searchResults.innerHTML = "";
-    searchResults.hidden = true;
-
-    if (currentView === "category") {
-        displayFilteredGames();
-    } else {
-        gameList.innerHTML = "";
-        gameList.hidden = true;
-        statusElement.textContent = "";
     }
-}
+  
+  if (platforms.length === 0) {
+  const message = document.createElement("div");
+  
+   message.className = "menu-separator";
+ message.textContent = "No platforms available";
+
+ platformList.appendChild(message);
+  
+  }
+  }
 
 /*
- * Close search outside.
- */
-document.addEventListener("click", event => {
-    if (searchContainer.hasAttribute("hidden")) {
-        return;
-    }
 
-    const clickedInsideSearch =
-        searchContainer.contains(event.target);
-
-    const clickedSearchButton =
-        searchButton.contains(event.target);
-
-    if (!clickedInsideSearch && !clickedSearchButton) {
-        closeSearch();
-    }
-});
+* MENU SEPARATOR
+  */
+  function addMenuSeparator(title) {
+  const separator = document.createElement("div");
+  
+  separator.className = "menu-separator";
+  separator.textContent = "── " + title + " ──";
+  
+  platformList.appendChild(separator);
+  }
 
 /*
- * Close search on scroll.
- */
-window.addEventListener(
-    "scroll",
-    () => {
-        closeSearch();
-    },
-    {
-        passive: true
-    }
-);
+
+* PLATFORM BUTTON
+  */
+  function addPlatformButton(platform) {
+  const button = document.createElement("button");
+  
+  button.type = "button";
+  button.className = "platform-button";
+  button.textContent = platform;
+  
+  button.addEventListener("click", () => {
+  currentView = "category";
+  selectedPlatform = platform;
+  selectedCategory = "";
+  
+   resetCategoryControls();
+
+ searchInput.value = "";
+ searchResults.innerHTML = "";
+ searchResults.hidden = true;
+
+ searchContainer.setAttribute("hidden", "");
+ searchButton.setAttribute("aria-expanded", "false");
+
+ showCategoryView();
+ displayFilteredGames();
+
+ closeMenu();
+  
+  });
+  
+  platformList.appendChild(button);
+  }
 
 /*
- * Return Home.
- */
-function goHome() {
-    currentView = "home";
-    selectedPlatform = "";
-    selectedCategory = "";
 
-    searchInput.value = "";
-    searchResults.innerHTML = "";
-    searchResults.hidden = true;
+* DISPLAY GAMES
+  */
+  function displayGames(list) {
+  gameList.hidden = false;
+  gameList.innerHTML = "";
+  
+  if (list.length === 0) {
+  gameList.innerHTML = "<div class="no-results"> No games found. </div>";
+  
+   statusElement.textContent = "0 games";
 
-    categorySearchInput.value = "";
-    selectedCategorySort = "updated";
-    categorySortDescending = false;
+ return;
+  
+  }
+  
+  statusElement.textContent =
+  "${list.length} game${list.length !== 1 ? "s" : ""}";
+  
+  const fragment = document.createDocumentFragment();
+  
+  for (const game of list) {
+  const element = document.createElement("a");
+  
+   element.className = "game";
+ element.href =
+     `game.html?game=${encodeURIComponent(game.slug)}`;
 
-    updateCategorySortDirection();
+ const name = document.createElement("h2");
 
-    gameList.innerHTML = "";
-    gameList.hidden = true;
-    statusElement.textContent = "";
+ name.className = "game-name";
+ name.textContent = game.name;
 
-    searchContainer.setAttribute("hidden", "");
+ const info = document.createElement("div");
 
-    showHomeSections();
-    closeMenu();
-}
+ info.className = "game-info";
 
-/*
- * Show All Games.
- */
-function showAllGames() {
-    currentView = "category";
-    selectedPlatform = "";
-    selectedCategory = "all-games";
+ if (game.year) {
+     const year = document.createElement("span");
 
-    resetCategoryControls();
+     year.textContent = game.year;
+     info.appendChild(year);
+ }
 
-    searchInput.value = "";
-    searchResults.innerHTML = "";
-    searchResults.hidden = true;
+ const portCount = document.createElement("span");
 
-    searchContainer.setAttribute("hidden", "");
+ portCount.textContent =
+     `${game.ports.length} port${game.ports.length !== 1 ? "s" : ""}`;
 
-    showCategoryView();
+ info.appendChild(portCount);
 
-    gameList.hidden = false;
+ element.appendChild(name);
+ element.appendChild(info);
 
-    displayFilteredGames();
-
-    closeMenu();
-}
-
-/*
- * Create category menu.
- */
-function displayPlatformMenu() {
-    platformList.innerHTML = "";
-
-    const multiGameButton =
-        document.createElement("button");
-
-    multiGameButton.type = "button";
-    multiGameButton.className = "platform-button";
-    multiGameButton.textContent = "Multi-game Apps";
-
-    multiGameButton.addEventListener("click", () => {
-        currentView = "category";
-        selectedPlatform = "";
-        selectedCategory = "multi-game-apps";
-
-        resetCategoryControls();
-
-        searchInput.value = "";
-        searchResults.innerHTML = "";
-        searchResults.hidden = true;
-
-        searchContainer.setAttribute("hidden", "");
-
-        showCategoryView();
-        displayFilteredGames();
-        closeMenu();
-    });
-
-    platformList.appendChild(multiGameButton);
-
-    const dualScreenButton =
-        document.createElement("button");
-
-    dualScreenButton.type = "button";
-    dualScreenButton.className = "platform-button";
-    dualScreenButton.textContent = "Dual Screen";
-
-    dualScreenButton.addEventListener("click", () => {
-        currentView = "category";
-        selectedPlatform = "";
-        selectedCategory = "dual-screen";
-
-        resetCategoryControls();
-
-        searchInput.value = "";
-        searchResults.innerHTML = "";
-        searchResults.hidden = true;
-
-        searchContainer.setAttribute("hidden", "");
-
-        showCategoryView();
-        displayFilteredGames();
-        closeMenu();
-    });
-
-    platformList.appendChild(dualScreenButton);
-
-    addMenuSeparator("Nintendo");
-
-    addPlatformButton("NES");
-    addPlatformButton("Super Nintendo");
-    addPlatformButton("Nintendo 64");
-    addPlatformButton("GameCube / Wii");
-    addPlatformButton("Nintendo Wii U");
-    addPlatformButton("Game Boy");
-    addPlatformButton("Game Boy Color");
-    addPlatformButton("Game Boy Advance");
-    addPlatformButton("Nintendo DS");
-    addPlatformButton("Nintendo 3DS");
-    addPlatformButton("Nintendo Switch");
-
-    addMenuSeparator("PlayStation");
-
-    addPlatformButton("Playstation");
-    addPlatformButton("Playstation 2");
-    addPlatformButton("Playstation 4");
-    addPlatformButton("Playstation Portable");
-
-    addMenuSeparator("Xbox");
-
-    addPlatformButton("Xbox");
-    addPlatformButton("Xbox 360");
-
-    addMenuSeparator("Others");
-
-    addPlatformButton("Others");
-}
+ fragment.appendChild(element);
+  
+  }
+  
+  gameList.appendChild(fragment);
+  }
 
 /*
- * Menu separator.
- */
-function addMenuSeparator(title) {
-    const separator =
-        document.createElement("div");
 
-    separator.className = "menu-separator";
-    separator.textContent = "── " + title + " ──";
+* GLOBAL SEARCH SUGGESTIONS
+  */
+  function searchGames() {
+  const query = normalizeText(searchInput.value);
+  
+  searchResults.innerHTML = "";
+  
+  if (!query) {
+  searchResults.hidden = true;
+  return;
+  }
+  
+  const filtered = games
+  .filter(game =>
+  normalizeText(game.name).includes(query)
+  )
+  .sort((a, b) => {
+  const nameA = normalizeText(a.name);
+  const nameB = normalizeText(b.name);
+  
+       const startsA = nameA.startsWith(query);
+     const startsB = nameB.startsWith(query);
 
-    platformList.appendChild(separator);
-}
+     if (startsA && !startsB) {
+         return -1;
+     }
 
-/*
- * Platform button.
- */
-function addPlatformButton(platform) {
-    const button =
-        document.createElement("button");
+     if (!startsA && startsB) {
+         return 1;
+     }
 
-    button.type = "button";
-    button.className = "platform-button";
-    button.textContent = platform;
+     return nameA.localeCompare(
+         nameB,
+         "en",
+         {
+             sensitivity: "base"
+         }
+     );
+ })
+ .slice(0, 5);
+  
+  if (filtered.length === 0) {
+  searchResults.hidden = true;
+  return;
+  }
+  
+  const fragment = document.createDocumentFragment();
+  
+  for (const game of filtered) {
+  const element = document.createElement("a");
+  
+   element.className = "search-result";
+ element.href =
+     `game.html?game=${encodeURIComponent(game.slug)}`;
 
-    button.addEventListener("click", () => {
-        currentView = "category";
-        selectedPlatform = platform;
-        selectedCategory = "";
+ element.textContent = game.name;
 
-        resetCategoryControls();
-
-        searchInput.value = "";
-        searchResults.innerHTML = "";
-        searchResults.hidden = true;
-
-        searchContainer.setAttribute("hidden", "");
-
-        showCategoryView();
-        displayFilteredGames();
-        closeMenu();
-    });
-
-    platformList.appendChild(button);
-}
-
-/*
- * Display games.
- */
-function displayGames(list) {
-    gameList.hidden = false;
-    gameList.innerHTML = "";
-
-    if (list.length === 0) {
-        gameList.innerHTML = `
-            <div class="no-results">
-                No games found.
-            </div>
-        `;
-
-        statusElement.textContent = "0 games";
-
-        return;
-    }
-
-    statusElement.textContent =
-        `${list.length} game${list.length !== 1 ? "s" : ""}`;
-
-    const fragment =
-        document.createDocumentFragment();
-
-    for (const game of list) {
-        const element =
-            document.createElement("a");
-
-        element.className = "game";
-
-        element.href =
-            `game.html?game=${encodeURIComponent(game.slug)}`;
-
-        const name =
-            document.createElement("h2");
-
-        name.className = "game-name";
-        name.textContent = game.name;
-
-        const info =
-            document.createElement("div");
-
-        info.className = "game-info";
-
-        if (game.year) {
-            const span =
-                document.createElement("span");
-
-            span.textContent = game.year;
-            info.appendChild(span);
-        }
-
-        const portCount =
-            document.createElement("span");
-
-        portCount.textContent =
-            `${game.ports.length} port${game.ports.length !== 1 ? "s" : ""}`;
-
-        info.appendChild(portCount);
-
-        element.appendChild(name);
-        element.appendChild(info);
-
-        fragment.appendChild(element);
-    }
-
-    gameList.appendChild(fragment);
-}
+ fragment.appendChild(element);
+  
+  }
+  
+  searchResults.appendChild(fragment);
+  searchResults.hidden = false;
+  }
 
 /*
- * Global search suggestions.
- */
-function searchGames() {
-    const query =
-        normalizeText(searchInput.value);
 
-    searchResults.innerHTML = "";
-
-    if (!query) {
-        searchResults.hidden = true;
-        return;
-    }
-
-    const filtered =
-        games
-            .filter(game =>
-                normalizeText(game.name).includes(query)
-            )
-            .sort((a, b) => {
-                const nameA = normalizeText(a.name);
-                const nameB = normalizeText(b.name);
-
-                const startsA = nameA.startsWith(query);
-                const startsB = nameB.startsWith(query);
-
-                if (startsA && !startsB) {
-                    return -1;
-                }
-
-                if (!startsA && startsB) {
-                    return 1;
-                }
-
-                return nameA.localeCompare(
-                    nameB,
-                    "en",
-                    {
-                        sensitivity: "base"
-                    }
-                );
-            })
-            .slice(0, 5);
-
-    if (filtered.length === 0) {
-        searchResults.hidden = true;
-        return;
-    }
-
-    const fragment =
-        document.createDocumentFragment();
-
-    for (const game of filtered) {
-        const element =
-            document.createElement("a");
-
-        element.className = "search-result";
-
-        element.href =
-            `game.html?game=${encodeURIComponent(game.slug)}`;
-
-        element.textContent = game.name;
-
-        fragment.appendChild(element);
-    }
-
-    searchResults.appendChild(fragment);
-    searchResults.hidden = false;
-}
+* SEARCH WHILE TYPING
+  */
+  searchInput.addEventListener(
+  "input",
+  searchGames
+  );
 
 /*
- * Search while typing.
- */
-searchInput.addEventListener(
-    "input",
-    searchGames
-);
+
+* SEARCH BUTTON
+  */
+  searchButton.addEventListener(
+  "click",
+  event => {
+  event.stopPropagation();
+  toggleSearch();
+  }
+  );
 
 /*
- * Search button.
- */
-searchButton.addEventListener(
-    "click",
-    event => {
-        event.stopPropagation();
-        toggleSearch();
-    }
-);
+
+* HOME BUTTON
+  */
+  homeButton.addEventListener(
+  "click",
+  goHome
+  );
 
 /*
- * Home button.
- */
-homeButton.addEventListener(
-    "click",
-    goHome
-);
 
-/*
- * Menu events.
- */
-menuButton.addEventListener(
-    "click",
-    openMenu
-);
+* MENU EVENTS
+  */
+  menuButton.addEventListener(
+  "click",
+  openMenu
+  );
 
 menuClose.addEventListener(
-    "click",
-    closeMenu
+"click",
+closeMenu
 );
 
 menuOverlay.addEventListener(
-    "click",
-    closeMenu
+"click",
+closeMenu
 );
 
 /*
- * All Games.
- */
-allGamesButton.addEventListener(
-    "click",
-    showAllGames
-);
+
+* ALL GAMES BUTTON
+  */
+  allGamesButton.addEventListener(
+  "click",
+  showAllGames
+  );
