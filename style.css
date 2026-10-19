@@ -1914,3 +1914,12 @@ footer p {
     animation-iteration-count: 1 !important;
   }
 }
+/* Respect hidden states in menus and expandable sections */
+
+[hidden] {
+    display: none !important;
+}
+
+.games-using-app-list:not([hidden]) {
+    display: flex;
+}
