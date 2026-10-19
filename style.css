@@ -1,6 +1,7 @@
+
 /* ==================================================
    THE PORTS VAULT — GLOBAL STYLES
-   Main stylesheet
+   Consolidated stylesheet
    ================================================== */
 
 /* =========================
@@ -18,6 +19,7 @@
 
   --line: #31534c;
   --line-soft: #254740;
+  --line-light: #42685f;
 
   --text-main: #e2eeea;
   --text-strong: #f0f7f4;
@@ -37,7 +39,7 @@
 
   --radius-small: 6px;
   --radius-medium: 8px;
-  --radius-large: 10px;
+  --radius-large: 12px;
 
   --transition-fast: 0.15s ease;
   --transition-menu: 0.2s ease;
@@ -61,10 +63,26 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
+
   background: var(--page-bg);
   color: var(--text-main);
-  font-family: Arial, sans-serif;
+
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  font-size: 14px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
   line-height: 1.5;
+
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 button,
@@ -100,12 +118,13 @@ header {
   top: 0;
   z-index: 100;
 
-  display: flex;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr) 42px;
   align-items: center;
   gap: 12px;
 
-  height: 64px;
-  padding: 0 16px;
+  min-height: 70px;
+  padding: 12px 16px;
 
   background: var(--header-bg);
   border-bottom: 1px solid var(--line);
@@ -114,12 +133,47 @@ header {
 header h1 {
   flex: 1;
   margin: 0;
+
   font-size: 20px;
   line-height: 1.3;
 }
 
-#home-button {
+header #home-button {
+  grid-column: 2;
+  grid-row: 1;
+
+  min-width: 0;
+  margin: 0;
+
+  color: var(--text-strong);
+  font-size: 0;
+  line-height: 1.15;
+  text-align: center;
   cursor: pointer;
+}
+
+header #home-button::before {
+  display: block;
+  content: "NAPL";
+
+  color: var(--text-strong);
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: 3px;
+  line-height: 1.2;
+}
+
+header #home-button::after {
+  display: block;
+  content: "NATIVE ANDROID PORT LIST";
+
+  margin-top: 3px;
+
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 400;
+  letter-spacing: 1.1px;
+  line-height: 1.4;
 }
 
 .header-link,
@@ -138,11 +192,14 @@ header h1 {
 
 header button {
   padding: 8px;
-  border: none;
+
   background: transparent;
+  border: none;
+
   color: var(--text-secondary);
   font-size: 22px;
   cursor: pointer;
+
   transition: color var(--transition-fast);
 }
 
@@ -150,25 +207,61 @@ header button:hover {
   color: var(--text-strong);
 }
 
-/* =========================
-   SEARCH BUTTON
-   ========================= */
+/* Menu button */
 
-#search-button {
+header #menu-button {
+  grid-column: 1;
+  grid-row: 1;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 39px;
+  height: 39px;
+  padding: 0;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+
+  color: var(--text-main);
+  font-size: 20px;
+  cursor: pointer;
+
+  transition:
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+header #menu-button:hover {
+  background: var(--surface-hover);
+  border-color: var(--accent-border);
+  color: var(--text-strong);
+}
+
+/* Search button */
+
+#search-button,
+header #search-button {
+  grid-column: 3;
+  grid-row: 1;
+
   display: flex;
   flex-shrink: 0;
   align-items: center;
   justify-content: center;
 
-  width: 42px;
-  height: 42px;
+  width: 39px;
+  height: 39px;
   padding: 0;
 
-  background: var(--header-bg);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: var(--radius-large);
+  border-radius: 9px;
 
-  color: var(--accent);
+  color: var(--text-main);
   cursor: pointer;
 
   transition:
@@ -184,13 +277,20 @@ header button:hover {
 }
 
 #search-button:hover {
-  background: var(--surface);
+  background: var(--surface-hover);
   border-color: var(--accent-border);
-  color: var(--accent-strong);
+  color: var(--text-strong);
 }
 
 #search-button:active {
   background: var(--surface-raised);
+}
+
+header #menu-button:focus-visible,
+header #search-button:focus-visible,
+header #home-button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
 }
 
 /* =========================
@@ -198,6 +298,7 @@ header button:hover {
    ========================= */
 
 main {
+  width: 100%;
   max-width: 900px;
   margin: 0 auto;
   padding: 24px 16px 40px;
@@ -215,6 +316,7 @@ main {
 #category-search {
   display: block;
   width: 100%;
+  min-width: 0;
   padding: 12px 14px;
 
   background: var(--surface);
@@ -290,6 +392,7 @@ main {
   gap: 4px;
 
   width: fit-content;
+  max-width: 100%;
   padding: 3px;
 
   background: var(--surface);
@@ -350,9 +453,11 @@ main {
 
 .error {
   padding: 15px;
+
   background: var(--error-bg);
   border: 1px solid var(--error-border);
   border-radius: var(--radius-medium);
+
   color: var(--error-text);
 }
 
@@ -374,6 +479,7 @@ main {
   background: var(--surface);
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-medium);
+
   transition:
     background-color var(--transition-fast),
     border-color var(--transition-fast);
@@ -382,14 +488,14 @@ main {
 .game {
   display: block;
   padding: 15px;
+
   color: inherit;
   text-decoration: none;
 }
 
 .game:hover,
 .home-game:hover,
-.popular-game:hover,
-.games-using-app-item:hover {
+.popular-game:hover {
   background: var(--surface-hover);
   border-color: var(--line);
 }
@@ -438,6 +544,7 @@ main {
 .home-game {
   display: block;
   padding: 12px 14px;
+
   color: var(--text-secondary);
   text-decoration: none;
 }
@@ -486,6 +593,7 @@ main {
 .popular-rank {
   flex-shrink: 0;
   width: 24px;
+
   color: var(--text-muted);
   font-size: 13px;
   text-align: center;
@@ -498,6 +606,7 @@ main {
 
 .popular-game-title {
   overflow: hidden;
+
   color: var(--text-main);
   font-size: 15px;
   text-overflow: ellipsis;
@@ -517,6 +626,7 @@ main {
 .back-button {
   display: inline-block;
   margin-bottom: 20px;
+
   color: var(--accent);
   font-size: 14px;
   text-decoration: none;
@@ -535,26 +645,31 @@ main {
   align-items: flex-start;
   gap: 22px;
 
-  margin-bottom: 25px;
-  padding: 20px;
+  min-width: 0;
+  margin: 0 0 32px;
+  padding: 0;
 
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 12px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .game-summary-cover {
   display: block;
   flex-shrink: 0;
+  align-self: flex-start;
 
   width: 180px;
   max-width: 35%;
   height: auto;
 
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+
   object-fit: contain;
-  background: var(--page-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-medium);
 }
 
 .game-summary-info {
@@ -562,45 +677,103 @@ main {
   min-width: 0;
 }
 
+.game-summary-eyebrow {
+  margin-bottom: 8px;
+
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
 #game-header .game-summary-title {
-  margin: 0 0 12px;
+  margin: 0 0 10px;
+
   color: var(--text-strong);
-  font-size: 30px;
-  line-height: 1.2;
+  font-size: clamp(25px, 5vw, 36px);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+
   overflow-wrap: anywhere;
 }
 
 .game-summary-metadata {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
+  align-items: center;
   gap: 8px;
-  margin-bottom: 14px;
+
+  margin: 0 0 18px;
+
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
 }
 
 .game-summary-year,
 .game-summary-genre {
   display: inline-block;
-  padding: 5px 9px;
+  padding: 4px 8px;
 
   background: var(--surface-raised);
   border: 1px solid var(--line);
   border-radius: 5px;
 
   color: var(--accent);
-  font-size: 13px;
+  font-size: 12px;
+}
+
+.game-summary-description-container {
+  width: 100%;
+  min-width: 0;
 }
 
 .game-summary-description {
   margin: 0;
+
   color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.7;
-  white-space: pre-line;
+  font-size: 15px;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.8;
+
   overflow-wrap: anywhere;
+  white-space: pre-line;
 }
 
-/* Compatibility with older game header markup. */
+.game-description-toggle {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--accent);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  letter-spacing: 0;
+  text-align: left;
+
+  cursor: pointer;
+  transition: color var(--transition-fast);
+}
+
+.game-description-toggle:hover {
+  color: var(--accent-strong);
+}
+
+.game-description-toggle:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+/* Compatibility with older game header markup */
 
 .game-header {
   margin-bottom: 25px;
@@ -618,18 +791,366 @@ main {
 }
 
 /* =========================
+   ANDROID PORTS SECTION
+   ========================= */
+
+.ports-section-title {
+  margin: 30px 0 8px;
+
+  color: var(--text-strong);
+  font-size: 23px;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.ports-section-description {
+  margin: 0 0 12px;
+
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+/* =========================
    PORT LIST AND CARDS
    ========================= */
 
-.port-list,
-#port-list {
+#port-list,
+.port-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 13px;
+
+  min-width: 0;
 }
 
-.port-card,
-#port-list .port {
+/* Individual port card */
+
+#port-list > .port,
+#port-list > .port-card {
+  min-width: 0;
+  margin: 0;
+  padding: 16px;
+
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-large);
+  box-shadow: none;
+
+  color: var(--text-main);
+}
+
+/* Port heading */
+
+#port-list .port-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+
+  min-width: 0;
+  margin: 0 0 15px;
+}
+
+#port-list .port-title,
+#port-list .port-top .port-title {
+  min-width: 0;
+  margin: 0;
+
+  color: var(--text-strong);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.4;
+
+  overflow-wrap: anywhere;
+}
+
+/* Port details grid */
+
+#port-list .port-details {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px 12px;
+
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+#port-list .port-detail {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+
+#port-list .port-detail-label {
+  display: block;
+  margin: 0 0 5px;
+
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#port-list .port-detail-value {
+  display: block;
+  min-width: 0;
+  margin: 0;
+
+  color: var(--text-main);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.55;
+
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+#port-list a.port-detail-value {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: var(--accent-border);
+  text-underline-offset: 3px;
+}
+
+#port-list a.port-detail-value:hover {
+  color: var(--accent-strong);
+}
+
+/* Port notes */
+
+#port-list .port-notes {
+  min-width: 0;
+  margin: 15px 0 0;
+  padding: 10px;
+
+  background: var(--surface-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+
+  color: var(--text-secondary);
+  font-size: 12px;
+  line-height: 1.6;
+
+  overflow-wrap: anywhere;
+}
+
+#port-list .port-notes-label {
+  margin: 0 0 5px;
+
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+#port-list .port-notes-text {
+  margin: 0;
+
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.6;
+
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* Download / view port button */
+
+#port-list a.port-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  margin: 16px 0 0;
+  padding: 12px;
+
+  background: var(--button-bg);
+  border: 1px solid var(--accent-border);
+  border-radius: 9px;
+
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  text-decoration: none;
+
+  overflow-wrap: anywhere;
+
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+#port-list a.port-link span {
+  flex-shrink: 0;
+  font-size: 15px;
+}
+
+#port-list a.port-link:hover {
+  background: var(--button-hover);
+  border-color: var(--accent);
+  color: var(--text-strong);
+}
+
+#port-list a.port-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* =========================
+   MULTI-GAME APP SUPPORT
+   ========================= */
+
+.games-using-app {
+  min-width: 0;
+  margin-top: 20px;
+  padding: 14px;
+
+  background: var(--header-bg);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-medium);
+}
+
+.games-using-app h3 {
+  margin: 0 0 10px;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.games-using-app-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
+  width: 100%;
+  min-width: 0;
+  padding: 8px 0;
+
+  background: transparent;
+  border: none;
+
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.games-using-app-toggle:hover {
+  color: var(--text-strong);
+}
+
+.games-using-app-toggle:focus {
+  outline: none;
+}
+
+.games-using-app-toggle:focus-visible {
+  outline: 1px solid var(--accent);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.games-using-app-arrow {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 11px;
+  transition: transform var(--transition-fast);
+}
+
+.games-using-app-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  min-width: 0;
+  margin-top: 8px;
+  padding: 0;
+}
+
+.games-using-app-item {
+  display: block;
+  min-width: 0;
+  padding: 8px 10px;
+
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-small);
+
+  color: var(--accent);
+  font-size: 12px;
+  line-height: 1.5;
+  text-decoration: none;
+
+  overflow-wrap: anywhere;
+
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast),
+    color var(--transition-fast);
+}
+
+.games-using-app-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--line);
+  color: var(--text-strong);
+}
+
+#port-list .games-using-app {
+  margin-top: 15px;
+  padding: 10px;
+  background: var(--surface-raised);
+  border-color: var(--line);
+}
+
+#port-list .games-using-app-toggle {
+  padding: 5px 0;
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+#port-list .games-using-app-toggle:hover {
+  color: var(--accent-strong);
+}
+
+#port-list .games-using-app-arrow {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+#port-list .games-using-app-item {
+  padding: 8px 10px;
+  background: var(--surface);
+  border-color: var(--line);
+  font-size: 12px;
+}
+
+#port-list .games-using-app-item:hover {
+  background: var(--surface-hover);
+  border-color: var(--line-light);
+  color: var(--accent-strong);
+}
+
+/* =========================
+   LEGACY PORT STYLES
+   Retained for older markup
+   ========================= */
+
+.port-card {
   padding: 20px;
   background: var(--surface);
   border: 1px solid var(--line);
@@ -641,16 +1162,6 @@ main {
   color: var(--text-strong);
   font-size: 17px;
 }
-
-#port-list .port-title {
-  margin: 0 0 18px;
-  color: var(--text-strong);
-  font-size: 21px;
-}
-
-/* =========================
-   PORT INFORMATION
-   ========================= */
 
 .port-info {
   margin-bottom: 10px;
@@ -700,25 +1211,6 @@ main {
   color: var(--accent-strong);
 }
 
-/* =========================
-   PORT NOTES
-   ========================= */
-
-#port-list .port-notes {
-  margin-top: 15px;
-  padding-top: 15px;
-
-  border-top: 1px solid var(--line);
-
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.6;
-}
-
-#port-list .port-notes p {
-  margin: 7px 0 0;
-}
-
 .notes {
   margin-top: 20px;
   padding: 12px 15px;
@@ -731,13 +1223,10 @@ main {
   line-height: 1.6;
 }
 
-/* =========================
-   PORT LINKS
-   ========================= */
-
 .port-link {
   display: inline-block;
   margin-top: 8px;
+
   color: var(--accent);
   font-size: 14px;
   text-decoration: none;
@@ -768,23 +1257,6 @@ main {
 #port-list .port-link:hover {
   background: var(--button-hover);
   border-color: var(--accent);
-}
-
-/* =========================
-   ANDROID PORTS SECTION
-   ========================= */
-
-.ports-section-title {
-  margin: 30px 0 8px;
-  color: var(--text-strong);
-  font-size: 22px;
-}
-
-.ports-section-description {
-  margin: 0 0 12px;
-  color: var(--text-muted);
-  font-size: 14px;
-  line-height: 1.5;
 }
 
 /* =========================
@@ -840,9 +1312,7 @@ main {
   text-transform: uppercase;
 }
 
-/* =========================
-   MENU OVERLAY
-   ========================= */
+/* Menu overlay */
 
 #menu-overlay {
   position: fixed;
@@ -861,9 +1331,7 @@ main {
   pointer-events: auto;
 }
 
-/* =========================
-   PLATFORM LIST
-   ========================= */
+/* Platform list */
 
 #platform-list {
   display: flex;
@@ -911,88 +1379,8 @@ main {
 
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: bold;
+  font-weight: 700;
   text-align: left;
-}
-
-/* =========================
-   GAMES USING APP
-   ========================= */
-
-.games-using-app {
-  margin-top: 20px;
-  padding: 14px;
-
-  background: var(--header-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-medium);
-}
-
-.games-using-app h3 {
-  margin: 0 0 10px;
-  color: var(--text-muted);
-  font-size: 14px;
-}
-
-.games-using-app-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-
-  width: 100%;
-  padding: 8px 0;
-
-  background: transparent;
-  border: none;
-
-  color: var(--text-muted);
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-}
-
-.games-using-app-toggle:hover {
-  color: var(--text-strong);
-}
-
-.games-using-app-toggle:focus {
-  outline: none;
-}
-
-.games-using-app-toggle:focus-visible {
-  outline: 1px solid var(--accent);
-  outline-offset: 4px;
-  border-radius: 4px;
-}
-
-.games-using-app-arrow {
-  flex-shrink: 0;
-  color: var(--text-muted);
-  font-size: 11px;
-  transition: transform var(--transition-fast);
-}
-
-.games-using-app-list {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-
-  margin-top: 6px;
-  padding-left: 4px;
-}
-
-.games-using-app-item {
-  display: block;
-  padding: 8px 10px;
-
-  color: var(--accent);
-  font-size: 13px;
-  text-decoration: none;
-}
-
-.games-using-app-item:hover {
-  color: var(--text-strong);
 }
 
 /* =========================
@@ -1029,16 +1417,40 @@ footer {
 }
 
 /* =========================
-   RESPONSIVE: TABLETS / MOBILE
+   RESPONSIVE: TABLETS
+   ========================= */
+
+@media (min-width: 620px) {
+  #port-list > .port,
+  #port-list > .port-card {
+    padding: 20px;
+  }
+
+  #port-list .port-details {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px 12px;
+  }
+}
+
+/* =========================
+   RESPONSIVE: MOBILE
    ========================= */
 
 @media (max-width: 600px) {
   header {
-    padding: 0 10px;
+    grid-template-columns: 39px minmax(0, 1fr) 39px;
+    gap: 8px;
+    padding: 10px;
   }
 
-  header h1 {
-    font-size: 18px;
+  header #home-button::before {
+    font-size: 19px;
+    letter-spacing: 2.5px;
+  }
+
+  header #home-button::after {
+    font-size: 8px;
+    letter-spacing: 0.7px;
   }
 
   main {
@@ -1070,9 +1482,8 @@ footer {
   }
 
   #game-header.game-summary-card {
-    align-items: flex-start;
     gap: 14px;
-    padding: 14px;
+    margin-bottom: 28px;
   }
 
   .game-summary-cover {
@@ -1080,9 +1491,13 @@ footer {
     max-width: 38%;
   }
 
+  .game-summary-info {
+    flex: 1;
+    min-width: 0;
+  }
+
   #game-header .game-summary-title {
-    margin-bottom: 10px;
-    font-size: 22px;
+    font-size: clamp(25px, 5vw, 36px);
   }
 
   .game-summary-metadata {
@@ -1097,17 +1512,20 @@ footer {
   }
 
   .game-summary-description {
+    font-size: 14px;
+    line-height: 1.7;
+  }
+
+  .game-description-toggle {
     font-size: 13px;
-    line-height: 1.55;
   }
 
-  #port-list .port {
-    padding: 16px;
+  .ports-section-title {
+    font-size: 21px;
   }
 
-  #port-list .port-info-label {
-    min-width: 100%;
-    margin-bottom: 2px;
+  #port-list .port-details {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .games-using-app-item {
@@ -1120,19 +1538,25 @@ footer {
    ========================= */
 
 @media (max-width: 380px) {
+  header {
+    grid-template-columns: 39px minmax(0, 1fr) 39px;
+    gap: 8px;
+    padding: 10px;
+  }
+
   #game-header.game-summary-card {
     flex-direction: column;
-    align-items: stretch;
+    align-items: flex-start;
   }
 
   .game-summary-cover {
-    align-self: center;
-    width: 150px;
+    align-self: flex-start;
+    width: 145px;
     max-width: 100%;
   }
 
   #game-header .game-summary-title {
-    font-size: 24px;
+    font-size: 28px;
   }
 
   .home-section-header {
@@ -1146,6 +1570,23 @@ footer {
 
   .popular-tab {
     flex: 1;
+  }
+
+  #port-list > .port,
+  #port-list > .port-card {
+    padding: 13px;
+  }
+
+  #port-list .port-details {
+    gap: 12px 9px;
+  }
+
+  #port-list .port-title {
+    font-size: 15px;
+  }
+
+  #port-list a.port-link {
+    padding: 11px 8px;
   }
 }
 
@@ -1161,805 +1602,5 @@ footer {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-  }
-}
-
-/* ==================================================
-   NAPL HEADER — NEW DESIGN
-   Preserves existing navigation and search controls
-   ================================================== */
-
-header {
-  position: sticky;
-  top: 0;
-  z-index: 100;
-
-  display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px;
-  align-items: center;
-  gap: 12px;
-
-  min-height: 70px;
-  height: auto;
-  padding: 12px 16px;
-
-  background: var(--header-bg);
-  border-bottom: 1px solid var(--line);
-}
-
-/* Centered NAPL branding, keeping the original clickable H1. */
-
-header #home-button {
-  grid-column: 2;
-  grid-row: 1;
-
-  min-width: 0;
-  margin: 0;
-
-  color: var(--text-strong);
-  font-size: 0;
-  line-height: 1.15;
-  text-align: center;
-  cursor: pointer;
-}
-
-header #home-button::before {
-  content: "NAPL";
-  display: block;
-
-  color: var(--text-strong);
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: 3px;
-  line-height: 1.2;
-}
-
-header #home-button::after {
-  content: "NATIVE ANDROID PORT LIST";
-  display: block;
-
-  margin-top: 3px;
-  color: var(--text-muted);
-  font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 1.1px;
-  line-height: 1.4;
-}
-
-/* Menu button on the left. */
-
-header #menu-button {
-  grid-column: 1;
-  grid-row: 1;
-
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  width: 39px;
-  height: 39px;
-  padding: 0;
-
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-
-  color: var(--text-main);
-  font-size: 20px;
-  cursor: pointer;
-
-  transition:
-    background var(--transition-fast),
-    border-color var(--transition-fast),
-    color var(--transition-fast);
-}
-
-header #menu-button:hover {
-  background: var(--surface-hover);
-  border-color: var(--accent-border);
-  color: var(--text-strong);
-}
-
-/* Search button on the right. */
-
-header #search-button {
-  grid-column: 3;
-  grid-row: 1;
-
-  width: 39px;
-  height: 39px;
-  padding: 0;
-
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 9px;
-
-  color: var(--text-main);
-}
-
-header #search-button:hover {
-  background: var(--surface-hover);
-  border-color: var(--accent-border);
-  color: var(--text-strong);
-}
-
-header #search-button .search-icon {
-  width: 21px;
-  height: 21px;
-}
-
-/* Keyboard accessibility. */
-
-header #menu-button:focus-visible,
-header #search-button:focus-visible,
-header #home-button:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-}
-
-/* Compact header on narrow screens. */
-
-@media (max-width: 380px) {
-  header {
-    grid-template-columns: 39px minmax(0, 1fr) 39px;
-    gap: 8px;
-    padding: 10px;
-  }
-
-  header #home-button::before {
-    font-size: 19px;
-    letter-spacing: 2.5px;
-  }
-
-  header #home-button::after {
-    font-size: 8px;
-    letter-spacing: 0.7px;
-  }
-}
-
-/* =========================================
-   GAME DESCRIPTION — SHOW MORE / SHOW LESS
-   ========================================= */
-
-.game-summary-description-container {
-  min-width: 0;
-  width: 100%;
-}
-
-.game-summary-description {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.7;
-  overflow-wrap: anywhere;
-  white-space: pre-line;
-}
-
-.game-description-toggle {
-  display: inline-block;
-  margin-top: 8px;
-  padding: 4px 0;
-
-  background: transparent;
-  border: none;
-
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 600;
-  text-align: left;
-  cursor: pointer;
-
-  transition: color var(--transition-fast);
-}
-
-.game-description-toggle:hover {
-  color: var(--accent-strong);
-}
-
-.game-description-toggle:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 3px;
-}
-
-/* =========================================
-   GAME COVER — IMAGE PRESENTATION
-   ========================================= */
-
-.game-summary-cover {
-  display: block;
-  flex-shrink: 0;
-
-  width: 180px;
-  max-width: 35%;
-  height: auto;
-  align-self: flex-start;
-
-  object-fit: contain;
-  background: var(--page-bg);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-medium);
-}
-
-/* =========================================
-   RESPONSIVE — MOBILE
-   ========================================= */
-
-@media (max-width: 600px) {
-  #game-header.game-summary-card {
-    align-items: flex-start;
-    gap: 14px;
-    padding: 14px;
-  }
-
-  .game-summary-cover {
-    width: 115px;
-    max-width: 38%;
-  }
-
-  .game-summary-info {
-    flex: 1;
-    min-width: 0;
-  }
-
-  .game-summary-description {
-    font-size: 13px;
-    line-height: 1.55;
-  }
-
-  .game-description-toggle {
-    font-size: 13px;
-  }
-}
-
-/* =========================================
-   RESPONSIVE — VERY SMALL SCREENS
-   ========================================= */
-
-@media (max-width: 380px) {
-  #game-header.game-summary-card {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .game-summary-cover {
-    align-self: center;
-    width: 150px;
-    max-width: 100%;
-  }
-}
-
-/* =========================================
-   NAPL — GAME PAGE REDESIGN
-   Remove the game information box and
-   modernize typography.
-   ========================================= */
-
-/* Modern system typography across the page */
-
-body {
-  font-family:
-    Inter,
-    ui-sans-serif,
-    system-ui,
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
-
-  font-weight: 400;
-  letter-spacing: -0.01em;
-
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-
-/* Remove the box surrounding the game information */
-
-#game-header.game-summary-card {
-  display: flex;
-  align-items: flex-start;
-  gap: 22px;
-
-  margin: 0 0 32px;
-  padding: 0;
-
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-/* Game title — typography matching the mockup */
-
-#game-header .game-summary-title {
-  margin: 0 0 10px;
-
-  color: var(--text-strong);
-  font-family: Inter, system-ui, sans-serif;
-  font-size: clamp(25px, 5vw, 36px);
-  font-weight: 750;
-  letter-spacing: -0.045em;
-  line-height: 1.15;
-
-  overflow-wrap: anywhere;
-}
-
-/* Release year and genre */
-
-.game-summary-metadata {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-
-  margin: 0 0 18px;
-
-  color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
-}
-
-/* Game description */
-
-.game-summary-description {
-  margin: 0;
-
-  color: var(--text-secondary);
-  font-size: 15px;
-  font-weight: 400;
-  letter-spacing: 0;
-  line-height: 1.8;
-
-  overflow-wrap: anywhere;
-  white-space: pre-line;
-}
-
-/* Show more / Show less */
-
-.game-description-toggle {
-  margin-top: 8px;
-  padding: 5px 0;
-
-  background: transparent;
-  border: none;
-
-  color: var(--accent);
-  font-family: inherit;
-  font-size: 14px;
-  font-weight: 650;
-  letter-spacing: 0;
-
-  cursor: pointer;
-}
-
-/* Cover without the card surrounding it */
-
-.game-summary-cover {
-  flex-shrink: 0;
-
-  width: 180px;
-  max-width: 35%;
-  height: auto;
-
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  box-shadow: none;
-
-  object-fit: contain;
-}
-
-/* Android ports section */
-
-.ports-section-title {
-  margin: 30px 0 8px;
-
-  color: var(--text-strong);
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
-}
-
-.ports-section-description {
-  color: var(--text-muted);
-  font-size: 14px;
-  line-height: 1.7;
-}
-
-/* Port titles */
-
-.port-title {
-  font-size: 18px;
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.35;
-}
-
-/* Port details */
-
-.port-info,
-.port-notes {
-  font-size: 14px;
-  line-height: 1.7;
-  letter-spacing: 0;
-}
-
-/* Mobile adjustments */
-
-@media (max-width: 600px) {
-  #game-header.game-summary-card {
-    gap: 14px;
-    margin-bottom: 28px;
-  }
-
-  .game-summary-cover {
-    width: 115px;
-    max-width: 38%;
-  }
-
-  #game-header .game-summary-title {
-    font-size: clamp(25px, 5vw, 36px);
-  }
-
-  .game-summary-description {
-    font-size: 14px;
-    line-height: 1.7;
-  }
-
-  .ports-section-title {
-    font-size: 21px;
-  }
-}
-
-/* Very narrow screens */
-
-@media (max-width: 380px) {
-  #game-header.game-summary-card {
-    flex-direction: column;
-    align-items: flex-start;
-  }
-
-  #game-header .game-summary-title {
-    font-size: 28px;
-  }
-
-  .game-summary-cover {
-    align-self: flex-start;
-    width: 145px;
-    max-width: 100%;
-  }
-}
-
-/* ==================================================
-   NAPL — PORT CARDS REDESIGN
-   Based on the supplied mockup.
-   Ratings and AI indicator intentionally omitted.
-   ================================================== */
-
-:root {
-  --port-card: #10312e;
-  --port-card-highlight: #123a35;
-  --port-border: #31534c;
-  --port-border-light: #42685f;
-  --port-text: #e2eeea;
-  --port-text-bright: #f0f7f4;
-  --port-text-secondary: #c0d3cd;
-  --port-muted: #a2bdb5;
-  --port-accent: #8fd3c3;
-  --port-accent-hover: #b8f0df;
-  --port-accent-border: #58a994;
-  --port-button: #236957;
-  --port-button-hover: #2b806a;
-}
-
-/* Port list */
-
-#port-list,
-.port-list {
-  display: flex;
-  flex-direction: column;
-  gap: 13px;
-}
-
-/* Main card */
-
-#port-list .port,
-#port-list .port-card {
-  min-width: 0;
-  padding: 16px;
-  margin: 0;
-
-  background: var(--port-card);
-  border: 1px solid var(--port-border);
-  border-radius: 12px;
-
-  color: var(--port-text);
-  box-shadow: none;
-}
-
-/* Port heading */
-
-#port-list .port-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-
-  margin-bottom: 15px;
-}
-
-#port-list .port-title,
-#port-list .port-top .port-title {
-  min-width: 0;
-  margin: 0;
-
-  color: var(--port-text-bright);
-  font-size: 16px;
-  font-weight: 750;
-  letter-spacing: -0.02em;
-  line-height: 1.4;
-
-  overflow-wrap: anywhere;
-}
-
-/* Details grid */
-
-#port-list .port-details {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 12px;
-
-  min-width: 0;
-}
-
-/* Individual detail */
-
-#port-list .port-detail {
-  min-width: 0;
-}
-
-#port-list .port-detail-label {
-  display: block;
-  margin-bottom: 5px;
-
-  color: var(--port-muted);
-  font-size: 10px;
-  font-weight: 400;
-  line-height: 1.4;
-  text-transform: uppercase;
-  letter-spacing: 0;
-}
-
-#port-list .port-detail-value {
-  display: block;
-  min-width: 0;
-
-  color: var(--port-text);
-  font-size: 12px;
-  font-weight: 400;
-  line-height: 1.55;
-
-  overflow-wrap: anywhere;
-  word-break: normal;
-}
-
-/* Clickable game-files URL */
-
-#port-list a.port-detail-value {
-  color: var(--port-accent);
-  text-decoration: underline;
-  text-decoration-color: var(--port-accent-border);
-  text-underline-offset: 3px;
-}
-
-#port-list a.port-detail-value:hover {
-  color: var(--port-accent-hover);
-}
-
-/* Notes */
-
-#port-list .port-notes {
-  min-width: 0;
-  margin-top: 15px;
-  padding: 10px;
-
-  background: var(--port-card-highlight);
-  border: 1px solid var(--port-border);
-  border-radius: 8px;
-
-  color: var(--port-text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-  overflow-wrap: anywhere;
-}
-
-#port-list .port-notes-label {
-  margin-bottom: 5px;
-
-  color: var(--port-muted);
-  font-size: 10px;
-  font-weight: 400;
-  text-transform: uppercase;
-}
-
-#port-list .port-notes-text {
-  margin: 0;
-
-  color: var(--port-text-secondary);
-  font-size: 12px;
-  line-height: 1.6;
-  white-space: pre-line;
-  overflow-wrap: anywhere;
-}
-
-/* Download / view port button */
-
-#port-list a.port-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-
-  width: 100%;
-  min-height: 44px;
-  margin-top: 16px;
-  padding: 12px;
-
-  background: var(--port-button);
-  border: 1px solid var(--port-accent-border);
-  border-radius: 9px;
-
-  color: var(--port-text-bright);
-  font-size: 12px;
-  font-weight: 700;
-  line-height: 1.4;
-  text-align: center;
-  text-decoration: none;
-
-  overflow-wrap: anywhere;
-
-  transition:
-    background-color 0.16s ease,
-    border-color 0.16s ease,
-    color 0.16s ease;
-}
-
-#port-list a.port-link span {
-  flex-shrink: 0;
-  font-size: 15px;
-}
-
-#port-list a.port-link:hover {
-  background: var(--port-button-hover);
-  border-color: var(--port-accent);
-  color: var(--port-text-bright);
-}
-
-#port-list a.port-link:focus-visible {
-  outline: 2px solid var(--port-accent);
-  outline-offset: 3px;
-}
-
-/* Multi-game app section */
-
-#port-list .games-using-app {
-  min-width: 0;
-  margin-top: 15px;
-  padding: 10px;
-
-  background: var(--port-card-highlight);
-  border: 1px solid var(--port-border);
-  border-radius: 8px;
-}
-
-#port-list .games-using-app-toggle {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-
-  width: 100%;
-  padding: 5px 0;
-
-  background: transparent;
-  border: none;
-
-  color: var(--port-text-secondary);
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: left;
-
-  cursor: pointer;
-}
-
-#port-list .games-using-app-toggle:hover {
-  color: var(--port-accent-hover);
-}
-
-#port-list .games-using-app-arrow {
-  flex-shrink: 0;
-  color: var(--port-muted);
-  font-size: 10px;
-}
-
-#port-list .games-using-app-list {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-
-  margin-top: 8px;
-  padding: 0;
-}
-
-#port-list .games-using-app-item {
-  display: block;
-  min-width: 0;
-  padding: 8px 10px;
-
-  background: var(--port-card);
-  border: 1px solid var(--port-border);
-  border-radius: 6px;
-
-  color: var(--port-accent);
-  font-size: 12px;
-  line-height: 1.5;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-
-#port-list .games-using-app-item:hover {
-  background: var(--port-card-highlight);
-  border-color: var(--port-border-light);
-  color: var(--port-accent-hover);
-}
-
-/* Desktop: four columns for port details */
-
-@media (min-width: 620px) {
-  #port-list .port,
-  #port-list .port-card {
-    padding: 20px;
-  }
-
-  #port-list .port-details {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px 12px;
-  }
-
-  #port-list .port-detail-value {
-    font-size: 12px;
-  }
-
-  #port-list .port-notes {
-    padding: 10px;
-  }
-}
-
-/* Mobile: two columns, including narrow devices */
-
-@media (max-width: 380px) {
-  #port-list .port,
-  #port-list .port-card {
-    padding: 13px;
-  }
-
-  #port-list .port-details {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px 9px;
-  }
-
-  #port-list .port-title,
-  #port-list .port-top .port-title {
-    font-size: 15px;
-  }
-
-  #port-list .port-detail-value {
-    font-size: 12px;
-  }
-
-  #port-list a.port-link {
-    padding: 11px 8px;
   }
 }
