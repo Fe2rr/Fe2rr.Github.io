@@ -56,13 +56,13 @@
   searchButton.setAttribute("aria-expanded", "false");
   
   searchInput.value = "";
-  searchResults.innerHTML = "";
+  searchResults.replaceChildren();
   searchResults.hidden = true;
   
   if (currentView === "category") {
   displayFilteredGames();
   } else {
-  gameList.innerHTML = "";
+  gameList.replaceChildren();
   gameList.hidden = true;
   statusElement.textContent = "";
   }
@@ -112,7 +112,7 @@
   selectedCategory = "";
   
   searchInput.value = "";
-  searchResults.innerHTML = "";
+  searchResults.replaceChildren();
   searchResults.hidden = true;
   
   categorySearchInput.value = "";
@@ -128,7 +128,7 @@
   );
   });
   
-  gameList.innerHTML = "";
+  gameList.replaceChildren();
   gameList.hidden = true;
   statusElement.textContent = "";
   
@@ -151,7 +151,7 @@
   resetCategoryControls();
   
   searchInput.value = "";
-  searchResults.innerHTML = "";
+  searchResults.replaceChildren();
   searchResults.hidden = true;
   
   searchContainer.setAttribute("hidden", "");
@@ -170,8 +170,8 @@
 
 * NORMALIZE PLATFORM LABELS
 * 
-* Removes extra whitespace and makes comparisons
-* case-insensitive without changing displayed names.
+* Removes extra whitespace without changing
+* the displayed platform names.
   */
   function normalizePlatformLabel(value) {
   return String(value || "")
@@ -223,7 +223,8 @@
      }
 
      /*
-      * Keep the first spelling encountered in the Sheet.
+      * Remove duplicates ignoring case and whitespace.
+      * Preserve the first label encountered.
       */
      if (!uniquePlatforms.has(key)) {
          uniquePlatforms.set(key, platform);
@@ -243,7 +244,7 @@
 
 * Grouping affects presentation only.
 
-* Filtering still uses the platform label from the spreadsheet.
+* Filtering uses the actual platform label from the Sheet.
   */
   function getPlatformGroup(platform) {
   const normalized = normalizeText(platform);
@@ -295,7 +296,7 @@
    resetCategoryControls();
 
  searchInput.value = "";
- searchResults.innerHTML = "";
+ searchResults.replaceChildren();
  searchResults.hidden = true;
 
  searchContainer.setAttribute("hidden", "");
@@ -336,8 +337,7 @@
   
   /*
   
-  * Collect unique platform labels directly from
-  * the loaded PLATFORM values.
+  * Collect unique platform labels from the loaded data.
     */
     const platforms = getAvailablePlatforms();
   
@@ -369,10 +369,6 @@
   /*
   
   * Render only groups containing platforms.
-  
-  * Platform order follows the first occurrence
-  
-  * in the spreadsheet.
     */
     for (const group of groupOrder) {
     const groupPlatforms =
@@ -432,7 +428,7 @@
    resetCategoryControls();
 
  searchInput.value = "";
- searchResults.innerHTML = "";
+ searchResults.replaceChildren();
  searchResults.hidden = true;
 
  searchContainer.setAttribute("hidden", "");
@@ -456,7 +452,7 @@
   gameList.hidden = false;
   gameList.replaceChildren();
   
-  if (list.length === 0) {
+  if (!Array.isArray(list) || list.length === 0) {
   const message = document.createElement("div");
   
    message.className = "no-results";
@@ -469,8 +465,14 @@
   
   }
   
-  statusElement.textContent =
-  "${list.length} game${list.length !== 1 ? "s" : ""}";
+  /*
+  
+  * IMPORTANT:
+  * Use backticks for template literals.
+  * Regular double quotes do not interpolate ${...}.
+    */
+    statusElement.textContent =
+    "${list.length} game${list.length !== 1 ? "s" : ""}";
   
   const fragment = document.createDocumentFragment();
   
@@ -497,10 +499,14 @@
      info.appendChild(year);
  }
 
+ const ports = Array.isArray(game.ports)
+     ? game.ports
+     : [];
+
  const portCount = document.createElement("span");
 
  portCount.textContent =
-     `${game.ports.length} port${game.ports.length !== 1 ? "s" : ""}`;
+     `${ports.length} port${ports.length !== 1 ? "s" : ""}`;
 
  info.appendChild(portCount);
 
