@@ -1,53 +1,59 @@
 
-/* ==================================================
-   THE PORTS VAULT — GLOBAL STYLES
-   Consolidated stylesheet
-   ================================================== */
+/* =========================================================
+   NAPL — THE PORTS VAULT
+   Visual redesign · Forest green edition
+   ========================================================= */
 
-/* =========================
-   COLOR PALETTE
-   ========================= */
+/* -------------------------
+   1. PALETA Y VARIABLES
+   ------------------------- */
 
 :root {
   color-scheme: dark;
 
-  --page-bg: #061513;
-  --header-bg: #0a211f;
-  --surface: #10312e;
-  --surface-raised: #123a35;
-  --surface-hover: #164039;
+  --page-bg: #07130f;
+  --page-glow: #10281c;
+  --header-bg: rgba(9, 27, 19, 0.94);
 
-  --line: #31534c;
-  --line-soft: #254740;
-  --line-light: #42685f;
+  --surface: #10251b;
+  --surface-raised: #153326;
+  --surface-hover: #1a4030;
+  --surface-deep: #0b1c14;
 
-  --text-main: #e2eeea;
-  --text-strong: #f0f7f4;
-  --text-secondary: #c0d3cd;
-  --text-muted: #a2bdb5;
+  --line: #315641;
+  --line-soft: #223e2e;
+  --line-light: #507b5c;
 
-  --accent: #8fd3c3;
-  --accent-strong: #b8f0df;
-  --accent-border: #58a994;
+  --text-main: #e0eae1;
+  --text-strong: #f5f8f3;
+  --text-secondary: #bfd0c1;
+  --text-muted: #8fa894;
 
-  --button-bg: #236957;
-  --button-hover: #2b806a;
+  --accent: #a8dfad;
+  --accent-strong: #d1f3d0;
+  --accent-border: #5e9c69;
+
+  --button-bg: #28623e;
+  --button-hover: #34794b;
 
   --error-bg: #351b1b;
   --error-border: #7a4141;
   --error-text: #f0c4c4;
 
-  --radius-small: 6px;
-  --radius-medium: 8px;
-  --radius-large: 12px;
+  --radius-small: 8px;
+  --radius-medium: 12px;
+  --radius-large: 18px;
 
-  --transition-fast: 0.15s ease;
-  --transition-menu: 0.2s ease;
+  --shadow-soft: 0 12px 32px rgba(0, 0, 0, 0.16);
+  --shadow-card: 0 8px 22px rgba(0, 0, 0, 0.19);
+
+  --transition-fast: 0.18s ease;
+  --transition-menu: 0.24s ease;
 }
 
-/* =========================
-   RESET AND BASE
-   ========================= */
+/* -------------------------
+   2. RESET Y BASE
+   ------------------------- */
 
 * {
   box-sizing: border-box;
@@ -63,9 +69,15 @@ html {
 body {
   min-height: 100vh;
   margin: 0;
-
-  background: var(--page-bg);
   color: var(--text-main);
+
+  background:
+    radial-gradient(
+      ellipse at 50% -180px,
+      rgba(54, 115, 66, 0.23),
+      transparent 620px
+    ),
+    var(--page-bg);
 
   font-family:
     Inter,
@@ -79,14 +91,16 @@ body {
   font-size: 14px;
   font-weight: 400;
   letter-spacing: -0.01em;
-  line-height: 1.5;
+  line-height: 1.55;
 
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 button,
-input {
+input,
+select,
+textarea {
   font: inherit;
 }
 
@@ -98,9 +112,19 @@ a {
   color: var(--accent);
 }
 
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
 button:focus-visible,
 a:focus-visible,
-input:focus-visible {
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -109,9 +133,13 @@ input:focus-visible {
   display: none !important;
 }
 
-/* =========================
-   HEADER
-   ========================= */
+img {
+  max-width: 100%;
+}
+
+/* -------------------------
+   3. ENCABEZADO
+   ------------------------- */
 
 header {
   position: sticky;
@@ -123,17 +151,19 @@ header {
   align-items: center;
   gap: 12px;
 
-  min-height: 70px;
-  padding: 12px 16px;
+  min-height: 72px;
+  padding: 12px 18px;
 
   background: var(--header-bg);
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid rgba(94, 156, 105, 0.22);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.12);
+
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 header h1 {
-  flex: 1;
   margin: 0;
-
   font-size: 20px;
   line-height: 1.3;
 }
@@ -157,9 +187,9 @@ header #home-button::before {
   content: "NAPL";
 
   color: var(--text-strong);
-  font-size: 22px;
+  font-size: 23px;
   font-weight: 800;
-  letter-spacing: 3px;
+  letter-spacing: 3.5px;
   line-height: 1.2;
 }
 
@@ -167,12 +197,11 @@ header #home-button::after {
   display: block;
   content: "NATIVE ANDROID PORT LIST";
 
-  margin-top: 3px;
-
+  margin-top: 4px;
   color: var(--text-muted);
   font-size: 9px;
-  font-weight: 400;
-  letter-spacing: 1.1px;
+  font-weight: 500;
+  letter-spacing: 1.25px;
   line-height: 1.4;
 }
 
@@ -192,22 +221,19 @@ header #home-button::after {
 
 header button {
   padding: 8px;
-
   background: transparent;
   border: none;
-
   color: var(--text-secondary);
   font-size: 22px;
   cursor: pointer;
-
   transition: color var(--transition-fast);
 }
 
 header button:hover {
-  color: var(--text-strong);
+  color: var(--accent-strong);
 }
 
-/* Menu button */
+/* Botón del menú */
 
 header #menu-button {
   grid-column: 1;
@@ -217,13 +243,13 @@ header #menu-button {
   align-items: center;
   justify-content: center;
 
-  width: 39px;
-  height: 39px;
+  width: 40px;
+  height: 40px;
   padding: 0;
 
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 11px;
 
   color: var(--text-main);
   font-size: 20px;
@@ -238,10 +264,10 @@ header #menu-button {
 header #menu-button:hover {
   background: var(--surface-hover);
   border-color: var(--accent-border);
-  color: var(--text-strong);
+  color: var(--accent-strong);
 }
 
-/* Search button */
+/* Botón de búsqueda */
 
 #search-button,
 header #search-button {
@@ -249,23 +275,22 @@ header #search-button {
   grid-row: 1;
 
   display: flex;
-  flex-shrink: 0;
   align-items: center;
   justify-content: center;
 
-  width: 39px;
-  height: 39px;
+  width: 40px;
+  height: 40px;
   padding: 0;
 
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 11px;
 
   color: var(--text-main);
   cursor: pointer;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast);
 }
@@ -279,11 +304,7 @@ header #search-button {
 #search-button:hover {
   background: var(--surface-hover);
   border-color: var(--accent-border);
-  color: var(--text-strong);
-}
-
-#search-button:active {
-  background: var(--surface-raised);
+  color: var(--accent-strong);
 }
 
 header #menu-button:focus-visible,
@@ -293,23 +314,33 @@ header #home-button:focus-visible {
   outline-offset: 3px;
 }
 
-/* =========================
-   MAIN CONTENT
-   ========================= */
+/* -------------------------
+   4. CONTENIDO PRINCIPAL
+   ------------------------- */
 
 main {
   width: 100%;
-  max-width: 900px;
+  max-width: 960px;
   margin: 0 auto;
-  padding: 24px 16px 40px;
+  padding: 30px 20px 52px;
 }
 
-/* =========================
-   SEARCH
-   ========================= */
+section {
+  min-width: 0;
+}
+
+#android-ports-section {
+  margin-top: 0;
+}
+
+/* -------------------------
+   5. BÚSQUEDA
+   ------------------------- */
 
 .search-container {
-  margin-bottom: 20px;
+  position: relative;
+  z-index: 20;
+  margin-bottom: 24px;
 }
 
 #search,
@@ -317,16 +348,21 @@ main {
   display: block;
   width: 100%;
   min-width: 0;
-  padding: 12px 14px;
+  padding: 14px 16px;
 
   background: var(--surface);
-  border: 1px solid var(--line);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-medium);
 
   color: var(--text-strong);
   font-size: 16px;
 
-  transition: border-color var(--transition-fast);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.015);
+
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 #search::placeholder,
@@ -337,31 +373,34 @@ main {
 
 #search:focus,
 #category-search:focus {
+  background: var(--surface-raised);
   border-color: var(--accent-border);
   outline: none;
+  box-shadow: 0 0 0 3px rgba(168, 223, 173, 0.08);
 }
 
 .search-results {
-  margin-top: 6px;
+  margin-top: 7px;
   overflow: hidden;
 
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-medium);
+  box-shadow: var(--shadow-card);
 }
 
 .search-result {
   display: block;
-  padding: 12px 16px;
+  padding: 13px 16px;
 
   border-bottom: 1px solid var(--line-soft);
 
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
   text-decoration: none;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
     color var(--transition-fast);
 }
 
@@ -374,15 +413,15 @@ main {
   color: var(--text-strong);
 }
 
-/* =========================
-   CATEGORY CONTROLS
-   ========================= */
+/* -------------------------
+   6. CONTROLES DE CATEGORÍA
+   ------------------------- */
 
 .category-controls {
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  margin-bottom: 20px;
+  gap: 12px;
+  margin-bottom: 22px;
 }
 
 .category-sort,
@@ -393,33 +432,34 @@ main {
 
   width: fit-content;
   max-width: 100%;
-  padding: 3px;
+  padding: 4px;
 
-  background: var(--surface);
+  background: var(--surface-deep);
   border: 1px solid var(--line-soft);
-  border-radius: 7px;
+  border-radius: 10px;
 }
 
 .category-sort-option,
 .category-sort-direction,
 .popular-tab {
-  padding: 6px 9px;
+  padding: 7px 11px;
 
   background: transparent;
   border: none;
-  border-radius: 5px;
+  border-radius: 7px;
 
   color: var(--text-muted);
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
     color var(--transition-fast);
 }
 
 .category-sort-direction {
-  min-width: 30px;
+  min-width: 32px;
   font-size: 13px;
 }
 
@@ -432,27 +472,40 @@ main {
 .category-sort-option.active,
 .popular-tab.active {
   background: var(--surface-raised);
-  color: var(--text-strong);
+  color: var(--accent-strong);
+  box-shadow: inset 0 0 0 1px rgba(94, 156, 105, 0.2);
 }
 
-/* =========================
-   STATUS AND FEEDBACK
-   ========================= */
+/* -------------------------
+   7. ESTADOS Y MENSAJES
+   ------------------------- */
 
 #status {
-  margin: 15px 0;
-  color: var(--text-muted);
-  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+
+  margin: 14px 0 18px;
+  padding: 6px 11px;
+
+  background: rgba(21, 51, 38, 0.75);
+  border: 1px solid var(--line-soft);
+  border-radius: 999px;
+
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
 }
 
 .no-results {
-  padding: 25px 10px;
+  padding: 30px 14px;
   color: var(--text-muted);
   text-align: center;
 }
 
 .error {
-  padding: 15px;
+  padding: 16px;
 
   background: var(--error-bg);
   border: 1px solid var(--error-border);
@@ -461,33 +514,43 @@ main {
   color: var(--error-text);
 }
 
-/* =========================
-   GAME LISTS AND CARDS
-   ========================= */
+/* -------------------------
+   8. LISTAS Y TARJETAS DE JUEGOS
+   ------------------------- */
 
 #game-list,
 .home-game-list,
 #popular-list {
   display: grid;
-  gap: 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 11px;
 }
 
 .game,
 .home-game,
 .popular-game,
 .games-using-app-item {
-  background: var(--surface);
+  min-width: 0;
+
+  background: linear-gradient(
+    145deg,
+    rgba(19, 46, 32, 0.96),
+    rgba(13, 32, 23, 0.98)
+  );
+
   border: 1px solid var(--line-soft);
   border-radius: var(--radius-medium);
 
   transition:
-    background-color var(--transition-fast),
-    border-color var(--transition-fast);
+    background var(--transition-fast),
+    border-color var(--transition-fast),
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
 .game {
   display: block;
-  padding: 15px;
+  padding: 17px;
 
   color: inherit;
   text-decoration: none;
@@ -497,36 +560,43 @@ main {
 .home-game:hover,
 .popular-game:hover {
   background: var(--surface-hover);
-  border-color: var(--line);
+  border-color: var(--line-light);
+  box-shadow: var(--shadow-soft);
 }
 
 .game-name {
-  margin: 0 0 6px;
+  margin: 0 0 7px;
   color: var(--text-strong);
   font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.35;
 }
 
 .game-info {
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .game-info span {
   margin-right: 10px;
 }
 
-/* =========================
-   HOME SECTIONS
-   ========================= */
+/* -------------------------
+   9. SECCIONES DE INICIO
+   ------------------------- */
 
 .home-section {
-  margin-bottom: 30px;
+  margin-bottom: 36px;
 }
 
 .home-section h2 {
-  margin: 0 0 12px;
+  margin: 0 0 14px;
   color: var(--text-strong);
-  font-size: 20px;
+  font-size: 21px;
+  font-weight: 750;
+  letter-spacing: -0.035em;
+  line-height: 1.3;
 }
 
 .home-section-header {
@@ -534,7 +604,7 @@ main {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: 12px;
+  margin-bottom: 14px;
 }
 
 .home-section-header h2 {
@@ -543,7 +613,7 @@ main {
 
 .home-game {
   display: block;
-  padding: 12px 14px;
+  padding: 14px 16px;
 
   color: var(--text-secondary);
   text-decoration: none;
@@ -552,50 +622,65 @@ main {
 .home-game-title {
   color: var(--text-main);
   font-size: 15px;
+  font-weight: 650;
+  line-height: 1.45;
 }
 
 .home-game-meta {
-  margin-top: 4px;
+  margin-top: 5px;
   color: var(--text-muted);
   font-size: 12px;
 }
 
 .home-view-more {
-  margin-top: 12px;
-  padding: 6px 0;
+  margin-top: 13px;
+  padding: 7px 0;
 
   background: transparent;
   border: none;
 
   color: var(--accent);
-  font-size: 14px;
+  font-size: 13px;
+  font-weight: 650;
   cursor: pointer;
+
+  transition: color var(--transition-fast);
 }
 
 .home-view-more:hover {
   color: var(--accent-strong);
 }
 
-/* =========================
-   POPULAR GAMES
-   ========================= */
+/* -------------------------
+   10. JUEGOS POPULARES
+   ------------------------- */
 
 .popular-game {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 11px 14px;
+  gap: 13px;
+  padding: 13px 15px;
 
   color: var(--text-secondary);
   text-decoration: none;
 }
 
 .popular-rank {
+  display: flex;
   flex-shrink: 0;
-  width: 24px;
+  align-items: center;
+  justify-content: center;
 
-  color: var(--text-muted);
-  font-size: 13px;
+  width: 30px;
+  min-height: 30px;
+
+  background: var(--surface-deep);
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 750;
   text-align: center;
 }
 
@@ -608,7 +693,8 @@ main {
   overflow: hidden;
 
   color: var(--text-main);
-  font-size: 15px;
+  font-size: 14px;
+  font-weight: 650;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -619,40 +705,60 @@ main {
   font-size: 12px;
 }
 
-/* =========================
-   BACK BUTTON
-   ========================= */
+/* -------------------------
+   11. BOTÓN VOLVER
+   ------------------------- */
 
 .back-button {
-  display: inline-block;
-  margin-bottom: 20px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
 
-  color: var(--accent);
-  font-size: 14px;
+  margin-bottom: 22px;
+  padding: 7px 0;
+
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
   text-decoration: none;
+
+  transition: color var(--transition-fast);
 }
 
 .back-button:hover {
   color: var(--accent-strong);
 }
 
-/* =========================
-   GAME SUMMARY
-   ========================= */
+/* -------------------------
+   12. CABECERA DEL JUEGO
+   ------------------------- */
 
 #game-header.game-summary-card {
+  position: relative;
+
   display: flex;
   align-items: flex-start;
-  gap: 22px;
+  gap: 25px;
 
   min-width: 0;
-  margin: 0 0 32px;
-  padding: 0;
+  margin: 0 0 38px;
+  padding: 25px;
 
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  box-shadow: none;
+  background:
+    radial-gradient(
+      ellipse at 0% 0%,
+      rgba(65, 124, 70, 0.2),
+      transparent 65%
+    ),
+    linear-gradient(
+      135deg,
+      rgba(19, 48, 33, 0.98),
+      rgba(10, 27, 19, 0.98)
+    );
+
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  box-shadow: var(--shadow-card);
 }
 
 .game-summary-cover {
@@ -660,41 +766,55 @@ main {
   flex-shrink: 0;
   align-self: flex-start;
 
-  width: 180px;
-  max-width: 35%;
+  width: 190px;
+  max-width: 36%;
   height: auto;
+  aspect-ratio: 2 / 3;
 
-  background: transparent;
-  border: none;
-  border-radius: 8px;
-  box-shadow: none;
+  background: var(--surface-deep);
+  border: 1px solid rgba(168, 223, 173, 0.24);
+  border-radius: 12px;
 
-  object-fit: contain;
+  box-shadow: 0 15px 30px rgba(0, 0, 0, 0.3);
+  object-fit: cover;
 }
 
 .game-summary-info {
   flex: 1;
   min-width: 0;
+  padding-top: 2px;
 }
 
 .game-summary-eyebrow {
-  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  margin-bottom: 11px;
 
   color: var(--accent);
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.09em;
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0.13em;
   text-transform: uppercase;
 }
 
+.game-summary-eyebrow::before {
+  display: inline-block;
+  width: 18px;
+  height: 2px;
+  background: var(--accent-border);
+  content: "";
+}
+
 #game-header .game-summary-title {
-  margin: 0 0 10px;
+  margin: 0 0 15px;
 
   color: var(--text-strong);
-  font-size: clamp(25px, 5vw, 36px);
-  font-weight: 750;
-  letter-spacing: -0.045em;
-  line-height: 1.15;
+  font-size: clamp(27px, 4vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.055em;
+  line-height: 1.08;
 
   overflow-wrap: anywhere;
 }
@@ -703,27 +823,35 @@ main {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 7px;
 
-  margin: 0 0 18px;
+  margin: 0 0 19px;
 
   color: var(--text-muted);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .game-summary-year,
 .game-summary-genre {
-  display: inline-block;
-  padding: 4px 8px;
+  display: inline-flex;
+  align-items: center;
 
-  background: var(--surface-raised);
+  min-height: 27px;
+  padding: 5px 9px;
+
+  background: rgba(8, 25, 16, 0.7);
   border: 1px solid var(--line);
-  border-radius: 5px;
+  border-radius: 7px;
 
-  color: var(--accent);
-  font-size: 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.game-summary-year {
+  color: var(--accent-strong);
+  border-color: rgba(94, 156, 105, 0.45);
 }
 
 .game-summary-description-container {
@@ -735,10 +863,10 @@ main {
   margin: 0;
 
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 400;
   letter-spacing: 0;
-  line-height: 1.8;
+  line-height: 1.85;
 
   overflow-wrap: anywhere;
   white-space: pre-line;
@@ -746,7 +874,7 @@ main {
 
 .game-description-toggle {
   display: inline-block;
-  margin-top: 8px;
+  margin-top: 10px;
   padding: 5px 0;
 
   background: transparent;
@@ -754,8 +882,8 @@ main {
 
   color: var(--accent);
   font-family: inherit;
-  font-size: 14px;
-  font-weight: 650;
+  font-size: 12px;
+  font-weight: 750;
   letter-spacing: 0;
   text-align: left;
 
@@ -773,7 +901,7 @@ main {
   border-radius: 3px;
 }
 
-/* Compatibility with older game header markup */
+/* Compatibilidad con versiones anteriores */
 
 .game-header {
   margin-bottom: 25px;
@@ -790,57 +918,96 @@ main {
   font-size: 14px;
 }
 
-/* =========================
-   ANDROID PORTS SECTION
-   ========================= */
+/* -------------------------
+   13. SECCIÓN DE ANDROID PORTS
+   ------------------------- */
 
 .ports-section-title {
-  margin: 30px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 
-  color: var(--text-strong);
-  font-size: 23px;
-  font-weight: 700;
-  letter-spacing: -0.035em;
+  margin: 30px 0 8px !important;
+
+  color: var(--text-strong) !important;
+  font-size: 25px !important;
+  font-weight: 800;
+  letter-spacing: -0.045em;
+  line-height: 1.25;
+}
+
+.ports-section-title::before {
+  display: block;
+  flex-shrink: 0;
+
+  width: 4px;
+  height: 25px;
+
+  background: var(--accent);
+  border-radius: 5px;
+  box-shadow: 0 0 15px rgba(168, 223, 173, 0.18);
+
+  content: "";
 }
 
 .ports-section-description {
-  margin: 0 0 12px;
+  margin: 0 0 16px !important;
 
-  color: var(--text-muted);
-  font-size: 14px;
+  color: var(--text-muted) !important;
+  font-size: 13px !important;
   line-height: 1.7;
 }
 
-/* =========================
-   PORT LIST AND CARDS
-   ========================= */
+/* -------------------------
+   14. LISTA Y TARJETAS DE PORTS
+   ------------------------- */
 
 #port-list,
 .port-list {
   display: flex;
   flex-direction: column;
-  gap: 13px;
+  gap: 15px;
 
   min-width: 0;
 }
 
-/* Individual port card */
+/* Tarjeta individual */
 
 #port-list > .port,
 #port-list > .port-card {
+  position: relative;
+
   min-width: 0;
   margin: 0;
-  padding: 16px;
+  padding: 21px;
 
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-large);
-  box-shadow: none;
+  background:
+    linear-gradient(
+      140deg,
+      rgba(19, 47, 32, 0.98),
+      rgba(12, 30, 21, 0.99)
+    );
+
+  border: 1px solid var(--line-soft);
+  border-radius: 17px;
+
+  box-shadow: 0 7px 22px rgba(0, 0, 0, 0.12);
 
   color: var(--text-main);
+
+  transition:
+    border-color var(--transition-fast),
+    background var(--transition-fast),
+    box-shadow var(--transition-fast);
 }
 
-/* Port heading */
+#port-list > .port:hover,
+#port-list > .port-card:hover {
+  border-color: var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+/* Título del port */
 
 #port-list .port-top {
   display: flex;
@@ -849,7 +1016,10 @@ main {
   gap: 10px;
 
   min-width: 0;
-  margin: 0 0 15px;
+  margin: 0 0 18px;
+  padding-bottom: 15px;
+
+  border-bottom: 1px solid var(--line-soft);
 }
 
 #port-list .port-title,
@@ -858,20 +1028,20 @@ main {
   margin: 0;
 
   color: var(--text-strong);
-  font-size: 16px;
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-size: 17px;
+  font-weight: 750;
+  letter-spacing: -0.025em;
   line-height: 1.4;
 
   overflow-wrap: anywhere;
 }
 
-/* Port details grid */
+/* Datos del port */
 
 #port-list .port-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 14px 12px;
+  gap: 17px 14px;
 
   min-width: 0;
   margin: 0;
@@ -890,9 +1060,9 @@ main {
 
   color: var(--text-muted);
   font-size: 10px;
-  font-weight: 500;
+  font-weight: 750;
   line-height: 1.4;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.075em;
   text-transform: uppercase;
 }
 
@@ -903,8 +1073,8 @@ main {
 
   color: var(--text-main);
   font-size: 12px;
-  font-weight: 400;
-  line-height: 1.55;
+  font-weight: 500;
+  line-height: 1.6;
 
   overflow-wrap: anywhere;
   word-break: normal;
@@ -913,39 +1083,41 @@ main {
 #port-list a.port-detail-value {
   color: var(--accent);
   text-decoration: underline;
-  text-decoration-color: var(--accent-border);
+  text-decoration-color: rgba(168, 223, 173, 0.35);
   text-underline-offset: 3px;
 }
 
 #port-list a.port-detail-value:hover {
   color: var(--accent-strong);
+  text-decoration-color: var(--accent-strong);
 }
 
-/* Port notes */
+/* Notas */
 
 #port-list .port-notes {
   min-width: 0;
-  margin: 15px 0 0;
-  padding: 10px;
+  margin: 19px 0 0;
+  padding: 13px 14px;
 
-  background: var(--surface-raised);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-medium);
+  background: rgba(7, 19, 13, 0.55);
+  border: 1px solid var(--line-soft);
+  border-left: 3px solid var(--accent-border);
+  border-radius: 9px;
 
   color: var(--text-secondary);
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.7;
 
   overflow-wrap: anywhere;
 }
 
 #port-list .port-notes-label {
-  margin: 0 0 5px;
+  margin: 0 0 6px;
 
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.04em;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-transform: uppercase;
 }
 
@@ -955,33 +1127,33 @@ main {
   color: var(--text-secondary);
   font-size: 12px;
   font-weight: 400;
-  line-height: 1.6;
+  line-height: 1.7;
 
   white-space: pre-line;
   overflow-wrap: anywhere;
 }
 
-/* Download / view port button */
+/* Botón de descarga o página del port */
 
 #port-list a.port-link {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  gap: 9px;
 
   width: 100%;
   min-width: 0;
-  min-height: 44px;
-  margin: 16px 0 0;
-  padding: 12px;
+  min-height: 46px;
+  margin: 19px 0 0;
+  padding: 12px 15px;
 
   background: var(--button-bg);
   border: 1px solid var(--accent-border);
-  border-radius: 9px;
+  border-radius: 10px;
 
   color: var(--text-strong);
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   line-height: 1.4;
   text-align: center;
   text-decoration: none;
@@ -989,20 +1161,24 @@ main {
   overflow-wrap: anywhere;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
     border-color var(--transition-fast),
-    color var(--transition-fast);
+    transform var(--transition-fast);
 }
 
 #port-list a.port-link span {
   flex-shrink: 0;
-  font-size: 15px;
+  font-size: 16px;
 }
 
 #port-list a.port-link:hover {
   background: var(--button-hover);
   border-color: var(--accent);
-  color: var(--text-strong);
+  color: #fff;
+}
+
+#port-list a.port-link:active {
+  transform: scale(0.99);
 }
 
 #port-list a.port-link:focus-visible {
@@ -1010,17 +1186,17 @@ main {
   outline-offset: 3px;
 }
 
-/* =========================
-   MULTI-GAME APP SUPPORT
-   ========================= */
+/* -------------------------
+   15. MULTI-GAME APP
+   ------------------------- */
 
 .games-using-app {
   min-width: 0;
   margin-top: 20px;
-  padding: 14px;
+  padding: 15px;
 
-  background: var(--header-bg);
-  border: 1px solid var(--line);
+  background: var(--surface-deep);
+  border: 1px solid var(--line-soft);
   border-radius: var(--radius-medium);
 }
 
@@ -1043,8 +1219,9 @@ main {
   background: transparent;
   border: none;
 
-  color: var(--text-muted);
-  font-size: 14px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 650;
   line-height: 1.5;
   text-align: left;
 
@@ -1052,7 +1229,7 @@ main {
 }
 
 .games-using-app-toggle:hover {
-  color: var(--text-strong);
+  color: var(--accent-strong);
 }
 
 .games-using-app-toggle:focus {
@@ -1067,7 +1244,7 @@ main {
 
 .games-using-app-arrow {
   flex-shrink: 0;
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 11px;
   transition: transform var(--transition-fast);
 }
@@ -1075,17 +1252,17 @@ main {
 .games-using-app-list {
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 7px;
 
   min-width: 0;
-  margin-top: 8px;
+  margin-top: 10px;
   padding: 0;
 }
 
 .games-using-app-item {
   display: block;
   min-width: 0;
-  padding: 8px 10px;
+  padding: 10px 12px;
 
   background: var(--surface);
   border: 1px solid var(--line-soft);
@@ -1099,7 +1276,7 @@ main {
   overflow-wrap: anywhere;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
     border-color var(--transition-fast),
     color var(--transition-fast);
 }
@@ -1111,10 +1288,10 @@ main {
 }
 
 #port-list .games-using-app {
-  margin-top: 15px;
-  padding: 10px;
-  background: var(--surface-raised);
-  border-color: var(--line);
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(7, 19, 13, 0.5);
+  border-color: var(--line-soft);
 }
 
 #port-list .games-using-app-toggle {
@@ -1128,14 +1305,14 @@ main {
 }
 
 #port-list .games-using-app-arrow {
-  color: var(--text-muted);
+  color: var(--accent);
   font-size: 10px;
 }
 
 #port-list .games-using-app-item {
-  padding: 8px 10px;
+  padding: 9px 10px;
   background: var(--surface);
-  border-color: var(--line);
+  border-color: var(--line-soft);
   font-size: 12px;
 }
 
@@ -1145,10 +1322,9 @@ main {
   color: var(--accent-strong);
 }
 
-/* =========================
-   LEGACY PORT STYLES
-   Retained for older markup
-   ========================= */
+/* -------------------------
+   16. COMPATIBILIDAD CON ESTILOS ANTIGUOS
+   ------------------------- */
 
 .port-card {
   padding: 20px;
@@ -1250,7 +1426,7 @@ main {
   text-decoration: none;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
     border-color var(--transition-fast);
 }
 
@@ -1259,9 +1435,9 @@ main {
   border-color: var(--accent);
 }
 
-/* =========================
-   SIDE MENU
-   ========================= */
+/* -------------------------
+   17. MENÚ LATERAL
+   ------------------------- */
 
 #side-menu {
   position: fixed;
@@ -1269,60 +1445,76 @@ main {
   left: 0;
   z-index: 200;
 
-  width: 280px;
-  max-width: 85vw;
+  width: 300px;
+  max-width: 88vw;
   height: 100vh;
   height: 100dvh;
-  padding: 20px;
+  padding: 22px;
 
   overflow-y: auto;
 
-  background: var(--header-bg);
-  border-right: 1px solid var(--line);
+  background:
+    radial-gradient(
+      ellipse at 0 0,
+      rgba(54, 115, 66, 0.15),
+      transparent 60%
+    ),
+    var(--header-bg);
 
-  transform: translateX(-100%);
-  transition: transform var(--transition-menu);
+  border-right: 1px solid var(--line);
+  box-shadow: 18px 0 45px rgba(0, 0, 0, 0.2);
+
+  transform: translateX(-105%);
+  visibility: hidden;
+
+  transition:
+    transform var(--transition-menu),
+    visibility var(--transition-menu);
 }
 
 #side-menu.open {
   transform: translateX(0);
+  visibility: visible;
 }
 
 #menu-close {
   display: block;
   margin-left: auto;
-  padding: 0 4px;
+  padding: 0 5px;
 
   background: transparent;
   border: none;
 
   color: var(--text-secondary);
-  font-size: 28px;
+  font-size: 29px;
   cursor: pointer;
 }
 
 #menu-close:hover {
-  color: var(--text-strong);
+  color: var(--accent-strong);
 }
 
 #side-menu h2 {
   margin: 25px 0 10px;
   color: var(--text-muted);
-  font-size: 15px;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
-/* Menu overlay */
+/* Fondo del menú */
 
 #menu-overlay {
   position: fixed;
   z-index: 150;
   inset: 0;
 
-  background: rgba(0, 0, 0, 0.62);
+  background: rgba(2, 9, 5, 0.72);
 
   opacity: 0;
   pointer-events: none;
+
   transition: opacity var(--transition-menu);
 }
 
@@ -1331,31 +1523,33 @@ main {
   pointer-events: auto;
 }
 
-/* Platform list */
+/* Enlaces de plataforma */
 
 #platform-list {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 5px;
 }
 
 .platform-button {
   display: block;
   width: 100%;
-  padding: 10px 8px;
+  padding: 11px 12px;
 
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   border-radius: var(--radius-small);
 
   color: var(--text-secondary);
-  font-size: 15px;
+  font-size: 13px;
+  font-weight: 550;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
 
   transition:
-    background-color var(--transition-fast),
+    background var(--transition-fast),
+    border-color var(--transition-fast),
     color var(--transition-fast);
 }
 
@@ -1367,25 +1561,43 @@ main {
 
 .platform-button:hover {
   background: var(--surface);
+  border-color: var(--line-soft);
   color: var(--text-strong);
   text-decoration: none;
 }
 
-.menu-separator {
-  margin: 15px 0 5px;
-  padding: 8px 12px;
+#side-menu a.platform-button {
+  display: block;
+  text-decoration: none;
+}
 
-  border-top: 1px solid var(--line);
+#side-menu a.platform-button:link,
+#side-menu a.platform-button:visited {
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+
+#side-menu a.platform-button:hover {
+  background: var(--surface-hover);
+  text-decoration: none;
+}
+
+.menu-separator {
+  margin: 16px 0 6px;
+  padding: 9px 10px;
+
+  border-top: 1px solid var(--line-soft);
 
   color: var(--text-muted);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
   text-align: left;
 }
 
-/* =========================
-   GAME FILES LINK
-   ========================= */
+/* -------------------------
+   18. ENLACES A ARCHIVOS DEL JUEGO
+   ------------------------- */
 
 .game-files-link {
   margin-top: 35px;
@@ -1403,58 +1615,73 @@ main {
   color: var(--accent-strong);
 }
 
-/* =========================
-   FOOTER
-   ========================= */
+/* -------------------------
+   19. PIE DE PÁGINA
+   ------------------------- */
 
 footer {
+  margin-top: 20px;
   padding: 25px 16px;
-  border-top: 1px solid var(--line);
+
+  background: rgba(6, 18, 11, 0.45);
+  border-top: 1px solid var(--line-soft);
 
   color: var(--text-muted);
-  font-size: 13px;
+  font-size: 11px;
+  letter-spacing: 0.035em;
   text-align: center;
 }
 
-/* =========================
-   RESPONSIVE: TABLETS
-   ========================= */
+footer p {
+  margin: 0;
+}
+
+/* -------------------------
+   20. TABLET Y PANTALLAS MEDIANAS
+   ------------------------- */
 
 @media (min-width: 620px) {
   #port-list > .port,
   #port-list > .port-card {
-    padding: 20px;
+    padding: 23px;
   }
 
   #port-list .port-details {
     grid-template-columns: repeat(4, minmax(0, 1fr));
-    gap: 14px 12px;
+    gap: 18px 15px;
+  }
+
+  #game-list,
+  .home-game-list,
+  #popular-list {
+    gap: 12px;
   }
 }
 
-/* =========================
-   RESPONSIVE: MOBILE
-   ========================= */
+/* -------------------------
+   21. MÓVILES
+   ------------------------- */
 
 @media (max-width: 600px) {
   header {
     grid-template-columns: 39px minmax(0, 1fr) 39px;
     gap: 8px;
-    padding: 10px;
+    padding: 10px 12px;
+    min-height: 65px;
   }
 
   header #home-button::before {
-    font-size: 19px;
-    letter-spacing: 2.5px;
+    font-size: 20px;
+    letter-spacing: 2.8px;
   }
 
   header #home-button::after {
     font-size: 8px;
-    letter-spacing: 0.7px;
+    letter-spacing: 0.75px;
   }
 
   main {
-    padding: 18px 12px 30px;
+    padding: 20px 13px 34px;
   }
 
   .category-sort {
@@ -1469,6 +1696,10 @@ footer {
     flex-shrink: 0;
   }
 
+  .home-section {
+    margin-bottom: 30px;
+  }
+
   .home-section-header {
     flex-wrap: wrap;
   }
@@ -1478,17 +1709,20 @@ footer {
   }
 
   .popular-tab {
-    padding: 6px 8px;
+    padding: 7px 8px;
   }
 
   #game-header.game-summary-card {
-    gap: 14px;
-    margin-bottom: 28px;
+    gap: 16px;
+    margin-bottom: 31px;
+    padding: 17px;
+    border-radius: 17px;
   }
 
   .game-summary-cover {
-    width: 115px;
+    width: 122px;
     max-width: 38%;
+    border-radius: 9px;
   }
 
   .game-summary-info {
@@ -1496,36 +1730,87 @@ footer {
     min-width: 0;
   }
 
+  .game-summary-eyebrow {
+    margin-bottom: 8px;
+    font-size: 9px;
+    letter-spacing: 0.09em;
+  }
+
+  .game-summary-eyebrow::before {
+    width: 12px;
+  }
+
   #game-header .game-summary-title {
-    font-size: clamp(25px, 5vw, 36px);
+    margin-bottom: 11px;
+    font-size: clamp(23px, 5.7vw, 33px);
   }
 
   .game-summary-metadata {
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 5px;
+    margin-bottom: 12px;
   }
 
   .game-summary-year,
   .game-summary-genre {
+    min-height: 25px;
     padding: 4px 7px;
-    font-size: 12px;
+    font-size: 10px;
   }
 
   .game-summary-description {
-    font-size: 14px;
-    line-height: 1.7;
+    font-size: 12px;
+    line-height: 1.75;
   }
 
   .game-description-toggle {
-    font-size: 13px;
+    font-size: 12px;
   }
 
   .ports-section-title {
-    font-size: 21px;
+    font-size: 22px !important;
+  }
+
+  #port-list {
+    gap: 12px;
+  }
+
+  #port-list > .port,
+  #port-list > .port-card {
+    padding: 16px;
+    border-radius: 14px;
+  }
+
+  #port-list .port-top {
+    margin-bottom: 15px;
+    padding-bottom: 12px;
+  }
+
+  #port-list .port-title,
+  #port-list .port-top .port-title {
+    font-size: 16px;
   }
 
   #port-list .port-details {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 15px 11px;
+  }
+
+  #port-list .port-detail-label {
+    font-size: 9px;
+  }
+
+  #port-list .port-detail-value {
+    font-size: 12px;
+  }
+
+  #port-list .port-notes {
+    margin-top: 16px;
+    padding: 11px;
+  }
+
+  #port-list a.port-link {
+    min-height: 45px;
+    margin-top: 16px;
   }
 
   .games-using-app-item {
@@ -1533,20 +1818,41 @@ footer {
   }
 }
 
-/* =========================
-   RESPONSIVE: SMALL SCREENS
-   ========================= */
+/* -------------------------
+   22. PANTALLAS MUY PEQUEÑAS
+   ------------------------- */
 
 @media (max-width: 380px) {
   header {
-    grid-template-columns: 39px minmax(0, 1fr) 39px;
-    gap: 8px;
-    padding: 10px;
+    grid-template-columns: 37px minmax(0, 1fr) 37px;
+    gap: 6px;
+    padding: 9px;
+  }
+
+  header #menu-button,
+  header #search-button {
+    width: 37px;
+    height: 37px;
+  }
+
+  header #home-button::before {
+    font-size: 18px;
+  }
+
+  header #home-button::after {
+    font-size: 7px;
+    letter-spacing: 0.5px;
+  }
+
+  main {
+    padding: 17px 10px 28px;
   }
 
   #game-header.game-summary-card {
     flex-direction: column;
     align-items: flex-start;
+    gap: 17px;
+    padding: 16px;
   }
 
   .game-summary-cover {
@@ -1555,8 +1861,12 @@ footer {
     max-width: 100%;
   }
 
+  .game-summary-info {
+    width: 100%;
+  }
+
   #game-header .game-summary-title {
-    font-size: 28px;
+    font-size: 29px;
   }
 
   .home-section-header {
@@ -1578,7 +1888,7 @@ footer {
   }
 
   #port-list .port-details {
-    gap: 12px 9px;
+    gap: 13px 9px;
   }
 
   #port-list .port-title {
@@ -1590,9 +1900,9 @@ footer {
   }
 }
 
-/* =========================
-   REDUCED MOTION
-   ========================= */
+/* -------------------------
+   23. MOVIMIENTO REDUCIDO
+   ------------------------- */
 
 @media (prefers-reduced-motion: reduce) {
   *,
