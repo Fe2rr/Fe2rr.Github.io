@@ -10,17 +10,17 @@
 import { displayGame } from "./game-render.js";
 
 
-/*
- * CONFIGURATION
- */
+/* ==================================================
+   CONFIGURATION
+   ================================================== */
 
 const GAME_SHEET_URL =
     "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 
 
-/*
- * TEXT HELPERS
- */
+/* ==================================================
+   TEXT HELPERS
+   ================================================== */
 
 function normalizeText(value) {
     return String(value || "")
@@ -48,12 +48,9 @@ function normalizeGameHeader(value) {
 }
 
 
-/*
- * CSV PARSER
- *
- * Supports quoted fields, commas and line breaks
- * inside quoted values.
- */
+/* ==================================================
+   CSV PARSER
+   ================================================== */
 
 function parseGameCSV(csv) {
     const rows = [];
@@ -94,11 +91,7 @@ function parseGameCSV(csv) {
 
             row.push(field);
 
-            if (
-                row.some(value =>
-                    value.trim() !== ""
-                )
-            ) {
+            if (row.some(value => value.trim() !== "")) {
                 rows.push(row);
             }
 
@@ -113,11 +106,7 @@ function parseGameCSV(csv) {
     if (field.length > 0 || row.length > 0) {
         row.push(field);
 
-        if (
-            row.some(value =>
-                value.trim() !== ""
-            )
-        ) {
+        if (row.some(value => value.trim() !== "")) {
             rows.push(row);
         }
     }
@@ -145,9 +134,9 @@ function parseGameCSV(csv) {
 }
 
 
-/*
- * COLUMN LOOKUP
- */
+/* ==================================================
+   COLUMN LOOKUP
+   ================================================== */
 
 function getGameColumn(row, aliases) {
     for (const alias of aliases) {
@@ -167,15 +156,9 @@ function getGameColumn(row, aliases) {
 }
 
 
-/*
- * GROUP GAME DATA
- *
- * Reads game information even when a row contains
- * no Android port data.
- *
- * Only creates a port card when the row actually
- * contains port information.
- */
+/* ==================================================
+   GROUP GAME DATA
+   ================================================== */
 
 function groupGameRows(rows) {
     const grouped = new Map();
@@ -287,12 +270,6 @@ function groupGameRows(rows) {
             "NOTAS"
         ]);
 
-        /*
-         * General game information.
-         *
-         * Keep COVER_URL with its underscore.
-         */
-
         const coverUrl = getGameColumn(row, [
             "COVER_URL",
             "COVER URL",
@@ -314,11 +291,6 @@ function groupGameRows(rows) {
             "DESCRIPCION"
         ]);
 
-        /*
-         * Create the game even if this row only
-         * contains general information.
-         */
-
         if (!grouped.has(key)) {
             grouped.set(key, {
                 name: currentGame,
@@ -333,10 +305,6 @@ function groupGameRows(rows) {
         }
 
         const game = grouped.get(key);
-
-        /*
-         * Fill missing general information.
-         */
 
         if (!game.year && currentYear) {
             game.year = currentYear;
@@ -362,7 +330,8 @@ function groupGameRows(rows) {
         }
 
         /*
-         * Skip rows without port information.
+         * General-information rows without port
+         * details do not create empty port cards.
          */
 
         const hasPortData = [
@@ -377,9 +346,7 @@ function groupGameRows(rows) {
             works,
             lastUpdate,
             notes
-        ].some(value =>
-            String(value || "").trim() !== ""
-        );
+        ].some(value => String(value || "").trim() !== "");
 
         if (!hasPortData) {
             continue;
@@ -407,9 +374,9 @@ function groupGameRows(rows) {
 }
 
 
-/*
- * LOAD THE SELECTED GAME
- */
+/* ==================================================
+   LOAD THE SELECTED GAME
+   ================================================== */
 
 async function loadSelectedGame() {
     const gameHeader =
@@ -425,6 +392,7 @@ async function loadSelectedGame() {
         console.error(
             "NAPL: required game page elements are missing."
         );
+
         return;
     }
 
@@ -435,8 +403,10 @@ async function loadSelectedGame() {
 
     if (!requestedSlug) {
         gameHeader.textContent = "No game selected.";
+
         status.textContent =
             "Return to the list and select a game.";
+
         portList.replaceChildren();
         return;
     }
@@ -475,14 +445,15 @@ async function loadSelectedGame() {
         const games = groupGameRows(rows);
 
         const game = games.find(
-            item =>
-                item.slug === createSlug(requestedSlug)
+            item => item.slug === createSlug(requestedSlug)
         );
 
         if (!game) {
             gameHeader.textContent = "Game not found.";
+
             status.textContent =
                 "This game could not be found in the spreadsheet.";
+
             portList.replaceChildren();
 
             console.error(
@@ -539,8 +510,8 @@ async function loadSelectedGame() {
 }
 
 
-/*
- * START
- */
+/* ==================================================
+   START
+   ================================================== */
 
 loadSelectedGame();
