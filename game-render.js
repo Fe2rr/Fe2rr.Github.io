@@ -1,4 +1,3 @@
-
 /*
  * NAPL — GAME RENDER
  *
@@ -6,6 +5,11 @@
  * Preserves existing navigation, links, notes,
  * expandable descriptions and Multi-Game App support.
  */
+
+
+/* ==================================================
+   IMPORTS
+   ================================================== */
 
 import {
     isMultiGameApp,
@@ -45,10 +49,6 @@ function restoreDescriptionLineBreaks(description) {
    PORT INFORMATION
    ================================================== */
 
-/*
- * Creates a detail field.
- * When url is supplied, the value remains clickable.
- */
 function createPortDetail(label, value, url = "") {
     if (!String(value || "").trim()) {
         return null;
@@ -61,14 +61,18 @@ function createPortDetail(label, value, url = "") {
     labelElement.className = "port-detail-label";
     labelElement.textContent = label;
 
-    const valueElement = url
+    const hasUrl = /^https?:\/\/\S+$/i.test(
+        String(url || "").trim()
+    );
+
+    const valueElement = hasUrl
         ? document.createElement("a")
         : document.createElement("div");
 
     valueElement.className = "port-detail-value";
     valueElement.textContent = value;
 
-    if (url) {
+    if (hasUrl) {
         valueElement.href = url;
         valueElement.target = "_blank";
         valueElement.rel = "noopener noreferrer";
@@ -100,9 +104,14 @@ function createExpandableDescription(description) {
     };
 
     Object.assign(text.style, collapsedStyles);
+
     container.appendChild(text);
 
     requestAnimationFrame(() => {
+        if (!text.isConnected) {
+            return;
+        }
+
         const isLong =
             text.scrollHeight > text.clientHeight + 1;
 
@@ -126,6 +135,7 @@ function createExpandableDescription(description) {
 
             if (expanded) {
                 Object.assign(text.style, collapsedStyles);
+
                 button.textContent = "Show more";
                 button.setAttribute("aria-expanded", "false");
             } else {
@@ -152,8 +162,7 @@ function createExpandableDescription(description) {
 
 function displayGameSummary(game, parentElement) {
     parentElement.replaceChildren();
-    parentElement.className =
-        "game-header game-summary-card";
+    parentElement.className = "game-header game-summary-card";
 
     const coverUrl = String(game.coverUrl || "").trim();
 
@@ -180,7 +189,7 @@ function displayGameSummary(game, parentElement) {
 
     const eyebrow = document.createElement("div");
     eyebrow.className = "game-summary-eyebrow";
-    eyebrow.textContent = "Featured port";
+    eyebrow.textContent = "ANDROID GAME";
 
     const title = document.createElement("h1");
     title.id = "game-title";
@@ -194,23 +203,28 @@ function displayGameSummary(game, parentElement) {
 
     if (game.year) {
         const year = document.createElement("span");
+
         year.className = "game-summary-year";
         year.textContent = game.year;
+
         metadata.appendChild(year);
     }
 
     if (game.genre) {
         const genre = document.createElement("span");
+
         genre.className = "game-summary-genre";
         genre.textContent = game.genre;
+
         metadata.appendChild(genre);
     }
 
-    const android = document.createElement("span");
-    android.className = "game-summary-genre";
-    android.textContent = "Android";
-    metadata.appendChild(android);
+    const platform = document.createElement("span");
 
+    platform.className = "game-summary-genre";
+    platform.textContent = "Android";
+
+    metadata.appendChild(platform);
     info.appendChild(metadata);
 
     if (game.description) {
@@ -238,7 +252,7 @@ function displayGamesUsingApp(
         allRows
     );
 
-    if (gamesUsingApp.length === 0) {
+    if (!gamesUsingApp.length) {
         return;
     }
 
@@ -257,6 +271,7 @@ function displayGamesUsingApp(
     const arrow = document.createElement("span");
     arrow.className = "games-using-app-arrow";
     arrow.textContent = "▼";
+    arrow.setAttribute("aria-hidden", "true");
 
     toggle.append(title, arrow);
 
@@ -278,6 +293,7 @@ function displayGamesUsingApp(
         if (game.year) {
             const year = document.createElement("span");
             year.textContent = ` (${game.year})`;
+
             link.appendChild(year);
         }
 
@@ -330,11 +346,7 @@ function displayPortCard(port, index, allRows) {
     const fields = [
         ["Version", port.version, ""],
         ["Developer", port.developer, ""],
-        [
-            "Need files?",
-            port.files,
-            port.dataUrl
-        ],
+        ["Need files?", port.files, port.dataUrl],
         ["Port type", port.platform, ""],
         ["Supported inputs", port.controller, ""],
         ["Works?", port.works, ""],
@@ -365,7 +377,7 @@ function displayPortCard(port, index, allRows) {
 
         const label = document.createElement("div");
         label.className = "port-notes-label";
-        label.textContent = "Notes";
+        label.textContent = "NOTES";
 
         const text = document.createElement("p");
         text.className = "port-notes-text";
@@ -375,13 +387,15 @@ function displayPortCard(port, index, allRows) {
         card.appendChild(notes);
     }
 
-    /* Download / port link */
+    /* Port link */
 
-    if (port.url) {
+    const portUrl = String(port.url || "").trim();
+
+    if (/^https?:\/\/\S+$/i.test(portUrl)) {
         const link = document.createElement("a");
 
         link.className = "port-link";
-        link.href = port.url;
+        link.href = portUrl;
         link.target = "_blank";
         link.rel = "noopener noreferrer";
         link.textContent = port.link || "Download / View Port";
@@ -442,21 +456,29 @@ export function displayGame(game, allRows) {
 
     /* Port count */
 
+    const portCount = game.ports.length;
+
     statusElement.textContent =
-        `${game.ports.length} port${
-            game.ports.length !== 1 ? "s" : ""
-        }`;
+        `${portCount} ${portCount === 1 ? "port" : "ports"}`;
+
+    /* Render ports */
 
     portList.replaceChildren();
 
-    /* Render every port */
+    if (portCount === 0) {
+        const emptyMessage = document.createElement("p");
 
-    for (let index = 0; index < game.ports.length; index++) {
-        const port = game.ports[index];
+        emptyMessage.className = "port-empty";
+        emptyMessage.textContent =
+            "No ports are currently listed for this game.";
 
-        portList.appendChild(
-            displayPortCard(port, index, allRows)
-        );
+        portList.appendChild(emptyMessage);
+    } else {
+        game.ports.forEach((port, index) => {
+            portList.appendChild(
+                displayPortCard(port, index, allRows)
+            );
+        });
     }
 
     /* Games using this Multi-Game App */
