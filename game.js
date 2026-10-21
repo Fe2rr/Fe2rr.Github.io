@@ -1,4 +1,3 @@
-
 /*
  * NAPL — GAME DATA
  *
