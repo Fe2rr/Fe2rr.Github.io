@@ -1,10 +1,18 @@
 /*
- * Normalize column names.
+ * THE PORTS VAULT — DATA PROCESSING
+ *
+ * Reads Google Sheets CSV data and normalizes
+ * game and port information for the application.
+ */
+
+
+/*
+ * NORMALIZE COLUMN NAMES
  */
 
 function normalizeHeader(value) {
 
-    return value
+    return String(value || "")
         .replace(/^\uFEFF/, "")
         .trim()
         .toUpperCase()
@@ -13,8 +21,9 @@ function normalizeHeader(value) {
 
 }
 
+
 /*
- * Normalize text.
+ * NORMALIZE TEXT
  */
 
 function normalizeText(value) {
@@ -27,8 +36,9 @@ function normalizeText(value) {
 
 }
 
+
 /*
- * Create game slug.
+ * CREATE GAME SLUG
  */
 
 function createSlug(name) {
@@ -39,8 +49,9 @@ function createSlug(name) {
 
 }
 
+
 /*
- * CSV parser.
+ * CSV PARSER
  */
 
 function parseCSV(csv) {
@@ -63,15 +74,16 @@ function parseCSV(csv) {
             ) {
 
                 field += '"';
-
                 i++;
 
             } else {
 
                 insideQuotes = !insideQuotes;
+
             }
 
             continue;
+
         }
 
         if (
@@ -80,10 +92,10 @@ function parseCSV(csv) {
         ) {
 
             row.push(field);
-
             field = "";
 
             continue;
+
         }
 
         if (
@@ -97,28 +109,30 @@ function parseCSV(csv) {
             ) {
 
                 i++;
+
             }
 
             row.push(field);
-
             field = "";
 
             if (
                 row.some(
-                    value =>
-                        value.trim() !== ""
+                    value => value.trim() !== ""
                 )
             ) {
 
                 rows.push(row);
+
             }
 
             row = [];
 
             continue;
+
         }
 
         field += char;
+
     }
 
     if (
@@ -130,24 +144,25 @@ function parseCSV(csv) {
 
         if (
             row.some(
-                value =>
-                    value.trim() !== ""
+                value => value.trim() !== ""
             )
         ) {
 
             rows.push(row);
+
         }
+
     }
 
     if (rows.length === 0) {
 
         return [];
+
     }
 
-    const headers =
-        rows.shift().map(
-            normalizeHeader
-        );
+    const headers = rows.shift().map(
+        normalizeHeader
+    );
 
     return rows.map(values => {
 
@@ -163,20 +178,19 @@ function parseCSV(csv) {
         );
 
         return rowObject;
+
     });
 
 }
 
+
 /*
- * Find a column by its header.
+ * FIND A COLUMN BY ITS HEADER
  *
  * Column positions do not matter.
  */
 
-function getColumn(
-    row,
-    possibleNames
-) {
+function getColumn(row, possibleNames) {
 
     for (const name of possibleNames) {
 
@@ -191,148 +205,176 @@ function getColumn(
         ) {
 
             return row[normalizedName];
+
         }
+
     }
 
     return "";
 
 }
 
+
 /*
- * Convert CSV rows.
+ * CONVERT CSV ROWS
  */
 
 function processRows(rows) {
 
     let currentGame = "";
-
     let currentYear = "";
 
     const result = [];
 
     for (const row of rows) {
 
-        const gameValue =
-            getColumn(row, [
-                "GAME",
-                "GAME NAME",
-                "NAME",
-                "JUEGO"
-            ]).trim();
+        const gameValue = getColumn(row, [
+            "GAME",
+            "GAME NAME",
+            "NAME",
+            "JUEGO"
+        ]).trim();
 
-        const yearValue =
-            getColumn(row, [
-                "YEAR",
-                "ANO",
-                "AÑO"
-            ]).trim();
+        const yearValue = getColumn(row, [
+            "YEAR",
+            "ANO",
+            "AÑO"
+        ]).trim();
 
         if (gameValue) {
 
             currentGame = gameValue;
+
         }
 
         if (yearValue) {
 
             currentYear = yearValue;
+
         }
 
-        const platform =
-            getColumn(row, [
-                "PLATFORM",
-                "PLATAFORM",
-                "PLATAFORMA"
-            ]).trim();
+        const platform = getColumn(row, [
+            "PLATFORM",
+            "PLATAFORM",
+            "PLATAFORMA"
+        ]).trim();
 
-        const project =
-            getColumn(row, [
-                "PROJECT",
-                "PROYECTO"
-            ]);
+        const project = getColumn(row, [
+            "PROJECT",
+            "PROYECTO"
+        ]);
 
-        const link =
-            getColumn(row, [
-                "LINK",
-                "PROJECT LINK",
-                "ENLACE"
-            ]);
+        const link = getColumn(row, [
+            "LINK",
+            "PROJECT LINK",
+            "ENLACE"
+        ]);
 
-        const url =
-            getColumn(row, [
-                "URL"
-            ]);
+        const url = getColumn(row, [
+            "URL"
+        ]);
 
-        const developer =
-            getColumn(row, [
-                "DEVELOPER",
-                "DEVELOPER/PUBLISHER",
-                "DESARROLLADOR"
-            ]);
+        const dataUrl = getColumn(row, [
+            "DATA URL",
+            "DATA LINK",
+            "GAME FILES URL"
+        ]);
 
-        const version =
-            getColumn(row, [
-                "VERSION",
-                "VERSIÓN"
-            ]);
+        const developer = getColumn(row, [
+            "DEVELOPER",
+            "DEVELOPER/PUBLISHER",
+            "DESARROLLADOR"
+        ]);
 
-        const controller =
-            getColumn(row, [
-                "CONTROLLER SUPPORT",
-                "CONTROLLER",
-                "GAMEPAD",
-                "MANDO"
-            ]);
+        const version = getColumn(row, [
+            "VERSION",
+            "VERSIÓN"
+        ]);
 
-        const files =
-            getColumn(row, [
-                "NEEDS GAME FILES?",
-                "NEEDS GAME FILES",
-                "GAME FILES",
-                "NECESITA ARCHIVOS"
-            ]);
+        const controller = getColumn(row, [
+            "CONTROLLER SUPPORT",
+            "CONTROLLER",
+            "GAMEPAD",
+            "MANDO"
+        ]);
 
-        const works =
-            getColumn(row, [
-                "WORKS?",
-                "WORKS",
-                "FUNCIONA"
-            ]);
+        const files = getColumn(row, [
+            "NEEDS GAME FILES?",
+            "NEEDS GAME FILES",
+            "GAME FILES",
+            "NECESITA ARCHIVOS"
+        ]);
 
-        const lastUpdate =
-            getColumn(row, [
-                "LAST UPDATE",
-                "LAST UPDATED",
-                "ÚLTIMA ACTUALIZACIÓN"
-            ]);
+        const works = getColumn(row, [
+            "WORKS?",
+            "WORKS",
+            "FUNCIONA"
+        ]);
+
+        const lastUpdate = getColumn(row, [
+            "LAST UPDATE",
+            "LAST UPDATED",
+            "ÚLTIMA ACTUALIZACIÓN"
+        ]);
+
+        const dateAdded = getColumn(row, [
+            "DATE ADDED"
+        ]).trim();
+
+        const notes = getColumn(row, [
+            "NOTES",
+            "NOTE",
+            "NOTAS"
+        ]);
 
         /*
-         * New DATE ADDED column.
+         * GAME METADATA
+         *
+         * These fields will be used by the home cards.
          */
 
-        const dateAdded =
-            getColumn(row, [
-                "DATE ADDED"
-            ]).trim();
+        const coverUrl = getColumn(row, [
+            "COVER_URL",
+            "COVER URL",
+            "COVER",
+            "COVER IMAGE",
+            "IMAGE URL",
+            "PORTADA"
+        ]).trim();
 
-        const notes =
-            getColumn(row, [
-                "NOTES",
-                "NOTE",
-                "NOTAS"
-            ]);
+        const genre = getColumn(row, [
+            "GENRE",
+            "GÉNERO",
+            "GENERO"
+        ]).trim();
 
-        const hasPortData =
-            project ||
-            link ||
-            url ||
-            developer ||
-            version ||
-            controller ||
-            files ||
-            works ||
-            lastUpdate ||
-            dateAdded ||
-            notes;
+        const description = getColumn(row, [
+            "DESCRIPTION",
+            "DESCRIPCIÓN",
+            "DESCRIPCION"
+        ]).trim();
+
+        /*
+         * Preserve the existing rule:
+         * a row must contain port data to be processed.
+         */
+
+        const hasPortData = [
+            project,
+            link,
+            url,
+            dataUrl,
+            developer,
+            version,
+            controller,
+            files,
+            works,
+            lastUpdate,
+            dateAdded,
+            notes
+        ].some(
+            value => String(value || "").trim() !== ""
+        );
 
         if (
             !currentGame ||
@@ -340,6 +382,7 @@ function processRows(rows) {
         ) {
 
             continue;
+
         }
 
         result.push({
@@ -356,6 +399,8 @@ function processRows(rows) {
 
             url: url.trim(),
 
+            dataUrl: dataUrl.trim(),
+
             developer: developer.trim(),
 
             version: version.trim(),
@@ -370,9 +415,16 @@ function processRows(rows) {
 
             dateAdded: dateAdded,
 
-            notes: notes.trim()
+            notes: notes.trim(),
+
+            coverUrl: coverUrl,
+
+            genre: genre,
+
+            description: description
 
         });
+
     }
 
     return result;
