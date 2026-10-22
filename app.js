@@ -1,5 +1,6 @@
+
 /*
- * THE PORTS VAULT — MAIN APPLICATION
+ * NAPL — MAIN APPLICATION
  *
  * Loads games from Google Sheets, groups the ports
  * and initializes the home page sections.
@@ -53,6 +54,44 @@ async function loadGames() {
             );
         }
 
+        /*
+         * Preserve the order of first appearance of platforms
+         * in the original spreadsheet, before processing games
+         * or sorting them alphabetically.
+         */
+
+        const uniquePlatforms = new Map();
+
+        for (const row of rows) {
+
+            const platform = getColumn(row, [
+                "PLATFORM",
+                "PLATAFORM",
+                "PLATAFORMA"
+            ]).trim();
+
+            if (!platform) {
+                continue;
+            }
+
+            const key = normalizeText(platform);
+
+            if (
+                key === "multi-game apps" ||
+                key === "multi game apps"
+            ) {
+                continue;
+            }
+
+            if (!uniquePlatforms.has(key)) {
+                uniquePlatforms.set(key, platform);
+            }
+        }
+
+        platformOrder = Array.from(
+            uniquePlatforms.values()
+        );
+
         const processedRows = processRows(rows);
 
         if (
@@ -81,6 +120,11 @@ async function loadGames() {
          */
 
         games = groupedGames;
+
+        /*
+         * Keep the home page game ordering alphabetical.
+         * The platform menu uses platformOrder separately.
+         */
 
         games.sort((a, b) =>
             a.name.localeCompare(
