@@ -240,7 +240,7 @@ function getPlatformGroup(platform) {
         return "Nintendo";
     }
 
-    return "Other Platforms";
+    return "Others";
 }
 
 
@@ -306,7 +306,6 @@ function displayPlatformMenu() {
         "PlayStation",
         "Xbox",
         "Others",
-        "Other Platforms"
     ];
 
     const groupedPlatforms = new Map(
