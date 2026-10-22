@@ -2372,3 +2372,6 @@ a {
     }
 
 }
+#status:empty {
+    display: none;
+}
