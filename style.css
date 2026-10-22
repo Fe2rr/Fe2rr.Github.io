@@ -2191,18 +2191,19 @@ a {
 
 /* Imagen de portada */
 
+./* Imagen de portada: mostrarla completa sin recortar */
+
 .home-game-cover {
     display: block;
 
     width: 100%;
     height: 100%;
 
-    object-fit: cover;
+    object-fit: contain;
     object-position: center;
 
     border-radius: 5px;
 }
-
 /* Estado sin portada */
 
 .home-game-cover-container.cover-unavailable {
