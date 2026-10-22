@@ -1,9 +1,20 @@
+
 /*
  * NAPL — NAVIGATION
  * Builds the platform menu dynamically from Google Sheets.
- * Uses the redesigned compact game cards in category views.
+ * Preserves spreadsheet platform order.
  * Branch: Nuevo-Formato
  */
+
+
+/*
+ * PLATFORM ORDER
+ *
+ * Filled by app.js using the original spreadsheet rows.
+ * Do not sort this array alphabetically.
+ */
+
+let platformOrder = [];
 
 
 /* OPEN MENU */
@@ -166,13 +177,57 @@ function normalizePlatformLabel(value) {
 
 
 /*
- * GET UNIQUE PLATFORMS FROM LOADED SHEET DATA
+ * GET UNIQUE PLATFORMS
  *
- * Preserves the order of first appearance.
- * Removes duplicates without sorting alphabetically.
+ * Prefer the platform order captured from the original
+ * spreadsheet rows by app.js.
+ *
+ * The fallback supports cases where the menu is called
+ * before platformOrder has been populated.
+ *
+ * Duplicates are removed without sorting alphabetically.
  */
 
 function getAvailablePlatforms() {
+    const uniquePlatforms = new Map();
+
+    const sourcePlatforms =
+        Array.isArray(platformOrder) && platformOrder.length > 0
+            ? platformOrder
+            : getPlatformsFromGames();
+
+    for (const rawPlatform of sourcePlatforms) {
+
+        const platform =
+            normalizePlatformLabel(rawPlatform);
+
+        if (!platform) {
+            continue;
+        }
+
+        const key = normalizeText(platform);
+
+        if (
+            key === "multi-game apps" ||
+            key === "multi game apps"
+        ) {
+            continue;
+        }
+
+        if (!uniquePlatforms.has(key)) {
+            uniquePlatforms.set(key, platform);
+        }
+    }
+
+    return Array.from(uniquePlatforms.values());
+}
+
+
+/*
+ * FALLBACK: GET PLATFORMS FROM LOADED GAMES
+ */
+
+function getPlatformsFromGames() {
     const uniquePlatforms = new Map();
 
     if (!Array.isArray(games)) {
@@ -180,12 +235,15 @@ function getAvailablePlatforms() {
     }
 
     for (const game of games) {
+
         if (!Array.isArray(game.platforms)) {
             continue;
         }
 
         for (const rawPlatform of game.platforms) {
-            const platform = normalizePlatformLabel(rawPlatform);
+
+            const platform =
+                normalizePlatformLabel(rawPlatform);
 
             if (!platform) {
                 continue;
@@ -289,6 +347,10 @@ function displayPlatformMenu() {
 
     platformList.replaceChildren();
 
+    /*
+     * These two categories always appear first.
+     */
+
     addCategoryButton(
         "Multi-Game Apps",
         "multi-game-apps"
@@ -301,11 +363,16 @@ function displayPlatformMenu() {
 
     const platforms = getAvailablePlatforms();
 
+    /*
+     * Fixed order for platform groups.
+     * Platforms inside each group retain their spreadsheet order.
+     */
+
     const groupOrder = [
         "Nintendo",
         "PlayStation",
         "Xbox",
-        "Others",
+        "Others"
     ];
 
     const groupedPlatforms = new Map(
@@ -313,6 +380,7 @@ function displayPlatformMenu() {
     );
 
     for (const platform of platforms) {
+
         const group = getPlatformGroup(platform);
 
         if (!groupedPlatforms.has(group)) {
@@ -320,13 +388,23 @@ function displayPlatformMenu() {
             groupOrder.push(group);
         }
 
+        /*
+         * Do not sort this array:
+         * insertion order is the spreadsheet order.
+         */
+
         groupedPlatforms.get(group).push(platform);
     }
 
     for (const group of groupOrder) {
-        const groupPlatforms = groupedPlatforms.get(group);
 
-        if (!groupPlatforms || groupPlatforms.length === 0) {
+        const groupPlatforms =
+            groupedPlatforms.get(group);
+
+        if (
+            !groupPlatforms ||
+            groupPlatforms.length === 0
+        ) {
             continue;
         }
 
@@ -422,9 +500,11 @@ function displayGames(list) {
     const fragment = document.createDocumentFragment();
 
     for (const game of list) {
-        const port = typeof getRepresentativePort === "function"
-            ? getRepresentativePort(game)
-            : null;
+
+        const port =
+            typeof getRepresentativePort === "function"
+                ? getRepresentativePort(game)
+                : null;
 
         const card = createHomeGameCard(game, port);
 
@@ -484,6 +564,7 @@ function searchGames() {
     const fragment = document.createDocumentFragment();
 
     for (const game of filtered) {
+
         const element = document.createElement("a");
 
         element.className = "search-result";
