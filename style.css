@@ -769,7 +769,6 @@ section {
   width: 190px;
   max-width: 36%;
   height: auto;
-  aspect-ratio: 2 / 3;
 
   background: var(--surface-deep);
   border: 1px solid rgba(168, 223, 173, 0.24);
