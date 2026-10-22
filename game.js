@@ -2,8 +2,8 @@
  * NAPL — GAME DATA
  *
  * Loads the selected game from Google Sheets,
- * groups its Android ports and sends the data
- * to game-render.js.
+ * groups its Android ports, registers the visit
+ * and sends the data to game-render.js.
  */
 
 import { displayGame } from "./game-render.js";
@@ -15,6 +15,9 @@ import { displayGame } from "./game-render.js";
 
 const GAME_SHEET_URL =
     "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
+
+const VISIT_TRACKING_URL =
+    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 
 /* ==================================================
@@ -44,6 +47,40 @@ function normalizeGameHeader(value) {
         .toUpperCase()
         .normalize("NFD")
         .replace(/[\u0300-\u036f]/g, "");
+}
+
+
+/* ==================================================
+   VISIT TRACKING
+   ================================================== */
+
+function registerGameVisit(gameName) {
+    if (!gameName) {
+        return;
+    }
+
+    const slug = createSlug(gameName);
+
+    if (!slug) {
+        return;
+    }
+
+    const url = new URL(VISIT_TRACKING_URL);
+
+    url.searchParams.set("game", slug);
+    url.searchParams.set("_", String(Date.now()));
+
+    fetch(url.toString(), {
+        method: "GET",
+        mode: "no-cors",
+        cache: "no-store",
+        keepalive: true
+    }).catch(error => {
+        console.error(
+            "NAPL: could not send the game visit.",
+            error
+        );
+    });
 }
 
 
@@ -464,6 +501,14 @@ async function loadSelectedGame() {
         }
 
         document.title = `${game.name} — NAPL`;
+
+        /*
+         * Register one visit after the game is found.
+         * The request runs independently so the game
+         * page does not have to wait for the counter.
+         */
+
+        registerGameVisit(game.name);
 
         const allRows = rows.map(row => ({
             game: getGameColumn(row, [
