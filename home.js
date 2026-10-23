@@ -1,3 +1,4 @@
+
 /*
  * NAPL — HOME PAGE
  *
@@ -50,27 +51,71 @@ function parseLastUpdate(value) {
 
 /*
  * CONVERT DATE ADDED INTO A DATE
+ *
+ * Supported formats:
+ * DD/MM/YYYY HH:mm:ss
+ * DD/MM/YYYY
+ * YYYY, Month DD
+ * YYYY, Month
+ *
+ * Missing times default to 00:00:00.
+ * Missing days default to the first day of the month.
  */
 
 function parseDateAdded(value) {
-    if (!value) return null;
+    if (value === null || value === undefined) return null;
 
     const text = String(value).trim();
     if (!text) return null;
 
-    const monthMatch = text.match(
+    let datePart = text;
+    let hours = 0;
+    let minutes = 0;
+    let seconds = 0;
+
+    // Extract an optional time, such as 20:12:50.
+    const timeMatch = text.match(
+        /(?:\s+|T)(\d{1,2}):(\d{2})(?::(\d{2}))?\s*$/i
+    );
+
+    if (timeMatch) {
+        hours = Number(timeMatch[1]);
+        minutes = Number(timeMatch[2]);
+        seconds = Number(timeMatch[3] || 0);
+
+        if (
+            hours > 23 ||
+            minutes > 59 ||
+            seconds > 59
+        ) {
+            return null;
+        }
+
+        datePart = text.slice(0, timeMatch.index).trim();
+    }
+
+    let year;
+    let month;
+    let day;
+
+    /*
+     * Format: YYYY, Month DD
+     * Format: YYYY, Month
+     */
+
+    const monthMatch = datePart.match(
         /^(\d{4})\s*,\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+)(?:\s+(\d{1,2}))?$/i
     );
 
     if (monthMatch) {
-        const year = Number(monthMatch[1]);
+        year = Number(monthMatch[1]);
 
         const monthName = monthMatch[2]
             .toLowerCase()
             .normalize("NFD")
             .replace(/[\u0300-\u036f]/g, "");
 
-        const day = monthMatch[3] ? Number(monthMatch[3]) : 1;
+        day = monthMatch[3] ? Number(monthMatch[3]) : 1;
 
         const months = {
             january: 0, enero: 0,
@@ -91,58 +136,57 @@ function parseDateAdded(value) {
             return null;
         }
 
-        const date = new Date(year, months[monthName], day);
+        month = months[monthName];
+    } else {
+        /*
+         * Format: DD/MM/YYYY
+         */
 
-        if (
-            date.getFullYear() !== year ||
-            date.getMonth() !== months[monthName] ||
-            date.getDate() !== day
-        ) {
-            return null;
+        const localMatch = datePart.match(
+            /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/
+        );
+
+        if (localMatch) {
+            day = Number(localMatch[1]);
+            month = Number(localMatch[2]) - 1;
+            year = Number(localMatch[3]);
+        } else {
+            /*
+             * Also preserve compatibility with YYYY-MM-DD.
+             */
+
+            const isoMatch = datePart.match(
+                /^(\d{4})-(\d{1,2})-(\d{1,2})$/
+            );
+
+            if (!isoMatch) return null;
+
+            year = Number(isoMatch[1]);
+            month = Number(isoMatch[2]) - 1;
+            day = Number(isoMatch[3]);
         }
-
-        return date;
     }
 
-    const isoMatch = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    const date = new Date(
+        year,
+        month,
+        day,
+        hours,
+        minutes,
+        seconds
+    );
 
-    if (isoMatch) {
-        const year = Number(isoMatch[1]);
-        const month = Number(isoMatch[2]) - 1;
-        const day = Number(isoMatch[3]);
-        const date = new Date(year, month, day);
-
-        if (
-            date.getFullYear() !== year ||
-            date.getMonth() !== month ||
-            date.getDate() !== day
-        ) {
-            return null;
-        }
-
-        return date;
+    // Reject invalid dates instead of allowing JavaScript
+    // to roll them over into another month.
+    if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month ||
+        date.getDate() !== day
+    ) {
+        return null;
     }
 
-    const localMatch = text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-
-    if (localMatch) {
-        const day = Number(localMatch[1]);
-        const month = Number(localMatch[2]) - 1;
-        const year = Number(localMatch[3]);
-        const date = new Date(year, month, day);
-
-        if (
-            date.getFullYear() !== year ||
-            date.getMonth() !== month ||
-            date.getDate() !== day
-        ) {
-            return null;
-        }
-
-        return date;
-    }
-
-    return null;
+    return date;
 }
 
 
