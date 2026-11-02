@@ -29,13 +29,35 @@
     <link rel="stylesheet" href="style.css">
 
     <style>
+        .adsterra-label {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            margin: 24px auto 8px;
+            color: #84948a;
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.2px;
+        }
+
+        .adsterra-label::before,
+        .adsterra-label::after {
+            content: "";
+            flex: 1;
+            max-width: 100px;
+            height: 1px;
+            background: #52645a;
+        }
+
         .adsterra-slot {
             display: flex;
             justify-content: center;
             align-items: center;
             width: 100%;
             min-height: 250px;
-            margin: 24px auto;
+            margin: 0 auto 24px;
             overflow: hidden;
         }
     </style>
@@ -172,6 +194,8 @@
             <div id="port-list"></div>
 
             <!-- ADSTERRA -->
+
+            <div class="adsterra-label">ADVERTISEMENT</div>
 
             <div
                 id="adsterra-game"
