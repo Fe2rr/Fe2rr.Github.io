@@ -166,13 +166,63 @@
 
     </div>
 
+    <!-- HOME TABS -->
+
+    <nav
+        id="home-tabs"
+        class="home-tabs"
+        role="tablist"
+        aria-label="Home sections"
+    >
+
+        <button
+            id="tab-last-added"
+            class="home-tab active"
+            type="button"
+            role="tab"
+            aria-selected="true"
+            aria-controls="last-added-section"
+            data-section="last-added"
+        >
+            Last Added
+        </button>
+
+        <button
+            id="tab-popular"
+            class="home-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="popular-section"
+            data-section="popular"
+            tabindex="-1"
+        >
+            Popular
+        </button>
+
+        <button
+            id="tab-last-updated"
+            class="home-tab"
+            type="button"
+            role="tab"
+            aria-selected="false"
+            aria-controls="last-updated-section"
+            data-section="last-updated"
+            tabindex="-1"
+        >
+            Last Updated
+        </button>
+
+    </nav>
+
+    <!-- LAST ADDED -->
+
     <section
         id="last-added-section"
         class="home-section"
-        aria-labelledby="last-added-heading"
+        role="tabpanel"
+        aria-labelledby="tab-last-added"
     >
-
-        <h2 id="last-added-heading">Last Added</h2>
 
         <div
             id="last-added-list"
@@ -190,15 +240,17 @@
 
     </section>
 
+    <!-- POPULAR -->
+
     <section
         id="popular-section"
         class="home-section"
-        aria-labelledby="popular-heading"
+        role="tabpanel"
+        aria-labelledby="tab-popular"
+        hidden
     >
 
         <div class="home-section-header">
-
-            <h2 id="popular-heading">Popular</h2>
 
             <div class="popular-tabs" aria-label="Popularity period">
 
@@ -248,13 +300,15 @@
 
     </section>
 
+    <!-- LAST UPDATED -->
+
     <section
         id="last-updated-section"
         class="home-section"
-        aria-labelledby="last-updated-heading"
+        role="tabpanel"
+        aria-labelledby="tab-last-updated"
+        hidden
     >
-
-        <h2 id="last-updated-heading">Last Updated</h2>
 
         <div
             id="last-updated-list"
