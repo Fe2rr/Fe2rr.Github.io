@@ -1,24 +1,41 @@
+
 /*
  * NAPL — NAVIGATION
- * Builds the platform menu dynamically from the PLATFORM values
- * loaded from Google Sheets.
+ * Builds the platform menu dynamically from Google Sheets.
+ * Preserves spreadsheet platform order.
  * Branch: Nuevo-Formato
  */
 
+
+/*
+ * PLATFORM ORDER
+ *
+ * Filled by app.js using the original spreadsheet rows.
+ * Do not sort this array alphabetically.
+ */
+
+let platformOrder = [];
+
+
 /* OPEN MENU */
+
 function openMenu() {
     closeSearch();
     sideMenu.classList.add("open");
     menuOverlay.classList.add("visible");
 }
 
+
 /* CLOSE MENU */
+
 function closeMenu() {
     sideMenu.classList.remove("open");
     menuOverlay.classList.remove("visible");
 }
 
+
 /* TOGGLE SEARCH */
+
 function toggleSearch() {
     const isHidden = searchContainer.hasAttribute("hidden");
 
@@ -31,7 +48,9 @@ function toggleSearch() {
     }
 }
 
+
 /* CLOSE SEARCH */
+
 function closeSearch() {
     if (searchContainer.hasAttribute("hidden")) {
         return;
@@ -53,7 +72,9 @@ function closeSearch() {
     }
 }
 
+
 /* CLOSE SEARCH WHEN CLICKING OUTSIDE */
+
 document.addEventListener("click", event => {
     if (searchContainer.hasAttribute("hidden")) {
         return;
@@ -70,7 +91,9 @@ document.addEventListener("click", event => {
     }
 });
 
+
 /* CLOSE SEARCH ON SCROLL */
+
 window.addEventListener(
     "scroll",
     () => {
@@ -81,7 +104,9 @@ window.addEventListener(
     }
 );
 
+
 /* RETURN HOME */
+
 function goHome() {
     currentView = "home";
     selectedPlatform = "";
@@ -115,7 +140,9 @@ function goHome() {
     closeMenu();
 }
 
+
 /* SHOW ALL GAMES */
+
 function showAllGames() {
     currentView = "category";
     selectedPlatform = "";
@@ -139,21 +166,68 @@ function showAllGames() {
     closeMenu();
 }
 
+
 /* NORMALIZE PLATFORM LABELS */
+
 function normalizePlatformLabel(value) {
     return String(value || "")
         .trim()
         .replace(/\s+/g, " ");
 }
 
+
 /*
- * GET UNIQUE PLATFORMS FROM LOADED SHEET DATA
+ * GET UNIQUE PLATFORMS
  *
- * Uses game.platforms, populated from the PLATFORM column.
- * Preserves the order of first appearance.
- * Removes duplicates without sorting alphabetically.
+ * Prefer the platform order captured from the original
+ * spreadsheet rows by app.js.
+ *
+ * The fallback supports cases where the menu is called
+ * before platformOrder has been populated.
+ *
+ * Duplicates are removed without sorting alphabetically.
  */
+
 function getAvailablePlatforms() {
+    const uniquePlatforms = new Map();
+
+    const sourcePlatforms =
+        Array.isArray(platformOrder) && platformOrder.length > 0
+            ? platformOrder
+            : getPlatformsFromGames();
+
+    for (const rawPlatform of sourcePlatforms) {
+
+        const platform =
+            normalizePlatformLabel(rawPlatform);
+
+        if (!platform) {
+            continue;
+        }
+
+        const key = normalizeText(platform);
+
+        if (
+            key === "multi-game apps" ||
+            key === "multi game apps"
+        ) {
+            continue;
+        }
+
+        if (!uniquePlatforms.has(key)) {
+            uniquePlatforms.set(key, platform);
+        }
+    }
+
+    return Array.from(uniquePlatforms.values());
+}
+
+
+/*
+ * FALLBACK: GET PLATFORMS FROM LOADED GAMES
+ */
+
+function getPlatformsFromGames() {
     const uniquePlatforms = new Map();
 
     if (!Array.isArray(games)) {
@@ -161,12 +235,15 @@ function getAvailablePlatforms() {
     }
 
     for (const game of games) {
+
         if (!Array.isArray(game.platforms)) {
             continue;
         }
 
         for (const rawPlatform of game.platforms) {
-            const platform = normalizePlatformLabel(rawPlatform);
+
+            const platform =
+                normalizePlatformLabel(rawPlatform);
 
             if (!platform) {
                 continue;
@@ -174,7 +251,6 @@ function getAvailablePlatforms() {
 
             const key = normalizeText(platform);
 
-            // These categories have dedicated menu buttons.
             if (
                 key === "multi-game apps" ||
                 key === "multi game apps"
@@ -182,7 +258,6 @@ function getAvailablePlatforms() {
                 continue;
             }
 
-            // Keep the first spelling and position encountered.
             if (!uniquePlatforms.has(key)) {
                 uniquePlatforms.set(key, platform);
             }
@@ -192,7 +267,9 @@ function getAvailablePlatforms() {
     return Array.from(uniquePlatforms.values());
 }
 
+
 /* GROUP PLATFORMS BY FAMILY */
+
 function getPlatformGroup(platform) {
     const normalized = normalizeText(platform);
 
@@ -221,10 +298,12 @@ function getPlatformGroup(platform) {
         return "Nintendo";
     }
 
-    return "Other Platforms";
+    return "Others";
 }
 
+
 /* CREATE CATEGORY BUTTON */
+
 function addCategoryButton(label, category) {
     const button = document.createElement("button");
 
@@ -255,7 +334,9 @@ function addCategoryButton(label, category) {
     platformList.appendChild(button);
 }
 
+
 /* CREATE THE PLATFORM MENU DYNAMICALLY */
+
 function displayPlatformMenu() {
     if (!platformList) {
         console.error(
@@ -266,7 +347,10 @@ function displayPlatformMenu() {
 
     platformList.replaceChildren();
 
-    // Special categories always appear first.
+    /*
+     * These two categories always appear first.
+     */
+
     addCategoryButton(
         "Multi-Game Apps",
         "multi-game-apps"
@@ -277,28 +361,26 @@ function displayPlatformMenu() {
         "dual-screen"
     );
 
-    // Obtain platforms in their original data order.
     const platforms = getAvailablePlatforms();
 
-    // Family order is intentional and remains fixed.
+    /*
+     * Fixed order for platform groups.
+     * Platforms inside each group retain their spreadsheet order.
+     */
+
     const groupOrder = [
         "Nintendo",
         "PlayStation",
         "Xbox",
-        "Others",
-        "Other Platforms"
+        "Others"
     ];
 
     const groupedPlatforms = new Map(
         groupOrder.map(group => [group, []])
     );
 
-    /*
-     * IMPORTANT:
-     * Iterate through platforms in their original order.
-     * Do not sort these arrays alphabetically.
-     */
     for (const platform of platforms) {
+
         const group = getPlatformGroup(platform);
 
         if (!groupedPlatforms.has(group)) {
@@ -306,20 +388,28 @@ function displayPlatformMenu() {
             groupOrder.push(group);
         }
 
+        /*
+         * Do not sort this array:
+         * insertion order is the spreadsheet order.
+         */
+
         groupedPlatforms.get(group).push(platform);
     }
 
-    // Render each family in the configured order.
     for (const group of groupOrder) {
-        const groupPlatforms = groupedPlatforms.get(group);
 
-        if (!groupPlatforms || groupPlatforms.length === 0) {
+        const groupPlatforms =
+            groupedPlatforms.get(group);
+
+        if (
+            !groupPlatforms ||
+            groupPlatforms.length === 0
+        ) {
             continue;
         }
 
         addMenuSeparator(group);
 
-        // Keep first-appearance order within each family.
         for (const platform of groupPlatforms) {
             addPlatformButton(platform);
         }
@@ -335,7 +425,9 @@ function displayPlatformMenu() {
     }
 }
 
+
 /* MENU SEPARATOR */
+
 function addMenuSeparator(title) {
     const separator = document.createElement("div");
 
@@ -345,7 +437,9 @@ function addMenuSeparator(title) {
     platformList.appendChild(separator);
 }
 
+
 /* PLATFORM BUTTON */
+
 function addPlatformButton(platform) {
     const button = document.createElement("button");
 
@@ -376,7 +470,14 @@ function addPlatformButton(platform) {
     platformList.appendChild(button);
 }
 
-/* DISPLAY GAMES */
+
+/*
+ * DISPLAY GAMES
+ *
+ * Uses the same compact cards as the home page.
+ * Keeps the game links and category result count.
+ */
+
 function displayGames(list) {
     gameList.hidden = false;
     gameList.replaceChildren();
@@ -399,49 +500,23 @@ function displayGames(list) {
     const fragment = document.createDocumentFragment();
 
     for (const game of list) {
-        const element = document.createElement("a");
 
-        element.className = "game";
-        element.href =
-            `game.html?game=${encodeURIComponent(game.slug)}`;
+        const port =
+            typeof getRepresentativePort === "function"
+                ? getRepresentativePort(game)
+                : null;
 
-        const name = document.createElement("h2");
+        const card = createHomeGameCard(game, port);
 
-        name.className = "game-name";
-        name.textContent = game.name;
-
-        const info = document.createElement("div");
-
-        info.className = "game-info";
-
-        if (game.year) {
-            const year = document.createElement("span");
-
-            year.textContent = game.year;
-            info.appendChild(year);
-        }
-
-        const ports = Array.isArray(game.ports)
-            ? game.ports
-            : [];
-
-        const portCount = document.createElement("span");
-
-        portCount.textContent =
-            `${ports.length} port${ports.length !== 1 ? "s" : ""}`;
-
-        info.appendChild(portCount);
-
-        element.appendChild(name);
-        element.appendChild(info);
-
-        fragment.appendChild(element);
+        fragment.appendChild(card);
     }
 
     gameList.appendChild(fragment);
 }
 
+
 /* GLOBAL SEARCH SUGGESTIONS */
+
 function searchGames() {
     const query = normalizeText(searchInput.value);
 
@@ -489,6 +564,7 @@ function searchGames() {
     const fragment = document.createDocumentFragment();
 
     for (const game of filtered) {
+
         const element = document.createElement("a");
 
         element.className = "search-result";
@@ -504,13 +580,17 @@ function searchGames() {
     searchResults.hidden = false;
 }
 
+
 /* SEARCH WHILE TYPING */
+
 searchInput.addEventListener(
     "input",
     searchGames
 );
 
+
 /* SEARCH BUTTON */
+
 searchButton.addEventListener(
     "click",
     event => {
@@ -519,13 +599,17 @@ searchButton.addEventListener(
     }
 );
 
+
 /* HOME BUTTON */
+
 homeButton.addEventListener(
     "click",
     goHome
 );
 
+
 /* MENU EVENTS */
+
 menuButton.addEventListener(
     "click",
     openMenu
@@ -541,7 +625,9 @@ menuOverlay.addEventListener(
     closeMenu
 );
 
+
 /* ALL GAMES BUTTON */
+
 allGamesButton.addEventListener(
     "click",
     showAllGames
