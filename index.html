@@ -6,48 +6,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#062e2b">
+
     <meta
         name="description"
-        content="Discover, explore and track native Android game ports."
+        content="NAPL — Discover, explore and track native Android game ports."
     >
 
-    <title>The Ports Vault — Android Game Ports</title>
+    <meta property="og:site_name" content="NAPL">
+    <meta property="og:title" content="NAPL — Android Game Ports">
+    <meta property="og:description" content="Discover, explore and track native Android game ports.">
+
+    <title>NAPL — Android Game Ports</title>
+
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "NAPL",
+        "alternateName": "NAPL Android Game Ports",
+        "url": "https://fe2rr.github.io/"
+    }
+    </script>
 
     <link rel="stylesheet" href="style.css">
-
-    <style>
-        .adsterra-label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            margin: 24px auto 8px;
-            color: #84948a;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 1.2px;
-        }
-
-        .adsterra-label::before,
-        .adsterra-label::after {
-            content: "";
-            flex: 1;
-            max-width: 100px;
-            height: 1px;
-            background: #52645a;
-        }
-
-        .adsterra-slot {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            min-height: 250px;
-            margin: 0 auto 24px;
-            overflow: hidden;
-        }
-    </style>
 </head>
 
 <body class="home-page">
@@ -65,7 +46,7 @@
     </button>
 
     <h1 id="home-button" role="button" tabindex="0">
-        The Ports Vault
+        NAPL
     </h1>
 
     <button
@@ -200,63 +181,13 @@
 
     </div>
 
-    <!-- HOME TABS -->
-
-    <nav
-        id="home-tabs"
-        class="home-tabs"
-        role="tablist"
-        aria-label="Home sections"
-    >
-
-        <button
-            id="tab-last-added"
-            class="home-tab active"
-            type="button"
-            role="tab"
-            aria-selected="true"
-            aria-controls="last-added-section"
-            data-section="last-added"
-        >
-            Last Added
-        </button>
-
-        <button
-            id="tab-popular"
-            class="home-tab"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            aria-controls="popular-section"
-            data-section="popular"
-            tabindex="-1"
-        >
-            Popular
-        </button>
-
-        <button
-            id="tab-last-updated"
-            class="home-tab"
-            type="button"
-            role="tab"
-            aria-selected="false"
-            aria-controls="last-updated-section"
-            data-section="last-updated"
-            tabindex="-1"
-        >
-            Last Updated
-        </button>
-
-    </nav>
-
-    <!-- LAST ADDED -->
-
     <section
         id="last-added-section"
         class="home-section"
-        role="tabpanel"
-        aria-labelledby="tab-last-added"
+        aria-labelledby="last-added-heading"
     >
+
+        <h2 id="last-added-heading">Last Added</h2>
 
         <div
             id="last-added-list"
@@ -274,17 +205,15 @@
 
     </section>
 
-    <!-- POPULAR -->
-
     <section
         id="popular-section"
         class="home-section"
-        role="tabpanel"
-        aria-labelledby="tab-popular"
-        hidden
+        aria-labelledby="popular-heading"
     >
 
         <div class="home-section-header">
+
+            <h2 id="popular-heading">Popular</h2>
 
             <div class="popular-tabs" aria-label="Popularity period">
 
@@ -334,15 +263,13 @@
 
     </section>
 
-    <!-- LAST UPDATED -->
-
     <section
         id="last-updated-section"
         class="home-section"
-        role="tabpanel"
-        aria-labelledby="tab-last-updated"
-        hidden
+        aria-labelledby="last-updated-heading"
     >
+
+        <h2 id="last-updated-heading">Last Updated</h2>
 
         <div
             id="last-updated-list"
@@ -368,16 +295,6 @@
 
     <div id="game-list" hidden></div>
 
-    <!-- ADSTERRA -->
-
-    <div class="adsterra-label">ADVERTISEMENT</div>
-
-    <div
-        id="adsterra-home"
-        class="adsterra-slot"
-        aria-label="Advertisement"
-    ></div>
-
 </main>
 
 <footer>
@@ -391,46 +308,6 @@
 <script src="categories.js"></script>
 <script src="navigation.js"></script>
 <script src="app.js"></script>
-
-<script>
-(function () {
-    const container = document.getElementById("adsterra-home");
-
-    if (!container) return;
-
-    const isMobile = window.matchMedia(
-        "(max-width: 767px)"
-    ).matches;
-
-    const ad = isMobile
-        ? {
-            key: "ed62153b8795508da7343fb2b14fa2b0",
-            width: 300,
-            height: 250,
-            src: "https://bellnewyork.org/22/ed62153b8795508da7343fb2b14fa2b0"
-        }
-        : {
-            key: "a9ac9cf76808c0f9aa55bba7eb77b863",
-            width: 728,
-            height: 90,
-            src: "https://bellnewyork.org/22/a9ac9cf76808c0f9aa55bba7eb77b863"
-        };
-
-    window.atOptions = {
-        key: ad.key,
-        format: "iframe",
-        height: ad.height,
-        width: ad.width,
-        params: {}
-    };
-
-    const script = document.createElement("script");
-    script.src = ad.src;
-    script.async = true;
-
-    container.appendChild(script);
-})();
-</script>
 
 </body>
 </html>
