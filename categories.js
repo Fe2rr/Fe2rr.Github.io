@@ -1,3 +1,4 @@
+
 /*
  * Show Home sections.
  */
@@ -11,6 +12,8 @@ function showHomeSections() {
     popularSection.hidden = false;
 
     categoryControls.hidden = true;
+
+    document.getElementById("home-tabs").hidden = false;
 
 }
 
@@ -27,6 +30,8 @@ function showCategoryView() {
     popularSection.hidden = true;
 
     categoryControls.hidden = false;
+
+    document.getElementById("home-tabs").hidden = true;
 
 }
 

@@ -768,3 +768,50 @@ if (lastUpdatedMore) {
         displayLastUpdated();
     });
 }
+
+/*
+ * NAPL — HOME SECTION TABS
+ *
+ * Switches between Last Added, Popular and Last Updated.
+ * Keeps the existing lists and their loading logic intact.
+ */
+
+const homeTabs = document.querySelectorAll(".home-tab");
+
+const homeSections = {
+    "last-added": lastAddedSection,
+    "popular": popularSection,
+    "last-updated": lastUpdatedSection
+};
+
+function showHomeSection(sectionName) {
+    const selectedSection = homeSections[sectionName];
+
+    if (!selectedSection) return;
+
+    // Show only the selected section.
+    Object.entries(homeSections).forEach(([name, section]) => {
+        if (!section) return;
+
+        section.hidden = name !== sectionName;
+    });
+
+    // Update the selected tab and accessibility attributes.
+    homeTabs.forEach(tab => {
+        const isActive = tab.dataset.section === sectionName;
+
+        tab.classList.toggle("active", isActive);
+        tab.setAttribute("aria-selected", String(isActive));
+        tab.tabIndex = isActive ? 0 : -1;
+    });
+}
+
+// Handle tab clicks.
+homeTabs.forEach(tab => {
+    tab.addEventListener("click", () => {
+        showHomeSection(tab.dataset.section);
+    });
+});
+
+// Start with Last Added selected.
+showHomeSection("last-added");
