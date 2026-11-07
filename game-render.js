@@ -1,11 +1,9 @@
+
 /*
  * NAPL — GAME RENDER
  *
- * Renders game information and Android port cards.
- * Displays real ratings loaded from the Cloudflare Worker.
- *
- * Preserves existing navigation, links, notes,
- * expandable descriptions and Multi-Game App support.
+ * Game information, port cards and ratings.
+ * Connected to the Cloudflare Workers ratings API.
  */
 
 
@@ -57,7 +55,6 @@ function injectRatingStyles() {
     }
 
     const style = document.createElement("style");
-
     style.id = "napl-rating-styles";
 
     style.textContent = `
@@ -74,7 +71,6 @@ function injectRatingStyles() {
             display: inline-flex;
             color: #e5ad42;
             font-size: 17px;
-            letter-spacing: 0;
             white-space: nowrap;
         }
 
@@ -185,6 +181,11 @@ function injectRatingStyles() {
             background: #285044;
         }
 
+        .port-rating-option:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+        }
+
         .port-rating-option-stars {
             color: #e5ad42;
             letter-spacing: 1px;
@@ -256,12 +257,64 @@ function injectRatingStyles() {
 
 
 /* ==================================================
+   GLOBAL POPOVER MANAGEMENT
+   ================================================== */
+
+let ratingPopoverEventsInitialized = false;
+
+function initializeRatingPopoverEvents() {
+    if (ratingPopoverEventsInitialized) {
+        return;
+    }
+
+    ratingPopoverEventsInitialized = true;
+
+    document.addEventListener("click", event => {
+        const clickedRating = event.target.closest(".port-rating");
+
+        document.querySelectorAll(".port-rating").forEach(container => {
+            if (container !== clickedRating) {
+                closeRatingPopover(container);
+            }
+        });
+    });
+
+    document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") {
+            return;
+        }
+
+        document.querySelectorAll(".port-rating").forEach(container => {
+            closeRatingPopover(container);
+        });
+    });
+}
+
+
+function closeRatingPopover(container) {
+    if (!container) {
+        return;
+    }
+
+    const popover = container.querySelector(".port-rating-popover");
+    const button = container.querySelector(".port-rating-button");
+
+    if (popover) {
+        popover.hidden = true;
+    }
+
+    if (button) {
+        button.setAttribute("aria-expanded", "false");
+    }
+}
+
+
+/* ==================================================
    RATING STARS
    ================================================== */
 
 function createRatingStars(average) {
     const stars = document.createElement("span");
-
     stars.className = "port-rating-stars";
 
     stars.setAttribute(
@@ -271,12 +324,10 @@ function createRatingStars(average) {
 
     for (let i = 1; i <= 5; i++) {
         const star = document.createElement("span");
-
         star.className = "port-rating-star";
         star.textContent = "★";
 
         const fill = document.createElement("span");
-
         fill.className = "port-rating-star-fill";
         fill.textContent = "★";
 
@@ -296,7 +347,7 @@ function createRatingStars(average) {
 
 
 /* ==================================================
-   FLOATING RATING POPOVER
+   PORT RATING
    ================================================== */
 
 function createPortRating(port, ratings, ratingActions) {
@@ -305,25 +356,22 @@ function createPortRating(port, ratings, ratingActions) {
     }
 
     const container = document.createElement("div");
-
     container.className = "port-rating";
 
     let currentRating = ratings?.[port.portId] || {};
 
     /* Rating display */
 
-    const starsElement = createRatingStars(
+    let starsElement = createRatingStars(
         Number(currentRating.avg) || 0
     );
 
     container.appendChild(starsElement);
 
     const averageElement = document.createElement("span");
-
     averageElement.className = "port-rating-average";
 
     const countElement = document.createElement("span");
-
     countElement.className = "port-rating-count";
 
     function updateRatingDisplay(rating) {
@@ -332,18 +380,12 @@ function createPortRating(port, ratings, ratingActions) {
         const average = Number(currentRating.avg) || 0;
         const votes = Number(currentRating.votes) || 0;
 
-        starsElement.replaceWith(
-            createRatingStars(votes > 0 ? average : 0)
+        const newStars = createRatingStars(
+            votes > 0 ? average : 0
         );
 
-        const newStars = container.querySelector(
-            ".port-rating-stars"
-        );
-
-        if (newStars) {
-            // Keep the current reference for future updates.
-            starsElement.replaceWith(newStars);
-        }
+        starsElement.replaceWith(newStars);
+        starsElement = newStars;
 
         averageElement.textContent =
             votes > 0 ? average.toFixed(1) : "—";
@@ -376,7 +418,7 @@ function createPortRating(port, ratings, ratingActions) {
     rateButton.textContent = "Rate";
     rateButton.setAttribute("aria-expanded", "false");
 
-    /* Floating popover */
+    /* Popover */
 
     const popover = document.createElement("div");
 
@@ -394,8 +436,6 @@ function createPortRating(port, ratings, ratingActions) {
     description.textContent = "Choose your rating";
 
     popover.append(heading, description);
-
-    /* Rating options */
 
     const options = [
         "AI Slop",
@@ -424,6 +464,26 @@ function createPortRating(port, ratings, ratingActions) {
     feedback.className = "port-rating-feedback";
     feedback.textContent = "Select one of the five options.";
 
+    function setFeedback(message, type = "") {
+        feedback.className = "port-rating-feedback";
+
+        if (type) {
+            feedback.classList.add(type);
+        }
+
+        feedback.textContent = message;
+    }
+
+    function updateSubmitButton() {
+        submit.disabled =
+            !selectedRating ||
+            loadingVote ||
+            submitting;
+
+        submit.textContent =
+            previousRating > 0 ? "Update vote" : "Submit vote";
+    }
+
     function selectRating(score) {
         selectedRating = score;
 
@@ -434,15 +494,11 @@ function createPortRating(port, ratings, ratingActions) {
             );
         });
 
-        submit.disabled = submitting || loadingVote;
+        updateSubmitButton();
 
-        submit.textContent =
-            previousRating > 0 ? "Update vote" : "Submit vote";
-
-        feedback.className = "port-rating-feedback";
-
-        feedback.textContent =
-            `Selected: ${options[score - 1]}`;
+        setFeedback(
+            `Selected: ${options[score - 1]}`
+        );
     }
 
     options.forEach((label, index) => {
@@ -454,11 +510,9 @@ function createPortRating(port, ratings, ratingActions) {
         option.className = "port-rating-option";
 
         const optionLabel = document.createElement("span");
-
         optionLabel.textContent = label;
 
         const optionStars = document.createElement("span");
-
         optionStars.className = "port-rating-option-stars";
         optionStars.textContent = "★".repeat(score);
 
@@ -473,7 +527,6 @@ function createPortRating(port, ratings, ratingActions) {
         });
 
         optionButtons.push(option);
-
         popover.appendChild(option);
     });
 
@@ -481,18 +534,25 @@ function createPortRating(port, ratings, ratingActions) {
 
     async function loadPreviousVote() {
         if (!ratingActions?.getMyVote) {
-            feedback.textContent =
-                "Rating service is unavailable.";
-
+            setFeedback(
+                "Rating service is unavailable.",
+                "error"
+            );
             return;
         }
 
         loadingVote = true;
 
-        submit.disabled = true;
+        selectedRating = 0;
 
-        feedback.className = "port-rating-feedback";
-        feedback.textContent = "Loading your previous vote...";
+        optionButtons.forEach(button => {
+            button.classList.remove("selected");
+            button.disabled = true;
+        });
+
+        updateSubmitButton();
+
+        setFeedback("Loading your previous vote...");
 
         try {
             const vote = await ratingActions.getMyVote(
@@ -501,30 +561,50 @@ function createPortRating(port, ratings, ratingActions) {
 
             previousRating = Number(vote) || 0;
 
-            if (previousRating >= 1 && previousRating <= 5) {
-                selectRating(previousRating);
+            if (
+                Number.isInteger(previousRating) &&
+                previousRating >= 1 &&
+                previousRating <= 5
+            ) {
+                selectedRating = previousRating;
 
-                feedback.textContent =
-                    `Your current rating: ${options[previousRating - 1]}`;
+                optionButtons[previousRating - 1]
+                    .classList.add("selected");
+
+                setFeedback(
+                    `Your current rating: ${options[previousRating - 1]}`
+                );
             } else {
+                previousRating = 0;
                 selectedRating = 0;
 
-                feedback.textContent =
-                    "Select one of the five options.";
+                setFeedback(
+                    "Select one of the five options."
+                );
             }
+
         } catch (error) {
-            console.error("Could not load previous vote:", error);
+            console.error(
+                "Could not load previous vote:",
+                error
+            );
 
-            feedback.className =
-                "port-rating-feedback error";
+            previousRating = 0;
+            selectedRating = 0;
 
-            feedback.textContent =
-                "Could not load your previous vote.";
+            setFeedback(
+                error.message || "Could not load your previous vote.",
+                "error"
+            );
+
         } finally {
             loadingVote = false;
 
-            submit.disabled =
-                selectedRating === 0 || submitting;
+            optionButtons.forEach(button => {
+                button.disabled = false;
+            });
+
+            updateSubmitButton();
         }
     }
 
@@ -534,6 +614,7 @@ function createPortRating(port, ratings, ratingActions) {
         if (
             !selectedRating ||
             submitting ||
+            loadingVote ||
             !ratingActions?.submitVote
         ) {
             return;
@@ -541,15 +622,13 @@ function createPortRating(port, ratings, ratingActions) {
 
         submitting = true;
 
-        submit.disabled = true;
-        submit.textContent = "Submitting...";
-
         optionButtons.forEach(button => {
             button.disabled = true;
         });
 
-        feedback.className = "port-rating-feedback";
-        feedback.textContent = "Sending your rating...";
+        updateSubmitButton();
+
+        setFeedback("Sending your rating...");
 
         try {
             const result = await ratingActions.submitVote(
@@ -561,121 +640,75 @@ function createPortRating(port, ratings, ratingActions) {
 
             if (result?.rating) {
                 updateRatingDisplay(result.rating);
+            } else {
+                /*
+                 * The vote was accepted, but the public
+                 * rating refresh did not return this port.
+                 */
+                console.warn(
+                    "Vote saved, but updated public rating was unavailable."
+                );
             }
 
-            feedback.className =
-                "port-rating-feedback success";
-
-            feedback.textContent =
-                "Your rating has been saved!";
-
-            submit.textContent = "Saved";
+            setFeedback(
+                "Your rating has been saved!",
+                "success"
+            );
 
             rateButton.textContent = "Rated";
 
+            submit.textContent = "Saved";
+
             setTimeout(() => {
-                popover.hidden = true;
-
-                rateButton.setAttribute(
-                    "aria-expanded",
-                    "false"
-                );
-
+                closeRatingPopover(container);
                 rateButton.textContent = "Rate";
             }, 900);
 
         } catch (error) {
-            console.error("Vote submission failed:", error);
+            console.error(
+                "Vote submission failed:",
+                error
+            );
 
-            feedback.className =
-                "port-rating-feedback error";
+            setFeedback(
+                error.message || "Could not submit your rating.",
+                "error"
+            );
 
-            feedback.textContent =
-                error.message || "Could not submit your rating.";
-
-            submit.textContent =
-                previousRating > 0 ? "Update vote" : "Submit vote";
-
-            submit.disabled = false;
+        } finally {
+            submitting = false;
 
             optionButtons.forEach(button => {
                 button.disabled = false;
             });
 
-        } finally {
-            submitting = false;
-
-            if (!popover.hidden) {
-                submit.disabled = selectedRating === 0;
-
-                optionButtons.forEach(button => {
-                    button.disabled = false;
-                });
-            }
+            updateSubmitButton();
         }
     });
 
     popover.append(submit, feedback);
 
-    /* Open and close popover */
+    /* Open popover */
 
     rateButton.addEventListener("click", async event => {
         event.stopPropagation();
 
-        const opening = popover.hidden;
-
-        // Close all other rating popovers.
-        document.querySelectorAll(".port-rating-popover")
-            .forEach(element => {
-                element.hidden = true;
-            });
-
-        document.querySelectorAll(".port-rating-button")
-            .forEach(element => {
-                element.setAttribute(
-                    "aria-expanded",
-                    "false"
-                );
-            });
-
-        popover.hidden = !opening;
-
-        rateButton.setAttribute(
-            "aria-expanded",
-            String(opening)
-        );
-
-        if (opening) {
-            await loadPreviousVote();
+        if (!popover.hidden) {
+            closeRatingPopover(container);
+            return;
         }
-    });
 
-    /* Close when clicking outside */
+        document.querySelectorAll(".port-rating").forEach(other => {
+            if (other !== container) {
+                closeRatingPopover(other);
+            }
+        });
 
-    document.addEventListener("click", event => {
-        if (!container.contains(event.target)) {
-            popover.hidden = true;
+        popover.hidden = false;
 
-            rateButton.setAttribute(
-                "aria-expanded",
-                "false"
-            );
-        }
-    });
+        rateButton.setAttribute("aria-expanded", "true");
 
-    /* Close with Escape */
-
-    container.addEventListener("keydown", event => {
-        if (event.key === "Escape") {
-            popover.hidden = true;
-
-            rateButton.setAttribute(
-                "aria-expanded",
-                "false"
-            );
-
-            rateButton.focus();
-        }
+        await loadPreviousVote();
     });
 
     container.append(rateButton, popover);
@@ -694,11 +727,9 @@ function createPortDetail(label, value, url = "") {
     }
 
     const detail = document.createElement("div");
-
     detail.className = "port-detail";
 
     const labelElement = document.createElement("span");
-
     labelElement.className = "port-detail-label";
     labelElement.textContent = label;
 
@@ -765,7 +796,6 @@ function createExpandableDescription(description) {
             text.style.display = "block";
             text.style.overflow = "visible";
             text.style.webkitLineClamp = "unset";
-
             return;
         }
 
@@ -930,20 +960,15 @@ function displayGamesUsingApp(
     toggle.type = "button";
     toggle.className = "games-using-app-toggle";
 
-    toggle.setAttribute(
-        "aria-expanded",
-        "false"
-    );
+    toggle.setAttribute("aria-expanded", "false");
 
     const title = document.createElement("span");
-
     title.textContent = titleText;
 
     const arrow = document.createElement("span");
 
     arrow.className = "games-using-app-arrow";
     arrow.textContent = "▼";
-
     arrow.setAttribute("aria-hidden", "true");
 
     toggle.append(title, arrow);
@@ -967,9 +992,7 @@ function displayGamesUsingApp(
 
         if (game.year) {
             const year = document.createElement("span");
-
             year.textContent = ` (${game.year})`;
-
             link.appendChild(year);
         }
 
@@ -1026,7 +1049,6 @@ function displayPortCard(
 
     top.appendChild(title);
 
-    // Ratings appear only on individual port cards.
     const rating = createPortRating(
         port,
         ratings,
@@ -1167,9 +1189,8 @@ export function displayGame(
         return;
     }
 
-    /* Inject rating styles once */
-
     injectRatingStyles();
+    initializeRatingPopoverEvents();
 
     /* Game information */
 
@@ -1195,6 +1216,7 @@ export function displayGame(
             "No ports are currently listed for this game.";
 
         portList.appendChild(emptyMessage);
+
     } else {
         game.ports.forEach((port, index) => {
             portList.appendChild(
