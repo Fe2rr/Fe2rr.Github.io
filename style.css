@@ -2464,3 +2464,72 @@ a {
         font-size: 10px;
     }
 }
+
+/* =========================================================
+   NAPL — PORT RATINGS
+   Ajustes de integración y adaptación a móviles
+   ========================================================= */
+
+/* Evitar que el título y las valoraciones se compriman */
+#port-list .port-top {
+    position: relative;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+/* Mantener las valoraciones por encima de otros elementos */
+#port-list .port-rating {
+    position: relative;
+    z-index: 30;
+    min-width: 0;
+}
+
+/* Popover flotante */
+#port-list .port-rating-popover {
+    z-index: 40;
+}
+
+/* Adaptación a móviles */
+@media (max-width: 520px) {
+
+    #port-list .port-top {
+        align-items: flex-start;
+        row-gap: 10px;
+    }
+
+    #port-list .port-top > .port-title {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+
+    #port-list .port-rating {
+        width: 100%;
+        margin-left: 0;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+
+    #port-list .port-rating-popover {
+        right: auto;
+        left: 0;
+        max-width: calc(100vw - 40px);
+    }
+}
+
+/* Pantallas muy pequeñas */
+@media (max-width: 350px) {
+
+    #port-list .port-rating {
+        gap: 5px;
+    }
+
+    #port-list .port-rating-stars {
+        font-size: 13px;
+    }
+
+    #port-list .port-rating-button {
+        padding: 5px 7px;
+    }
+}
+
