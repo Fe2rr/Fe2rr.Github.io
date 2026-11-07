@@ -1,3 +1,4 @@
+
 /*
  * NAPL — GAME DATA
  *
@@ -245,6 +246,13 @@ function groupGameRows(rows) {
             "PROYECTO"
         ]);
 
+        // Unique identifier assigned to this port/project.
+        const portId = getGameColumn(row, [
+            "PORTS_ID",
+            "PORT ID",
+            "PORT_ID"
+        ]);
+
         const link = getGameColumn(row, [
             "LINK",
             "PROJECT LINK",
@@ -393,6 +401,7 @@ function groupGameRows(rows) {
             year: currentYear,
             platform,
             project,
+            portId,
             link,
             url,
             dataUrl,
