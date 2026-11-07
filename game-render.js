@@ -1,4 +1,3 @@
-
 /*
  * NAPL — GAME RENDER
  *
@@ -63,7 +62,8 @@ function injectRatingStyles() {
             display: flex;
             align-items: center;
             gap: 7px;
-            margin-left: auto;
+            width: 100%;
+            margin-left: 0;
             flex-shrink: 0;
         }
 
@@ -109,6 +109,7 @@ function injectRatingStyles() {
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
+            margin-left: auto;
         }
 
         .port-rating-button:hover {
@@ -1218,7 +1219,43 @@ export function displayGame(
         portList.appendChild(emptyMessage);
 
     } else {
-        game.ports.forEach((port, index) => {
+        /*
+         * Sort ports by rating:
+         * - Rated ports first, highest average first.
+         * - Ports without votes remain at the bottom.
+         * - Equal ratings (and unrated ports) keep their original order.
+         */
+        const sortedPorts = game.ports
+            .map((port, originalIndex) => ({
+                port,
+                originalIndex,
+                rating: ratings?.[port.portId] || {}
+            }))
+            .sort((a, b) => {
+                const aVotes = Number(a.rating.votes) || 0;
+                const bVotes = Number(b.rating.votes) || 0;
+
+                const aHasVotes = aVotes > 0;
+                const bHasVotes = bVotes > 0;
+
+                if (aHasVotes !== bHasVotes) {
+                    return aHasVotes ? -1 : 1;
+                }
+
+                if (aHasVotes && bHasVotes) {
+                    const averageDifference =
+                        (Number(b.rating.avg) || 0) -
+                        (Number(a.rating.avg) || 0);
+
+                    if (averageDifference !== 0) {
+                        return averageDifference;
+                    }
+                }
+
+                return a.originalIndex - b.originalIndex;
+            });
+
+        sortedPorts.forEach(({ port }, index) => {
             portList.appendChild(
                 displayPortCard(
                     port,
