@@ -3,7 +3,8 @@
  * NAPL — GAME RENDER
  *
  * Renders game information and Android port cards.
- * Includes floating port rating popovers.
+ * Displays real ratings loaded from the Cloudflare Worker.
+ *
  * Preserves existing navigation, links, notes,
  * expandable descriptions and Multi-Game App support.
  */
@@ -57,6 +58,7 @@ function injectRatingStyles() {
     }
 
     const style = document.createElement("style");
+
     style.id = "napl-rating-styles";
 
     style.textContent = `
@@ -227,8 +229,17 @@ function injectRatingStyles() {
                 font-size: 12px;
             }
 
+            .port-rating-count {
+                font-size: 10px;
+            }
+
             .port-rating-button {
                 padding: 5px 8px;
+            }
+
+            .port-rating-popover {
+                right: 0;
+                width: 250px;
             }
         }
     `;
@@ -281,7 +292,7 @@ function createRatingStars(average) {
    FLOATING RATING POPOVER
    ================================================== */
 
-function createPortRating(port) {
+function createPortRating(port, ratings) {
     // Ports without an ID cannot receive individual ratings.
     if (!port.portId) {
         return null;
@@ -292,35 +303,46 @@ function createPortRating(port) {
     container.className = "port-rating";
 
     /*
-     * Temporary values.
-     * These will be replaced with real Worker data.
+     * Retrieve the real rating using PORTS_ID.
+     * The API returns avg, votes and score.
+     *
+     * The displayed rating uses avg, not score.
+     * score is reserved for future ranking features.
      */
 
-    const average = 0;
-    const voteCount = 0;
+    const rating = ratings?.[port.portId] || {};
+
+    const average = Number(rating.avg) || 0;
+    const voteCount = Number(rating.votes) || 0;
 
     container.appendChild(
-        createRatingStars(average)
+        createRatingStars(
+            voteCount > 0 ? average : 0
+        )
     );
+
+    /* Average */
 
     const averageElement = document.createElement("span");
 
     averageElement.className = "port-rating-average";
 
-    averageElement.textContent = average
+    averageElement.textContent = voteCount > 0
         ? average.toFixed(1)
         : "—";
 
     container.appendChild(averageElement);
 
-    if (voteCount > 0) {
-        const count = document.createElement("span");
+    /* Vote count */
 
-        count.className = "port-rating-count";
-        count.textContent = `(${voteCount})`;
+    const count = document.createElement("span");
 
-        container.appendChild(count);
-    }
+    count.className = "port-rating-count";
+    count.textContent = `(${voteCount})`;
+
+    count.title = `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`;
+
+    container.appendChild(count);
 
     /* Rate button */
 
@@ -424,7 +446,8 @@ function createPortRating(port) {
 
         /*
          * Vote submission will be connected
-         * to the Cloudflare Worker API.
+         * to the Cloudflare Worker API
+         * in the next implementation step.
          */
 
         feedback.textContent =
@@ -819,7 +842,7 @@ function displayGamesUsingApp(
    PORT CARD
    ================================================== */
 
-function displayPortCard(port, index, allRows) {
+function displayPortCard(port, index, allRows, ratings) {
     const card = document.createElement("article");
 
     card.className = "port port-card";
@@ -839,8 +862,8 @@ function displayPortCard(port, index, allRows) {
 
     top.appendChild(title);
 
-    // Rating appears only on individual port cards.
-    const rating = createPortRating(port);
+    // Ratings appear only on individual port cards.
+    const rating = createPortRating(port, ratings);
 
     if (rating) {
         top.appendChild(rating);
@@ -948,7 +971,7 @@ function displayPortCard(port, index, allRows) {
    DISPLAY SELECTED GAME
    ================================================== */
 
-export function displayGame(game, allRows) {
+export function displayGame(game, allRows, ratings = {}) {
     const gameHeader =
         document.getElementById("game-header");
 
@@ -1002,7 +1025,12 @@ export function displayGame(game, allRows) {
     } else {
         game.ports.forEach((port, index) => {
             portList.appendChild(
-                displayPortCard(port, index, allRows)
+                displayPortCard(
+                    port,
+                    index,
+                    allRows,
+                    ratings
+                )
             );
         });
     }
