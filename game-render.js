@@ -1,4 +1,3 @@
-
 /*
  * NAPL — GAME RENDER
  *
@@ -216,6 +215,14 @@ function injectRatingStyles() {
             font-size: 11px;
         }
 
+        .port-rating-feedback.error {
+            color: #ff9999;
+        }
+
+        .port-rating-feedback.success {
+            color: #8ed9ae;
+        }
+
         @media (max-width: 480px) {
             .port-rating {
                 gap: 5px;
@@ -292,8 +299,7 @@ function createRatingStars(average) {
    FLOATING RATING POPOVER
    ================================================== */
 
-function createPortRating(port, ratings) {
-    // Ports without an ID cannot receive individual ratings.
+function createPortRating(port, ratings, ratingActions) {
     if (!port.portId) {
         return null;
     }
@@ -302,47 +308,64 @@ function createPortRating(port, ratings) {
 
     container.className = "port-rating";
 
-    /*
-     * Retrieve the real rating using PORTS_ID.
-     * The API returns avg, votes and score.
-     *
-     * The displayed rating uses avg, not score.
-     * score is reserved for future ranking features.
-     */
+    let currentRating = ratings?.[port.portId] || {};
 
-    const rating = ratings?.[port.portId] || {};
+    /* Rating display */
 
-    const average = Number(rating.avg) || 0;
-    const voteCount = Number(rating.votes) || 0;
-
-    container.appendChild(
-        createRatingStars(
-            voteCount > 0 ? average : 0
-        )
+    const starsElement = createRatingStars(
+        Number(currentRating.avg) || 0
     );
 
-    /* Average */
+    container.appendChild(starsElement);
 
     const averageElement = document.createElement("span");
 
     averageElement.className = "port-rating-average";
 
-    averageElement.textContent = voteCount > 0
-        ? average.toFixed(1)
-        : "—";
+    const countElement = document.createElement("span");
 
-    container.appendChild(averageElement);
+    countElement.className = "port-rating-count";
 
-    /* Vote count */
+    function updateRatingDisplay(rating) {
+        currentRating = rating || {};
 
-    const count = document.createElement("span");
+        const average = Number(currentRating.avg) || 0;
+        const votes = Number(currentRating.votes) || 0;
 
-    count.className = "port-rating-count";
-    count.textContent = `(${voteCount})`;
+        starsElement.replaceWith(
+            createRatingStars(votes > 0 ? average : 0)
+        );
 
-    count.title = `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`;
+        const newStars = container.querySelector(
+            ".port-rating-stars"
+        );
 
-    container.appendChild(count);
+        if (newStars) {
+            // Keep the current reference for future updates.
+            starsElement.replaceWith(newStars);
+        }
+
+        averageElement.textContent =
+            votes > 0 ? average.toFixed(1) : "—";
+
+        countElement.textContent = `(${votes})`;
+
+        countElement.title =
+            `${votes} ${votes === 1 ? "vote" : "votes"}`;
+    }
+
+    const initialAverage = Number(currentRating.avg) || 0;
+    const initialVotes = Number(currentRating.votes) || 0;
+
+    averageElement.textContent =
+        initialVotes > 0 ? initialAverage.toFixed(1) : "—";
+
+    countElement.textContent = `(${initialVotes})`;
+
+    countElement.title =
+        `${initialVotes} ${initialVotes === 1 ? "vote" : "votes"}`;
+
+    container.append(averageElement, countElement);
 
     /* Rate button */
 
@@ -383,8 +406,44 @@ function createPortRating(port, ratings) {
     ];
 
     let selectedRating = 0;
+    let previousRating = 0;
+    let loadingVote = false;
+    let submitting = false;
 
     const optionButtons = [];
+
+    const submit = document.createElement("button");
+
+    submit.type = "button";
+    submit.className = "port-rating-submit";
+    submit.textContent = "Submit vote";
+    submit.disabled = true;
+
+    const feedback = document.createElement("p");
+
+    feedback.className = "port-rating-feedback";
+    feedback.textContent = "Select one of the five options.";
+
+    function selectRating(score) {
+        selectedRating = score;
+
+        optionButtons.forEach((button, index) => {
+            button.classList.toggle(
+                "selected",
+                index + 1 === score
+            );
+        });
+
+        submit.disabled = submitting || loadingVote;
+
+        submit.textContent =
+            previousRating > 0 ? "Update vote" : "Submit vote";
+
+        feedback.className = "port-rating-feedback";
+
+        feedback.textContent =
+            `Selected: ${options[score - 1]}`;
+    }
 
     options.forEach((label, index) => {
         const score = index + 1;
@@ -406,18 +465,11 @@ function createPortRating(port, ratings) {
         option.append(optionLabel, optionStars);
 
         option.addEventListener("click", () => {
-            selectedRating = score;
+            if (loadingVote || submitting) {
+                return;
+            }
 
-            optionButtons.forEach(button => {
-                button.classList.toggle(
-                    "selected",
-                    button === option
-                );
-            });
-
-            submit.disabled = false;
-
-            feedback.textContent = `Selected: ${label}`;
+            selectRating(score);
         });
 
         optionButtons.push(option);
@@ -425,47 +477,149 @@ function createPortRating(port, ratings) {
         popover.appendChild(option);
     });
 
-    /* Submit button */
+    /* Load previous vote */
 
-    const submit = document.createElement("button");
+    async function loadPreviousVote() {
+        if (!ratingActions?.getMyVote) {
+            feedback.textContent =
+                "Rating service is unavailable.";
 
-    submit.type = "button";
-    submit.className = "port-rating-submit";
-    submit.textContent = "Submit vote";
-    submit.disabled = true;
-
-    const feedback = document.createElement("p");
-
-    feedback.className = "port-rating-feedback";
-    feedback.textContent = "Select one of the five options.";
-
-    submit.addEventListener("click", () => {
-        if (!selectedRating) {
             return;
         }
 
-        /*
-         * Vote submission will be connected
-         * to the Cloudflare Worker API
-         * in the next implementation step.
-         */
+        loadingVote = true;
 
-        feedback.textContent =
-            `Selected rating: ${selectedRating}/5.`;
+        submit.disabled = true;
 
-        popover.hidden = true;
+        feedback.className = "port-rating-feedback";
+        feedback.textContent = "Loading your previous vote...";
 
-        rateButton.setAttribute(
-            "aria-expanded",
-            "false"
-        );
+        try {
+            const vote = await ratingActions.getMyVote(
+                port.portId
+            );
+
+            previousRating = Number(vote) || 0;
+
+            if (previousRating >= 1 && previousRating <= 5) {
+                selectRating(previousRating);
+
+                feedback.textContent =
+                    `Your current rating: ${options[previousRating - 1]}`;
+            } else {
+                selectedRating = 0;
+
+                feedback.textContent =
+                    "Select one of the five options.";
+            }
+        } catch (error) {
+            console.error("Could not load previous vote:", error);
+
+            feedback.className =
+                "port-rating-feedback error";
+
+            feedback.textContent =
+                "Could not load your previous vote.";
+        } finally {
+            loadingVote = false;
+
+            submit.disabled =
+                selectedRating === 0 || submitting;
+        }
+    }
+
+    /* Submit vote */
+
+    submit.addEventListener("click", async () => {
+        if (
+            !selectedRating ||
+            submitting ||
+            !ratingActions?.submitVote
+        ) {
+            return;
+        }
+
+        submitting = true;
+
+        submit.disabled = true;
+        submit.textContent = "Submitting...";
+
+        optionButtons.forEach(button => {
+            button.disabled = true;
+        });
+
+        feedback.className = "port-rating-feedback";
+        feedback.textContent = "Sending your rating...";
+
+        try {
+            const result = await ratingActions.submitVote(
+                port.portId,
+                selectedRating
+            );
+
+            previousRating = selectedRating;
+
+            if (result?.rating) {
+                updateRatingDisplay(result.rating);
+            }
+
+            feedback.className =
+                "port-rating-feedback success";
+
+            feedback.textContent =
+                "Your rating has been saved!";
+
+            submit.textContent = "Saved";
+
+            rateButton.textContent = "Rated";
+
+            setTimeout(() => {
+                popover.hidden = true;
+
+                rateButton.setAttribute(
+                    "aria-expanded",
+                    "false"
+                );
+
+                rateButton.textContent = "Rate";
+            }, 900);
+
+        } catch (error) {
+            console.error("Vote submission failed:", error);
+
+            feedback.className =
+                "port-rating-feedback error";
+
+            feedback.textContent =
+                error.message || "Could not submit your rating.";
+
+            submit.textContent =
+                previousRating > 0 ? "Update vote" : "Submit vote";
+
+            submit.disabled = false;
+
+            optionButtons.forEach(button => {
+                button.disabled = false;
+            });
+
+        } finally {
+            submitting = false;
+
+            if (!popover.hidden) {
+                submit.disabled = selectedRating === 0;
+
+                optionButtons.forEach(button => {
+                    button.disabled = false;
+                });
+            }
+        }
     });
 
     popover.append(submit, feedback);
 
     /* Open and close popover */
 
-    rateButton.addEventListener("click", event => {
+    rateButton.addEventListener("click", async event => {
         event.stopPropagation();
 
         const opening = popover.hidden;
@@ -490,6 +644,10 @@ function createPortRating(port, ratings) {
             "aria-expanded",
             String(opening)
         );
+
+        if (opening) {
+            await loadPreviousVote();
+        }
     });
 
     /* Close when clicking outside */
@@ -713,7 +871,7 @@ function displayGameSummary(game, parentElement) {
         year.className = "game-summary-year";
         year.textContent = game.year;
 
-        metadata.appendChild(year);
+        metadata.append(year);
     }
 
     if (game.genre) {
@@ -722,7 +880,7 @@ function displayGameSummary(game, parentElement) {
         genre.className = "game-summary-genre";
         genre.textContent = game.genre;
 
-        metadata.appendChild(genre);
+        metadata.append(genre);
     }
 
     const platform = document.createElement("span");
@@ -730,7 +888,7 @@ function displayGameSummary(game, parentElement) {
     platform.className = "game-summary-genre";
     platform.textContent = "Android";
 
-    metadata.appendChild(platform);
+    metadata.append(platform);
 
     info.appendChild(metadata);
 
@@ -842,7 +1000,13 @@ function displayGamesUsingApp(
    PORT CARD
    ================================================== */
 
-function displayPortCard(port, index, allRows, ratings) {
+function displayPortCard(
+    port,
+    index,
+    allRows,
+    ratings,
+    ratingActions
+) {
     const card = document.createElement("article");
 
     card.className = "port port-card";
@@ -863,7 +1027,11 @@ function displayPortCard(port, index, allRows, ratings) {
     top.appendChild(title);
 
     // Ratings appear only on individual port cards.
-    const rating = createPortRating(port, ratings);
+    const rating = createPortRating(
+        port,
+        ratings,
+        ratingActions
+    );
 
     if (rating) {
         top.appendChild(rating);
@@ -971,7 +1139,12 @@ function displayPortCard(port, index, allRows, ratings) {
    DISPLAY SELECTED GAME
    ================================================== */
 
-export function displayGame(game, allRows, ratings = {}) {
+export function displayGame(
+    game,
+    allRows,
+    ratings = {},
+    ratingActions = null
+) {
     const gameHeader =
         document.getElementById("game-header");
 
@@ -1029,7 +1202,8 @@ export function displayGame(game, allRows, ratings = {}) {
                     port,
                     index,
                     allRows,
-                    ratings
+                    ratings,
+                    ratingActions
                 )
             );
         });
