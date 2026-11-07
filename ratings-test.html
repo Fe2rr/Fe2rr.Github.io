@@ -8,9 +8,7 @@
   <title>NAPL — Ratings Test</title>
 
   <style>
-    * {
-      box-sizing: border-box;
-    }
+    * { box-sizing: border-box; }
 
     body {
       margin: 0;
@@ -102,23 +100,13 @@
       min-height: 40px;
     }
 
-    .success {
-      color: #79dda8;
-    }
-
-    .error {
-      color: #ff8585;
-    }
+    .success { color: #79dda8; }
+    .error { color: #ff8585; }
 
     .warning {
       color: #e8c77b;
       font-size: 13px;
       line-height: 1.5;
-    }
-
-    .stars {
-      color: #f5c75e;
-      font-size: 21px;
     }
 
     .small {
@@ -138,21 +126,15 @@
   <section class="panel">
     <h2>1. Worker connection</h2>
     <button id="checkRatings">Check ratings API</button>
-    <div id="ratingsResult" class="result">
-      Not tested yet.
-    </div>
+    <div id="ratingsResult" class="result">Not tested yet.</div>
   </section>
 
   <section class="panel">
     <h2>2. User token</h2>
     <button id="getToken">Get or reuse token</button>
     <button id="checkVotes" class="secondary">Load my votes</button>
-    <div id="tokenResult" class="result">
-      No token loaded.
-    </div>
-    <div id="votesResult" class="result">
-      Votes not loaded.
-    </div>
+    <div id="tokenResult" class="result">No token loaded.</div>
+    <div id="votesResult" class="result">Votes not loaded.</div>
   </section>
 
   <section class="panel">
@@ -164,12 +146,9 @@
     </p>
 
     <label for="portId">PORTS_ID</label>
-    <input
-      id="portId"
-      type="text"
+    <input id="portId" type="text"
       placeholder="Example: castlevania-symphony-android"
-      autocomplete="off"
-    >
+      autocomplete="off">
 
     <label for="stars">Rating</label>
     <select id="stars">
@@ -181,29 +160,25 @@
     </select>
 
     <button id="submitVote">Submit rating</button>
-    <div id="voteResult" class="result">
-      No rating submitted.
-    </div>
+    <div id="voteResult" class="result">No rating submitted.</div>
   </section>
 
   <section class="panel">
     <h2>4. Refresh ratings</h2>
     <button id="refreshRatings">Refresh ratings</button>
-    <div id="refreshResult" class="result">
-      Not tested yet.
-    </div>
+    <div id="refreshResult" class="result">Not tested yet.</div>
   </section>
 
   <p class="small">
     NAPL — Native Android Port List<br>
-    Temporary diagnostic page. You can delete this file after testing.
+    Temporary diagnostic page.
   </p>
 
 </main>
 
 <script>
 const API =
-  "https://ports-ratings.federicoxastro.workers.dev";
+  "https://ports-ratings-worker.federicoxastro.workers.dev";
 
 const TOKEN_KEY = "napl_rating_token_v1";
 
@@ -216,11 +191,27 @@ function show(id, message, type = "") {
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(API + path, options);
+  let response;
 
-  const data = await response.json().catch(() => ({
-    error: "invalid_response"
-  }));
+  try {
+    response = await fetch(API + path, options);
+  } catch (error) {
+    throw new Error(
+      "Network/CORS error: " + error.message
+    );
+  }
+
+  const text = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(text);
+  } catch {
+    throw new Error(
+      `Invalid server response (HTTP ${response.status}): ${text.slice(0, 200)}`
+    );
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -241,7 +232,7 @@ function post(path, body) {
   });
 }
 
-/* 1. GET /ratings */
+/* GET /ratings */
 
 $("checkRatings").addEventListener("click", async () => {
   show("ratingsResult", "Checking...");
@@ -256,18 +247,14 @@ $("checkRatings").addEventListener("click", async () => {
     );
 
   } catch (error) {
-    show(
-      "ratingsResult",
-      "ERROR: " + error.message,
-      "error"
-    );
+    show("ratingsResult", "ERROR: " + error.message, "error");
   }
 });
 
-/* 2. TOKEN */
+/* TOKEN */
 
 $("getToken").addEventListener("click", async () => {
-  show("tokenResult", "Checking token...");
+  show("tokenResult", "Requesting token...");
 
   try {
     let token = localStorage.getItem(TOKEN_KEY);
@@ -298,15 +285,11 @@ $("getToken").addEventListener("click", async () => {
     );
 
   } catch (error) {
-    show(
-      "tokenResult",
-      "ERROR: " + error.message,
-      "error"
-    );
+    show("tokenResult", "ERROR: " + error.message, "error");
   }
 });
 
-/* 3. MY VOTES */
+/* MY VOTES */
 
 $("checkVotes").addEventListener("click", async () => {
   show("votesResult", "Loading votes...");
@@ -318,9 +301,7 @@ $("checkVotes").addEventListener("click", async () => {
       throw new Error("Get a token first.");
     }
 
-    const data = await post("/my-votes", {
-      token
-    });
+    const data = await post("/my-votes", { token });
 
     const count = Object.keys(data.votes || {}).length;
 
@@ -332,15 +313,11 @@ $("checkVotes").addEventListener("click", async () => {
     );
 
   } catch (error) {
-    show(
-      "votesResult",
-      "ERROR: " + error.message,
-      "error"
-    );
+    show("votesResult", "ERROR: " + error.message, "error");
   }
 });
 
-/* 4. SUBMIT VOTE */
+/* SUBMIT VOTE */
 
 $("submitVote").addEventListener("click", async () => {
   const portId = $("portId").value.trim();
@@ -381,15 +358,11 @@ $("submitVote").addEventListener("click", async () => {
     );
 
   } catch (error) {
-    show(
-      "voteResult",
-      "ERROR: " + error.message,
-      "error"
-    );
+    show("voteResult", "ERROR: " + error.message, "error");
   }
 });
 
-/* 5. REFRESH RATINGS */
+/* REFRESH RATINGS */
 
 $("refreshRatings").addEventListener("click", async () => {
   show("refreshResult", "Refreshing...");
@@ -423,11 +396,7 @@ $("refreshRatings").addEventListener("click", async () => {
     );
 
   } catch (error) {
-    show(
-      "refreshResult",
-      "ERROR: " + error.message,
-      "error"
-    );
+    show("refreshResult", "ERROR: " + error.message, "error");
   }
 });
 </script>
