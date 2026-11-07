@@ -2467,21 +2467,42 @@ a {
 
 /* =========================================================
    NAPL — PORT RATINGS
-   Ajustes de integración y adaptación a móviles
+   Distribución de valoraciones y adaptación responsive
    ========================================================= */
 
-/* Evitar que el título y las valoraciones se compriman */
 #port-list .port-top {
     position: relative;
+    display: flex;
     flex-wrap: wrap;
     align-items: center;
+    gap: 10px;
 }
 
-/* Mantener las valoraciones por encima de otros elementos */
+/* Título del port en su propia línea */
+#port-list .port-top > .port-title {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Fila de valoraciones */
 #port-list .port-rating {
     position: relative;
     z-index: 30;
+
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+
+    width: 100%;
     min-width: 0;
+    margin-left: 0;
+    gap: 7px;
+}
+
+/* Rate siempre a la derecha */
+#port-list .port-rating-button {
+    margin-left: auto;
 }
 
 /* Popover flotante */
@@ -2491,22 +2512,13 @@ a {
 
 /* Adaptación a móviles */
 @media (max-width: 520px) {
-
     #port-list .port-top {
         align-items: flex-start;
         row-gap: 10px;
     }
 
-    #port-list .port-top > .port-title {
-        flex: 1 1 100%;
-        width: 100%;
-    }
-
     #port-list .port-rating {
-        width: 100%;
-        margin-left: 0;
         justify-content: flex-start;
-        flex-wrap: wrap;
         gap: 6px;
     }
 
@@ -2519,7 +2531,6 @@ a {
 
 /* Pantallas muy pequeñas */
 @media (max-width: 350px) {
-
     #port-list .port-rating {
         gap: 5px;
     }
@@ -2532,4 +2543,3 @@ a {
         padding: 5px 7px;
     }
 }
-
