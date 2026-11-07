@@ -1,3 +1,4 @@
+
 /*
  * NAPL — GAME RENDER
  *
@@ -100,6 +101,27 @@ function injectRatingStyles() {
             white-space: nowrap;
         }
 
+        .port-rating-trigger {
+            position: relative;
+            display: inline-flex;
+            flex: 0 0 auto;
+            margin-left: auto;
+        }
+
+        .port-rating-trigger.is-open::after {
+            content: "";
+            position: absolute;
+            z-index: 22;
+            top: calc(100% + 5px);
+            left: 50%;
+            width: 10px;
+            height: 10px;
+            transform: translateX(-50%) rotate(45deg);
+            background: #12352f;
+            border-left: 1px solid #438372;
+            border-top: 1px solid #438372;
+        }
+
         .port-rating-button {
             border: 1px solid #438372;
             background: #17483f;
@@ -109,7 +131,7 @@ function injectRatingStyles() {
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
-            margin-left: auto;
+            margin-left: 0;
         }
 
         .port-rating-button:hover {
@@ -118,7 +140,7 @@ function injectRatingStyles() {
 
         .port-rating-popover {
             position: absolute;
-            z-index: 20;
+            z-index: 21;
             top: calc(100% + 10px);
             right: 0;
             width: 260px;
@@ -132,19 +154,6 @@ function injectRatingStyles() {
 
         .port-rating-popover[hidden] {
             display: none;
-        }
-
-        .port-rating-popover::before {
-            content: "";
-            position: absolute;
-            top: -6px;
-            right: 25px;
-            width: 10px;
-            height: 10px;
-            transform: rotate(45deg);
-            background: #12352f;
-            border-left: 1px solid #438372;
-            border-top: 1px solid #438372;
         }
 
         .port-rating-popover-title {
@@ -299,6 +308,7 @@ function closeRatingPopover(container) {
 
     const popover = container.querySelector(".port-rating-popover");
     const button = container.querySelector(".port-rating-button");
+    const trigger = container.querySelector(".port-rating-trigger");
 
     if (popover) {
         popover.hidden = true;
@@ -306,6 +316,10 @@ function closeRatingPopover(container) {
 
     if (button) {
         button.setAttribute("aria-expanded", "false");
+    }
+
+    if (trigger) {
+        trigger.classList.remove("is-open");
     }
 }
 
@@ -689,6 +703,13 @@ function createPortRating(port, ratings, ratingActions) {
 
     popover.append(submit, feedback);
 
+    /* Button wrapper */
+
+    const trigger = document.createElement("div");
+    trigger.className = "port-rating-trigger";
+
+    trigger.append(rateButton, popover);
+
     /* Open popover */
 
     rateButton.addEventListener("click", async event => {
@@ -707,12 +728,14 @@ function createPortRating(port, ratings, ratingActions) {
 
         popover.hidden = false;
 
+        trigger.classList.add("is-open");
+
         rateButton.setAttribute("aria-expanded", "true");
 
         await loadPreviousVote();
     });
 
-    container.append(rateButton, popover);
+    container.appendChild(trigger);
 
     return container;
 }
