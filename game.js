@@ -24,7 +24,7 @@ const VISIT_TRACKING_URL =
     "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 const RATINGS_API_BASE =
-    "https://ports-rankings.federicoxastro.workers.dev";
+    "https://ports-ratings-worker.federicoxastro.workers.dev";
 
 const RATINGS_API_URL =
     RATINGS_API_BASE + "/ratings";
