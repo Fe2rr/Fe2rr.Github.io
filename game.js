@@ -3,8 +3,9 @@
  * NAPL — GAME DATA
  *
  * Loads the selected game from Google Sheets,
- * groups its Android ports, registers the visit
- * and sends the data to game-render.js.
+ * groups its Android ports, registers the visit,
+ * loads port ratings and sends everything to
+ * game-render.js.
  */
 
 import { displayGame } from "./game-render.js";
@@ -19,6 +20,9 @@ const GAME_SHEET_URL =
 
 const VISIT_TRACKING_URL =
     "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
+
+const RATINGS_API_URL =
+    "https://ports-rankings.federicoxastro.workers.dev/ratings";
 
 
 /* ==================================================
@@ -82,6 +86,81 @@ function registerGameVisit(gameName) {
             error
         );
     });
+}
+
+
+/* ==================================================
+   LOAD PORT RATINGS
+   ================================================== */
+
+/*
+ * Returns an object indexed by PORTS_ID.
+ *
+ * Example:
+ * {
+ *   "example-port": {
+ *     avg: 4.25,
+ *     votes: 12,
+ *     score: 3.90
+ *   }
+ * }
+ *
+ * If the API is unavailable, returns an empty
+ * object without interrupting the game page.
+ */
+
+async function loadPortRatings() {
+    try {
+        const response = await fetch(RATINGS_API_URL, {
+            method: "GET",
+            cache: "no-store"
+        });
+
+        if (!response.ok) {
+            throw new Error(
+                `Ratings API returned HTTP ${response.status}.`
+            );
+        }
+
+        const data = await response.json();
+
+        if (!data || !Array.isArray(data.ports)) {
+            throw new Error(
+                "Ratings API returned an invalid response."
+            );
+        }
+
+        const ratings = {};
+
+        for (const port of data.ports) {
+            if (
+                typeof port.port_id !== "string" ||
+                !port.port_id.trim()
+            ) {
+                continue;
+            }
+
+            const avg = Number(port.avg);
+            const votes = Number(port.votes);
+            const score = Number(port.score);
+
+            ratings[port.port_id] = {
+                avg: Number.isFinite(avg) ? avg : 0,
+                votes: Number.isFinite(votes) ? votes : 0,
+                score: Number.isFinite(score) ? score : 0
+            };
+        }
+
+        return ratings;
+
+    } catch (error) {
+        console.warn(
+            "NAPL: could not load port ratings.",
+            error
+        );
+
+        return {};
+    }
 }
 
 
@@ -246,7 +325,6 @@ function groupGameRows(rows) {
             "PROYECTO"
         ]);
 
-        // Unique identifier assigned to this port/project.
         const portId = getGameColumn(row, [
             "PORTS_ID",
             "PORT ID",
@@ -372,11 +450,6 @@ function groupGameRows(rows) {
         ) {
             game.platforms.push(platform);
         }
-
-        /*
-         * General-information rows without port
-         * details do not create empty port cards.
-         */
 
         const hasPortData = [
             project,
@@ -513,8 +586,6 @@ async function loadSelectedGame() {
 
         /*
          * Register one visit after the game is found.
-         * The request runs independently so the game
-         * page does not have to wait for the counter.
          */
 
         registerGameVisit(game.name);
@@ -542,7 +613,15 @@ async function loadSelectedGame() {
             ])
         }));
 
-        displayGame(game, allRows);
+        /*
+         * Load ratings independently.
+         * An API error does not prevent the game
+         * from being displayed.
+         */
+
+        const ratings = await loadPortRatings();
+
+        displayGame(game, allRows, ratings);
 
     } catch (error) {
         console.error(
