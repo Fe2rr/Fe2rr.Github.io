@@ -5,9 +5,8 @@
 (function () {
     const beacon = document.createElement("script");
 
-    beacon.defer = true;
-    beacon.src =
-        "https://static.cloudflareinsights.com/beacon.min.js";
+    beacon.type = "module";
+    beacon.src = "https://static.cloudflareinsights.com/beacon.min.js";
 
     beacon.setAttribute(
         "data-cf-beacon",
