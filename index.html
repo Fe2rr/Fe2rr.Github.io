@@ -40,39 +40,6 @@
 
     <link rel="stylesheet" href="style.css">
 
-    <style>
-        .adsterra-label {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-            width: 100%;
-            margin: 24px auto 8px;
-            color: #84948a;
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 1.2px;
-        }
-
-        .adsterra-label::before,
-        .adsterra-label::after {
-            content: "";
-            flex: 1;
-            max-width: 100px;
-            height: 1px;
-            background: #52645a;
-        }
-
-        .adsterra-slot {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
-            min-height: 250px;
-            margin: 0 auto 24px;
-            overflow: hidden;
-        }
-    </style>
 </head>
 
 <body class="home-page">
@@ -393,16 +360,6 @@
 
     <div id="game-list" hidden></div>
 
-    <!-- ADSTERRA -->
-
-    <div class="adsterra-label">ADVERTISEMENT</div>
-
-    <div
-        id="adsterra-home"
-        class="adsterra-slot"
-        aria-label="Advertisement"
-    ></div>
-
 </main>
 
 <footer>
@@ -416,46 +373,6 @@
 <script src="categories.js"></script>
 <script src="navigation.js"></script>
 <script src="app.js"></script>
-
-<script>
-(function () {
-    const container = document.getElementById("adsterra-home");
-
-    if (!container) return;
-
-    const isMobile = window.matchMedia(
-        "(max-width: 767px)"
-    ).matches;
-
-    const ad = isMobile
-        ? {
-            key: "ed62153b8795508da7343fb2b14fa2b0",
-            width: 300,
-            height: 250,
-            src: "https://bellnewyork.org/22/ed62153b8795508da7343fb2b14fa2b0"
-        }
-        : {
-            key: "a9ac9cf76808c0f9aa55bba7eb77b863",
-            width: 728,
-            height: 90,
-            src: "https://bellnewyork.org/22/a9ac9cf76808c0f9aa55bba7eb77b863"
-        };
-
-    window.atOptions = {
-        key: ad.key,
-        format: "iframe",
-        height: ad.height,
-        width: ad.width,
-        params: {}
-    };
-
-    const script = document.createElement("script");
-    script.src = ad.src;
-    script.async = true;
-
-    container.appendChild(script);
-})();
-</script>
 
 </body>
 </html>
