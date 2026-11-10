@@ -2190,7 +2190,7 @@ a {
 
 /* Imagen de portada */
 
-./* Imagen de portada: mostrarla completa sin recortar */
+/* Imagen de portada: mostrarla completa sin recortar */
 
 .home-game-cover {
     display: block;
@@ -2462,5 +2462,86 @@ a {
 @media (max-width: 350px) {
     .home-tab {
         font-size: 10px;
+    }
+}
+
+/* =========================================================
+   NAPL — PORT RATINGS
+   Distribución de valoraciones y adaptación responsive
+   ========================================================= */
+
+#port-list .port-top {
+    position: relative;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Título del port en su propia línea */
+#port-list .port-top > .port-title {
+    flex: 1 1 100%;
+    width: 100%;
+    min-width: 0;
+}
+
+/* Fila de valoraciones */
+#port-list .port-rating {
+    position: relative;
+    z-index: 30;
+
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+
+    width: 100%;
+    min-width: 0;
+    margin-left: 0;
+    gap: 7px;
+}
+
+/* Rate siempre a la derecha */
+#port-list .port-rating-button {
+    margin-left: auto;
+}
+
+/* Popover flotante */
+#port-list .port-rating-popover {
+    z-index: 40;
+}
+
+/* Adaptación a móviles */
+@media (max-width: 520px) {
+    #port-list .port-top {
+        align-items: flex-start;
+        row-gap: 10px;
+    }
+
+    #port-list .port-rating {
+        justify-content: flex-start;
+        gap: 6px;
+    }
+
+    #port-list .port-rating-popover {
+    left: auto;
+    right: 0;
+    width: min(250px, calc(100vw - 32px));
+    max-width: calc(100vw - 32px);
+}
+    }
+}
+
+/* Pantallas muy pequeñas */
+@media (max-width: 350px) {
+    #port-list .port-rating {
+        gap: 5px;
+    }
+
+    #port-list .port-rating-stars {
+        font-size: 13px;
+    }
+
+    #port-list .port-rating-button {
+        padding: 5px 7px;
     }
 }
