@@ -12,6 +12,7 @@
 
 import { displayGame } from "./game-render.js";
 import { createSlug } from "./text.js";
+import { API_BASE } from "./api-config.js";
 
 
 /* ==================================================
@@ -20,10 +21,7 @@ import { createSlug } from "./text.js";
 
 
 
-const RATINGS_API_BASE =
-    window.location.hostname === "localhost"
-        ? "http://localhost:8787"
-        : "https://ports-ratings-worker.federicoxastro.workers.dev";
+const RATINGS_API_BASE = API_BASE;
 
 const RATINGS_API_URL =
     RATINGS_API_BASE + "/ratings";
@@ -461,12 +459,20 @@ function toGameModel(data) {
 function toRelatedRows(data, game) {
     return [
         ...game.ports,
-        ...data.apps_used.map(app => ({
-            game: app.name,
-            year: "",
-            platform: MULTI_GAME_PLATFORM,
-            project: ""
-        })),
+        ...data.apps_used.flatMap(app => [
+            {
+                game: app.name,
+                year: "",
+                platform: MULTI_GAME_PLATFORM,
+                project: ""
+            },
+            ...(app.games || []).map(item => ({
+                game: item.name,
+                year: item.year,
+                platform: "",
+                project: app.name
+            }))
+        ]),
         ...data.games_using_app.map(item => ({
             game: item.name,
             year: item.year,
