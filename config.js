@@ -7,16 +7,16 @@
  * GOOGLE SHEETS
  */
 
-const SHEET_URL =
-    "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
+const API_BASE =
+    window.location.hostname === "localhost"
+        ? "http://localhost:8787"
+        : "https://ports-ratings-worker.federicoxastro.workers.dev";
 
 
 /*
  * POPULARITY SERVICE
  */
 
-const POPULAR_URL =
-    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 
 /*

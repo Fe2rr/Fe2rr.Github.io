@@ -6,6 +6,8 @@
  * compatible with each app.
  */
 
+import { normalizeText } from "./text.js";
+
 
 /*
  * NORMALIZE TEXT
@@ -14,13 +16,6 @@
  * accents and surrounding whitespace.
  */
 
-function normalizeText(value) {
-    return String(value ?? "")
-        .trim()
-        .toLowerCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
-}
 
 
 /*

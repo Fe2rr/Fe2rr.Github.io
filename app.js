@@ -12,6 +12,38 @@
  * LOAD GAMES
  */
 
+/*
+ * API GAME -> HOME MODEL
+ */
+
+function toGameModel(game) {
+    const ports = game.ports.map(port => ({
+        game: game.name,
+        year: game.year,
+        platform: port.platform,
+        project: port.project,
+        developer: port.developer,
+        portId: port.port_id,
+        lastUpdate: port.last_update,
+        dateAdded: port.date_added,
+        coverUrl: game.cover_url,
+        genre: game.genre,
+        description: ""
+    }));
+
+    return {
+        name: game.name,
+        year: game.year,
+        slug: game.slug,
+        coverUrl: game.cover_url,
+        genre: game.genre,
+        description: "",
+        ports,
+        platforms: [...new Set(ports.map(port => port.platform).filter(Boolean))]
+    };
+}
+
+
 async function loadGames() {
 
     if (!statusElement || !gameList) {
@@ -27,112 +59,31 @@ async function loadGames() {
 
     try {
 
-        const response = await fetch(SHEET_URL, {
-            method: "GET",
-            cache: "no-store"
-        });
+        const response = await fetch(`${API_BASE}/api/games`);
 
         if (!response.ok) {
             throw new Error(
-                `The spreadsheet returned HTTP ${response.status}.`
+                `The catalog returned HTTP ${response.status}.`
             );
         }
 
-        const csv = await response.text();
+        const data = await response.json();
 
-        if (!csv || !csv.trim()) {
-            throw new Error(
-                "The spreadsheet returned an empty response."
-            );
+        if (!Array.isArray(data.games) || data.games.length === 0) {
+            throw new Error("The catalog returned no games.");
         }
 
-        const rows = parseCSV(csv);
-
-        if (!Array.isArray(rows) || rows.length === 0) {
-            throw new Error(
-                "No rows were found in the spreadsheet."
-            );
-        }
-
-        /*
-         * Preserve the order of first appearance of platforms
-         * in the original spreadsheet, before processing games
-         * or sorting them alphabetically.
-         */
-
-        const uniquePlatforms = new Map();
-
-        for (const row of rows) {
-
-            const platform = getColumn(row, [
-                "PLATFORM",
-                "PLATAFORM",
-                "PLATAFORMA"
-            ]).trim();
-
-            if (!platform) {
-                continue;
-            }
-
+        platformOrder = data.platforms.filter(platform => {
             const key = normalizeText(platform);
+            return key !== "multi-game apps" && key !== "multi game apps";
+        });
 
-            if (
-                key === "multi-game apps" ||
-                key === "multi game apps"
-            ) {
-                continue;
-            }
+        games = data.games.map(toGameModel);
 
-            if (!uniquePlatforms.has(key)) {
-                uniquePlatforms.set(key, platform);
-            }
-        }
-
-        platformOrder = Array.from(
-            uniquePlatforms.values()
+        allTimePopular = new Map(
+            data.games.map(game => [game.slug, Number(game.visits) || 0])
         );
-
-        const processedRows = processRows(rows);
-
-        if (
-            !Array.isArray(processedRows) ||
-            processedRows.length === 0
-        ) {
-            throw new Error(
-                "No valid game entries were found. Check the spreadsheet column names and data."
-            );
-        }
-
-        /*
-         * Group all ports belonging to the same game.
-         */
-
-        const groupedGames = groupGames(processedRows);
-
-        if (groupedGames.length === 0) {
-            throw new Error(
-                "The spreadsheet could not be grouped into games."
-            );
-        }
-
-        /*
-         * Update shared application state.
-         */
-
-        games = groupedGames;
-
-        /*
-         * Keep the home page game ordering alphabetical.
-         * The platform menu uses platformOrder separately.
-         */
-
-        games.sort((a, b) =>
-            a.name.localeCompare(
-                b.name,
-                "en",
-                { sensitivity: "base" }
-            )
-        );
+        allTimePopularLoaded = true;
 
         /*
          * Render the menu and home page sections.

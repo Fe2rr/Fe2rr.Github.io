@@ -509,165 +509,65 @@ function displayLastUpdated() {
  * LOAD POPULAR RANKING
  */
 
-function loadPopular(period = selectedPopularPeriod) {
+let popularRequestId = 0;
+
+async function loadPopular(period = selectedPopularPeriod) {
     if (!popularList) return;
+
+    const requestId = ++popularRequestId;
+    const apiPeriod = period === "alltime" ? "all" : period;
 
     popularList.innerHTML = `
         <div class="home-loading">Loading...</div>
     `;
 
-    const callbackName = `popularCallback_${Date.now()}`;
+    try {
+        const response = await fetch(
+            `${API_BASE}/api/popular?period=${encodeURIComponent(apiPeriod)}`
+        );
 
-    window[callbackName] = function(data) {
-        try {
-            if (!data.success || !Array.isArray(data.games)) {
-                throw new Error(
-                    data.error || "Could not load popular games."
-                );
-            }
-
-            const gameMap = new Map(
-                games.map(game => [game.slug, game])
-            );
-
-            const ranking = data.games
-                .map(item => {
-                    const game = gameMap.get(createSlug(item.game));
-
-                    if (!game) return null;
-
-                    return {
-                        game,
-                        visits: Number(item.visits) || 0,
-                        port: getRepresentativePort(game)
-                    };
-                })
-                .filter(item => item !== null);
-
-            displayPopular(ranking);
-        } catch (error) {
-            console.error("Could not load popular games:", error);
-
-            popularList.innerHTML = `
-                <div class="error">Could not load popular games.</div>
-            `;
-
-            if (popularMore) popularMore.hidden = true;
-        } finally {
-            delete window[callbackName];
-
-            const script = document.getElementById(callbackName);
-            if (script) script.remove();
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
         }
-    };
 
-    const script = document.createElement("script");
+        const data = await response.json();
 
-    script.id = callbackName;
-    script.src =
-        `${POPULAR_URL}?popular=${encodeURIComponent(period)}&callback=${callbackName}`;
+        // A newer tab click superseded this request.
+        if (requestId !== popularRequestId) return;
 
-    script.onerror = function() {
-        console.error("Could not load popular games.");
+        const gameMap = new Map(games.map(game => [game.slug, game]));
 
+        const ranking = data.games
+            .map(item => {
+                const game = gameMap.get(item.slug);
+                if (!game) return null;
+
+                return {
+                    game,
+                    visits: Number(item.visits) || 0,
+                    port: getRepresentativePort(game)
+                };
+            })
+            .filter(item => item !== null);
+
+        displayPopular(ranking);
+    } catch (error) {
+        if (requestId !== popularRequestId) return;
+
+        console.error("Could not load popular games:", error);
         popularList.innerHTML = `
             <div class="error">Could not load popular games.</div>
         `;
-
         if (popularMore) popularMore.hidden = true;
-
-        delete window[callbackName];
-        script.remove();
-    };
-
-    document.body.appendChild(script);
-}
-
-
-/*
- * LOAD ALL-TIME POPULARITY FOR CATEGORY SORTING
- */
-
-function loadAllTimePopular(callback) {
-    if (allTimePopularLoaded) {
-        callback();
-        return;
     }
-
-    allTimePopularCallbacks.push(callback);
-
-    if (allTimePopularLoading) return;
-
-    allTimePopularLoading = true;
-
-    const callbackName = `allTimePopularCallback_${Date.now()}`;
-
-    window[callbackName] = function(data) {
-        try {
-            if (!data.success || !Array.isArray(data.games)) {
-                throw new Error(
-                    data.error || "Could not load All Time popularity."
-                );
-            }
-
-            allTimePopular = new Map(
-                data.games.map(item => [
-                    createSlug(item.game),
-                    Number(item.visits) || 0
-                ])
-            );
-
-            allTimePopularLoaded = true;
-        } catch (error) {
-            console.error(
-                "Could not load All Time popularity:",
-                error
-            );
-        } finally {
-            allTimePopularLoading = false;
-
-            delete window[callbackName];
-
-            const script = document.getElementById(callbackName);
-            if (script) script.remove();
-
-            const callbacks = allTimePopularCallbacks;
-            allTimePopularCallbacks = [];
-
-            callbacks.forEach(callback => callback());
-        }
-    };
-
-    const script = document.createElement("script");
-
-    script.id = callbackName;
-    script.src =
-        `${POPULAR_URL}?popular=alltime&callback=${callbackName}`;
-
-    script.onerror = function() {
-        console.error("Could not load All Time popularity.");
-
-        allTimePopularLoading = false;
-
-        delete window[callbackName];
-        script.remove();
-
-        const callbacks = allTimePopularCallbacks;
-        allTimePopularCallbacks = [];
-
-        callbacks.forEach(callback => callback());
-    };
-
-    document.body.appendChild(script);
 }
 
-
 /*
- * DISPLAY POPULAR
- *
- * Preserves the ranking order returned by the popularity source.
- * Does not display a port name.
+ * All-time visits now arrive with the catalog index (app.js).
  */
+function loadAllTimePopular(callback) {
+    callback();
+}
 
 function displayPopular(ranking) {
     if (!popularList || !popularMore) return;
