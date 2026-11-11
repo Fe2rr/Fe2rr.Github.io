@@ -15,7 +15,6 @@ const editor = $("editor-panel");
 const form = $("port-form");
 const formMessage = $("form-message");
 const saveButton = $("save-button");
-const deleteButton = $("delete-button");
 const gameSelect = $("game-select");
 const platformOptions = $("platform-options");
 
@@ -143,7 +142,6 @@ function openEditor(port = null) {
   showMessage(formMessage, "");
   $("editor-title").textContent = port ? "Edit port" : "Add port";
   saveButton.textContent = port ? "Save changes" : "Add port";
-  deleteButton.hidden = !port;
   populateGameOptions(port?.gameSlug || "__new__");
   if (port) {
     for (const [key, id] of Object.entries(fields)) setValue(key, port[key]);
@@ -216,26 +214,6 @@ form.addEventListener("submit", async (event) => {
     showMessage(formMessage, error.message, true);
   } finally {
     saveButton.disabled = false;
-  }
-});
-
-deleteButton.addEventListener("click", async () => {
-  if (!editing || !confirm("Delete this port? This cannot be undone.")) return;
-  deleteButton.disabled = true;
-  showMessage(formMessage, "Deleting…");
-  try {
-    await api("/admin/ports/delete", { method: "POST", body: JSON.stringify(editing) });
-    const data = await api("/admin/ports/list");
-    games = data.games || [];
-    ports = data.ports || [];
-    renderList();
-    editor.hidden = true;
-    editing = null;
-    showMessage($("global-message"), "Port deleted.");
-  } catch (error) {
-    showMessage(formMessage, error.message, true);
-  } finally {
-    deleteButton.disabled = false;
   }
 });
 
