@@ -553,6 +553,7 @@ async function handleAdminSavePort(request, env) {
 
     const existingGame = await env.DB.prepare("SELECT slug FROM games WHERE slug = ?").bind(gameSlug).first();
     if (!isNewGame && !existingGame) return jsonResponse({ success: false, error: "Selected game no longer exists. Reload the list." }, 409);
+    if (isNewGame && existingGame) return jsonResponse({ success: false, error: "A game with that name already exists. Select it from the game list instead." }, 409);
     const sortRow = await env.DB.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM ports").first();
 
     const statements = [
