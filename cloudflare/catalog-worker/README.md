@@ -66,7 +66,19 @@ npx wrangler d1 execute napl-db --remote --file=./popularity-seed.sql
 
 Este proceso importa los totales históricos. No reconstruye el historial de visitas diarias.
 
-## 5. Desplegar y verificar
+## 5. Administrar juegos y ports
+
+La interfaz de administración está publicada en `/public/admin.html` (en GitHub Pages: `https://fe2rr.github.io/public/admin.html`).
+
+- Usa el secret existente `IMPORT_SECRET` como contraseña.
+- La sesión guarda el secret únicamente en `sessionStorage`; al cerrar la sesión se elimina.
+- La API protegida incluye `GET /admin/ports/list`, `POST /admin/ports/save` y `POST /admin/ports/delete`.
+- Los cambios se guardan en `napl-db` y actualizan las relaciones normalizadas de desarrolladores y categorías.
+- Los identificadores de ports existentes se mantienen fijos durante la edición para no desvincular reportes externos.
+
+Después de actualizar el código del Worker, desplegarlo para habilitar los endpoints de administración.
+
+## 6. Desplegar y verificar
 
 Después de aplicar los esquemas e importar los datos necesarios:
 
