@@ -479,6 +479,124 @@ async function handleHealth(env) {
 
 
 // -----------------------------------------------------------------------------
+// Protected catalog administration (games and ports).
+// Uses the existing IMPORT_SECRET; no public write endpoints are exposed.
+// -----------------------------------------------------------------------------
+
+function isAdminAuthorized(request, env) {
+    if (!env.IMPORT_SECRET) return false;
+    const authorization = request.headers.get("Authorization") || "";
+    const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
+    return Boolean(supplied && supplied === env.IMPORT_SECRET);
+}
+
+function requireAdmin(request, env) {
+    if (!env.IMPORT_SECRET) return jsonResponse({ success: false, error: "Admin secret is not configured." }, 503);
+    if (!isAdminAuthorized(request, env)) return jsonResponse({ success: false, error: "Unauthorized." }, 401);
+    return null;
+}
+
+async function handleAdminListPorts(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const [games, ports] = await Promise.all([
+        env.DB.prepare("SELECT slug, name, year, genre, description, cover_url, launchbox_url FROM games ORDER BY name COLLATE NOCASE").all(),
+        env.DB.prepare("SELECT p.*, g.name AS game_name, g.year AS game_year, g.genre AS game_genre, g.description AS game_description, g.cover_url AS game_cover_url, g.launchbox_url AS game_launchbox_url FROM ports p JOIN games g ON g.slug = p.game_slug ORDER BY g.name COLLATE NOCASE, p.platform COLLATE NOCASE, p.port_id").all()
+    ]);
+    return jsonResponse({
+        success: true,
+        games: games.results || [],
+        ports: (ports.results || []).map((p) => ({
+            gameSlug: p.game_slug, gameName: p.game_name, year: p.game_year || "",
+            genre: p.game_genre || "", description: p.game_description || "",
+            coverUrl: p.game_cover_url || "", launchboxUrl: p.game_launchbox_url || "",
+            portId: p.port_id, platform: p.platform || "", project: p.project || "",
+            link: p.link || "", url: p.url || "", developer: p.developer || "",
+            version: p.version || "", lastUpdate: p.last_update || "",
+            dateAdded: p.date_added || "", needsFiles: p.needs_files || "",
+            dataUrl: p.data_url || "", notes: p.notes || "", works: p.works || "",
+            controllerSupport: p.controller_support || ""
+        }))
+    }, 200, { "Cache-Control": "no-store" });
+}
+
+async function handleAdminSavePort(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") return jsonResponse({ success: false, error: "Invalid JSON body." }, 400);
+
+    const clean = (value, max = 2000) => String(value ?? "").trim().slice(0, max);
+    const gameName = clean(body.gameName, 180);
+    const requestedSlug = clean(body.gameSlug, 180);
+    const isNewGame = requestedSlug === "__new__";
+    const gameSlug = isNewGame ? importSlug(gameName) : requestedSlug;
+    const portId = clean(body.portId, 120);
+    const platform = clean(body.platform, 100);
+    if (!gameName || !gameSlug || !portId || !platform) {
+        return jsonResponse({ success: false, error: "Game name, game, port ID and platform are required." }, 400);
+    }
+
+    const game = {
+        slug: gameSlug, name: gameName, year: clean(body.year, 20),
+        genre: clean(body.genre, 120), description: clean(body.description, 4000),
+        coverUrl: clean(body.coverUrl, 1000), launchboxUrl: clean(body.launchboxUrl, 1000)
+    };
+    const port = {
+        portId, platform, project: clean(body.project, 300), link: clean(body.link, 1000),
+        url: clean(body.url, 1000), developer: clean(body.developer, 180),
+        version: clean(body.version, 100), lastUpdate: clean(body.lastUpdate, 100),
+        dateAdded: clean(body.dateAdded, 100), needsFiles: clean(body.needsFiles, 100),
+        dataUrl: clean(body.dataUrl, 1000), notes: clean(body.notes, 2000),
+        works: clean(body.works, 100), controllerSupport: clean(body.controllerSupport, 100)
+    };
+
+    const existingGame = await env.DB.prepare("SELECT slug FROM games WHERE slug = ?").bind(gameSlug).first();
+    if (!isNewGame && !existingGame) return jsonResponse({ success: false, error: "Selected game no longer exists. Reload the list." }, 409);
+    const sortRow = await env.DB.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM ports").first();
+
+    const statements = [
+        env.DB.prepare("INSERT INTO games (slug, name, year, genre, description, cover_url, launchbox_url) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET name = excluded.name, year = excluded.year, genre = excluded.genre, description = excluded.description, cover_url = excluded.cover_url, launchbox_url = excluded.launchbox_url, updated_at = CURRENT_TIMESTAMP")
+            .bind(game.slug, game.name, game.year, game.genre, game.description, game.coverUrl, game.launchboxUrl),
+        env.DB.prepare("INSERT INTO platforms (name, sort_order) VALUES (?, 999) ON CONFLICT(name) DO NOTHING").bind(port.platform),
+        env.DB.prepare("INSERT INTO ports (port_id, game_slug, platform, project, link, url, developer, version, last_update, date_added, needs_files, data_url, notes, works, controller_support, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(game_slug, port_id) DO UPDATE SET platform = excluded.platform, project = excluded.project, link = excluded.link, url = excluded.url, developer = excluded.developer, version = excluded.version, last_update = excluded.last_update, date_added = excluded.date_added, needs_files = excluded.needs_files, data_url = excluded.data_url, notes = excluded.notes, works = excluded.works, controller_support = excluded.controller_support")
+            .bind(port.portId, game.slug, port.platform, port.project, port.link, port.url, port.developer, port.version, port.lastUpdate, port.dateAdded, port.needsFiles, port.dataUrl, port.notes, port.works, port.controllerSupport, Number(sortRow?.next_order) || 0),
+        env.DB.prepare("DELETE FROM port_developers WHERE game_slug = ? AND port_id = ?").bind(game.slug, port.portId),
+        env.DB.prepare("DELETE FROM game_categories WHERE game_slug = ?").bind(game.slug)
+    ];
+
+    if (port.developer) {
+        const developerSlug = importSlug(port.developer);
+        if (developerSlug) {
+            statements.push(env.DB.prepare("INSERT INTO developers (name, slug) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET slug = excluded.slug").bind(port.developer, developerSlug));
+            statements.push(env.DB.prepare("INSERT INTO port_developers (game_slug, port_id, developer_id) SELECT ?, ?, id FROM developers WHERE slug = ? ON CONFLICT(game_slug, port_id, developer_id) DO NOTHING").bind(game.slug, port.portId, developerSlug));
+        }
+    }
+    if (game.genre) {
+        const categorySlug = importSlug(game.genre);
+        if (categorySlug) {
+            statements.push(env.DB.prepare("INSERT INTO categories (name, slug) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET slug = excluded.slug").bind(game.genre, categorySlug));
+            statements.push(env.DB.prepare("INSERT INTO game_categories (game_slug, category_id) SELECT ?, id FROM categories WHERE slug = ? ON CONFLICT(game_slug, category_id) DO NOTHING").bind(game.slug, categorySlug));
+        }
+    }
+
+    await env.DB.batch(statements);
+    return jsonResponse({ success: true, gameSlug: game.slug, portId: port.portId });
+}
+
+async function handleAdminDeletePort(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const body = await request.json().catch(() => null);
+    const gameSlug = String(body?.gameSlug || "").trim();
+    const portId = String(body?.portId || "").trim();
+    if (!gameSlug || !portId) return jsonResponse({ success: false, error: "gameSlug and portId are required." }, 400);
+    const result = await env.DB.prepare("DELETE FROM ports WHERE game_slug = ? AND port_id = ?").bind(gameSlug, portId).run();
+    if (!result.meta?.changes) return jsonResponse({ success: false, error: "Port not found." }, 404);
+    return jsonResponse({ success: true, deleted: { gameSlug, portId } });
+}
+
+// -----------------------------------------------------------------------------
 // Protected one-time migration from the published Google Sheets CSV.
 // Configure IMPORT_SECRET as a Worker secret before using POST /admin/import-sheet.
 // -----------------------------------------------------------------------------
@@ -901,6 +1019,16 @@ export default {
         const path = url.pathname.replace(/\/+$/, "") || "/";
 
         try {
+            if (request.method === "GET" && path === "/admin/ports/list") {
+                return await handleAdminListPorts(request, env);
+            }
+            if (request.method === "POST" && path === "/admin/ports/save") {
+                return await handleAdminSavePort(request, env);
+            }
+            if (request.method === "POST" && path === "/admin/ports/delete") {
+                return await handleAdminDeletePort(request, env);
+            }
+
             if (request.method === "GET" && path === "/admin/import-devices") {
                 return handleImportDevicesPage();
             }
