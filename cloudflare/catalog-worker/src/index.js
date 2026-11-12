@@ -619,6 +619,47 @@ async function handleUpdateGitHubVersions(request, env) {
     const result = await updateGitHubVersions(env);
     return jsonResponse(result, 200, { 'Cache-Control': 'no-store' });
 }
+
+async function updateDevelopers(env) {
+    const rowsResult = await env.DB.prepare(
+        "SELECT game_slug, port_id, url FROM ports WHERE url IS NOT NULL AND TRIM(url) <> ''"
+    ).all();
+
+    const statements = [];
+    let updatedRows = 0;
+    let uniqueDevelopers = new Set();
+
+    for (const row of rowsResult.results || []) {
+        const info = normalizeGitHubRepo(row.url);
+        if (!info) continue;
+
+        statements.push(
+            env.DB.prepare(
+                "UPDATE ports SET developer = ? WHERE game_slug = ? AND port_id = ?"
+            ).bind(info.owner, row.game_slug, row.port_id)
+        );
+        uniqueDevelopers.add(info.owner.toLowerCase());
+        updatedRows++;
+    }
+
+    for (let i = 0; i < statements.length; i += 50) {
+        await env.DB.batch(statements.slice(i, i + 50));
+    }
+
+    return {
+        success: true,
+        scannedRows: (rowsResult.results || []).length,
+        updatedRows,
+        uniqueDevelopers: uniqueDevelopers.size
+    };
+}
+
+async function handleUpdateDevelopers(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const result = await updateDevelopers(env);
+    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
+}
 async function registerMissingPortDates(env) {
     const result = await env.DB.prepare(
         "UPDATE ports " +
@@ -1295,7 +1336,11 @@ document.getElementById("f").addEventListener("submit", async function(e) {
 
 export default {
     async scheduled(controller, env, ctx) {
-        ctx.waitUntil(Promise.allSettled([registerMissingPortDates(env), updateGitHubVersions(env)]));
+        ctx.waitUntil(Promise.allSettled([
+            registerMissingPortDates(env),
+            updateGitHubVersions(env),
+            updateDevelopers(env)
+        ]));
     },
 
     async fetch(request, env) {
@@ -1348,6 +1393,10 @@ export default {
 
             if (request.method === "POST" && path === "/admin/update-github-versions") {
                 return await handleUpdateGitHubVersions(request, env);
+            }
+
+            if (request.method === "POST" && path === "/admin/update-developers") {
+                return await handleUpdateDevelopers(request, env);
             }
 
             if (request.method === "POST" && path === "/admin/register-missing-dates") {
