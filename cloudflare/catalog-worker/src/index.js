@@ -499,6 +499,126 @@ async function handleReportLink(request, env) {
     return jsonResponse({ success: true, portId, reason });
 }
 
+function normalizeGitHubRepo(value) {
+    const match = String(value || '').trim().match(/^https?:\\/\\/(?:www\\.)?github\\.com\\/([^/?#]+)\\/([^/?#]+)/i);
+    if (!match) return null;
+    const owner = match[1];
+    const repo = match[2].replace(/\\.git$/i, '');
+    const blockedOwners = ['settings','search','login','logout','signup','explore','marketplace','topics','orgs','users','collections','sponsors','notifications','new'];
+    const blockedRepos = /^(issues|pulls|projects|actions|releases|tags|branches|wiki|tree|blob|commit|commits)$/i;
+    if (!owner || !repo || blockedOwners.includes(owner.toLowerCase()) || blockedRepos.test(repo)) return null;
+    return { owner, repo, key: owner.toLowerCase() + '/' + repo.toLowerCase() };
+}
+
+function githubApiUrl(info, suffix = '') {
+    return 'https://api.github.com/repos/' + encodeURIComponent(info.owner) + '/' + encodeURIComponent(info.repo) + suffix;
+}
+
+function formatGitHubDate(value) {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Montevideo', year: 'numeric', month: 'long', day: 'numeric' }).formatToParts(date);
+    const part = (type) => parts.find((item) => item.type === type)?.value || '';
+    return part('year') + ', ' + part('month') + ' ' + Number(part('day'));
+}
+
+async function githubRequest(url, token) {
+    return fetch(url, {
+        headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+        cf: { cacheTtl: 0, cacheEverything: false }
+    });
+}
+
+async function resolveGitHubVersion(info, token) {
+    let releaseResponse;
+    try { releaseResponse = await githubRequest(githubApiUrl(info, '/releases/latest'), token); }
+    catch (error) { return { key: info.key, error: 'release_network_error' }; }
+
+    if (releaseResponse.status === 200) {
+        try {
+            const release = await releaseResponse.json();
+            const version = String(release.tag_name || release.name || '').trim();
+            if (version) return { key: info.key, version, date: release.published_at || release.created_at || '', source: 'Release' };
+        } catch (_) {}
+    } else if (releaseResponse.status !== 404) {
+        return { key: info.key, error: 'release_http_' + releaseResponse.status };
+    }
+
+    let tagsResponse;
+    try { tagsResponse = await githubRequest(githubApiUrl(info, '/tags?per_page=1'), token); }
+    catch (error) { return { key: info.key, error: 'tags_network_error' }; }
+    if (!tagsResponse.ok) return { key: info.key, error: 'tags_http_' + tagsResponse.status };
+
+    let tags;
+    try { tags = await tagsResponse.json(); } catch (_) { return { key: info.key, error: 'invalid_tags_json' }; }
+    if (!Array.isArray(tags) || !tags.length) return { key: info.key, error: 'no_release_or_tag' };
+    const version = String(tags[0]?.name || '').trim();
+    if (!version) return { key: info.key, error: 'empty_tag' };
+
+    let pushedAt = '';
+    try {
+        const repositoryResponse = await githubRequest(githubApiUrl(info), token);
+        if (repositoryResponse.ok) {
+            const repository = await repositoryResponse.json();
+            pushedAt = repository.pushed_at || '';
+        }
+    } catch (_) {}
+    return { key: info.key, version, date: pushedAt, source: 'Tag' };
+}
+
+async function updateGitHubVersions(env) {
+    if (!env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN secret is not configured.');
+    const rowsResult = await env.DB.prepare("SELECT game_slug, port_id, url FROM ports WHERE url IS NOT NULL AND TRIM(url) <> ''").all();
+    const rows = rowsResult.results || [];
+    const repoMap = new Map();
+    for (const row of rows) {
+        const info = normalizeGitHubRepo(row.url);
+        if (info && !repoMap.has(info.key)) repoMap.set(info.key, info);
+    }
+    const repos = Array.from(repoMap.values());
+    const results = new Map();
+    const errors = [];
+    const batchSize = 20;
+    for (let offset = 0; offset < repos.length; offset += batchSize) {
+        const batch = repos.slice(offset, offset + batchSize);
+        const resolved = await Promise.all(batch.map((info) => resolveGitHubVersion(info, env.GITHUB_TOKEN)));
+        for (const item of resolved) {
+            if (item.version) results.set(item.key, item);
+            else if (item.error) errors.push({ repository: item.key, error: item.error });
+        }
+    }
+
+    const statements = [];
+    let updatedRows = 0;
+    let versionRows = 0;
+    let dateRows = 0;
+    for (const row of rows) {
+        const info = normalizeGitHubRepo(row.url);
+        if (!info) continue;
+        const result = results.get(info.key);
+        if (!result?.version) continue;
+        const assignments = ['version = ?'];
+        const values = [String(result.version)];
+        versionRows++;
+        if (result.date) {
+            const formattedDate = formatGitHubDate(result.date);
+            if (formattedDate) { assignments.push('last_update = ?'); values.push(formattedDate); dateRows++; }
+        }
+        values.push(row.game_slug, row.port_id);
+        statements.push(env.DB.prepare('UPDATE ports SET ' + assignments.join(', ') + ' WHERE game_slug = ? AND port_id = ?').bind(...values));
+        updatedRows++;
+    }
+    for (let i = 0; i < statements.length; i += 50) await env.DB.batch(statements.slice(i, i + 50));
+    return { success: true, uniqueRepositories: repos.length, repositoriesWithVersion: results.size, updatedRows, versionRows, dateRows, errors };
+}
+
+async function handleUpdateGitHubVersions(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    if (!env.GITHUB_TOKEN) return jsonResponse({ success: false, error: 'GITHUB_TOKEN secret is not configured.' }, 503);
+    const result = await updateGitHubVersions(env);
+    return jsonResponse(result, 200, { 'Cache-Control': 'no-store' });
+}
 async function registerMissingPortDates(env) {
     const result = await env.DB.prepare(
         "UPDATE ports " +
@@ -1175,7 +1295,7 @@ document.getElementById("f").addEventListener("submit", async function(e) {
 
 export default {
     async scheduled(controller, env, ctx) {
-        ctx.waitUntil(registerMissingPortDates(env));
+        ctx.waitUntil(Promise.all([registerMissingPortDates(env), updateGitHubVersions(env)]));
     },
 
     async fetch(request, env) {
@@ -1224,6 +1344,10 @@ export default {
 
             if (request.method === "POST" && path === "/admin/import-sheet") {
                 return await handleImportSheet(request, env);
+            }
+
+            if (request.method === "POST" && path === "/admin/update-github-versions") {
+                return await handleUpdateGitHubVersions(request, env);
             }
 
             if (request.method === "POST" && path === "/admin/register-missing-dates") {
