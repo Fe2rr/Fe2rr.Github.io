@@ -104,6 +104,11 @@ CREATE TABLE IF NOT EXISTS game_visit_daily_totals (
 
 CREATE INDEX IF NOT EXISTS idx_daily_visits_date ON game_visit_daily_totals(visit_date);
 
+CREATE TABLE IF NOT EXISTS game_visit_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT NOT NULL
+);
+
 -- Broken / dead link reports
 CREATE TABLE IF NOT EXISTS link_reports (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
