@@ -499,6 +499,30 @@ async function handleReportLink(request, env) {
     return jsonResponse({ success: true, portId, reason });
 }
 
+async function registerMissingPortDates(env) {
+    const result = await env.DB.prepare(
+        "UPDATE ports " +
+        "SET date_added = strftime('%Y-%m-%d %H:%M:%S', 'now', '-3 hours') " +
+        "WHERE TRIM(COALESCE(date_added, '')) = '' " +
+        "AND (TRIM(COALESCE(port_id, '')) <> '' OR " +
+        "TRIM(COALESCE(platform, '')) <> '' OR TRIM(COALESCE(project, '')) <> '' OR " +
+        "TRIM(COALESCE(link, '')) <> '' OR TRIM(COALESCE(url, '')) <> '' OR " +
+        "TRIM(COALESCE(developer, '')) <> '' OR TRIM(COALESCE(version, '')) <> '' OR " +
+        "TRIM(COALESCE(last_update, '')) <> '' OR TRIM(COALESCE(needs_files, '')) <> '' OR " +
+        "TRIM(COALESCE(data_url, '')) <> '' OR TRIM(COALESCE(notes, '')) <> '')"
+    ).run();
+    return Number(result.meta?.changes) || 0;
+}
+
+async function handleRegisterMissingPortDates(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const updated = await registerMissingPortDates(env);
+    return jsonResponse({
+        success: true, updated,
+        message: updated ? "Missing DATE ADDED values were registered." : "No ports needed a DATE ADDED value."
+    });
+}
 async function handleHealth(env) {
     const [catalogCounts, deviceCounts] = await Promise.all([
         env.DB.prepare(
@@ -588,7 +612,7 @@ async function handleAdminSavePort(request, env) {
         portId, platform, project: clean(body.project, 300), link: clean(body.link, 1000),
         url: clean(body.url, 1000), developer: clean(body.developer, 180),
         version: clean(body.version, 100), lastUpdate: clean(body.lastUpdate, 100),
-        dateAdded: clean(body.dateAdded, 100), needsFiles: clean(body.needsFiles, 100),
+        dateAdded: clean(body.dateAdded, 100) || new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '), needsFiles: clean(body.needsFiles, 100),
         dataUrl: clean(body.dataUrl, 1000), notes: clean(body.notes, 2000),
         works: clean(body.works, 100), controllerSupport: clean(body.controllerSupport, 100)
     };
@@ -602,7 +626,7 @@ async function handleAdminSavePort(request, env) {
         env.DB.prepare("INSERT INTO games (slug, name, year, genre, description, cover_url, launchbox_url) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET name = excluded.name, year = excluded.year, genre = excluded.genre, description = excluded.description, cover_url = excluded.cover_url, launchbox_url = excluded.launchbox_url, updated_at = CURRENT_TIMESTAMP")
             .bind(game.slug, game.name, game.year, game.genre, game.description, game.coverUrl, game.launchboxUrl),
         env.DB.prepare("INSERT INTO platforms (name, sort_order) VALUES (?, 999) ON CONFLICT(name) DO NOTHING").bind(port.platform),
-        env.DB.prepare("INSERT INTO ports (port_id, game_slug, platform, project, link, url, developer, version, last_update, date_added, needs_files, data_url, notes, works, controller_support, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(game_slug, port_id) DO UPDATE SET platform = excluded.platform, project = excluded.project, link = excluded.link, url = excluded.url, developer = excluded.developer, version = excluded.version, last_update = excluded.last_update, date_added = excluded.date_added, needs_files = excluded.needs_files, data_url = excluded.data_url, notes = excluded.notes, works = excluded.works, controller_support = excluded.controller_support")
+        env.DB.prepare("INSERT INTO ports (port_id, game_slug, platform, project, link, url, developer, version, last_update, date_added, needs_files, data_url, notes, works, controller_support, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(game_slug, port_id) DO UPDATE SET platform = excluded.platform, project = excluded.project, link = excluded.link, url = excluded.url, developer = excluded.developer, version = excluded.version, last_update = excluded.last_update, date_added = CASE WHEN TRIM(COALESCE(ports.date_added, '')) <> '' THEN ports.date_added ELSE excluded.date_added END, needs_files = excluded.needs_files, data_url = excluded.data_url, notes = excluded.notes, works = excluded.works, controller_support = excluded.controller_support")
             .bind(port.portId, game.slug, port.platform, port.project, port.link, port.url, port.developer, port.version, port.lastUpdate, port.dateAdded, port.needsFiles, port.dataUrl, port.notes, port.works, port.controllerSupport, Number(sortRow?.next_order) || 0),
         env.DB.prepare("DELETE FROM port_developers WHERE game_slug = ? AND port_id = ?").bind(game.slug, port.portId),
         env.DB.prepare("DELETE FROM game_categories WHERE game_slug = ?").bind(game.slug)
@@ -1150,6 +1174,10 @@ document.getElementById("f").addEventListener("submit", async function(e) {
 }
 
 export default {
+    async scheduled(controller, env, ctx) {
+        ctx.waitUntil(registerMissingPortDates(env));
+    },
+
     async fetch(request, env) {
         if (request.method === "OPTIONS") {
             return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -1196,6 +1224,10 @@ export default {
 
             if (request.method === "POST" && path === "/admin/import-sheet") {
                 return await handleImportSheet(request, env);
+            }
+
+            if (request.method === "POST" && path === "/admin/register-missing-dates") {
+                return await handleRegisterMissingPortDates(request, env);
             }
 
             if (request.method === "GET" && path === "/health") {
