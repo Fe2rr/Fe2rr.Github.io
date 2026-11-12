@@ -1295,7 +1295,7 @@ document.getElementById("f").addEventListener("submit", async function(e) {
 
 export default {
     async scheduled(controller, env, ctx) {
-        ctx.waitUntil(Promise.all([registerMissingPortDates(env), updateGitHubVersions(env)]));
+        ctx.waitUntil(Promise.allSettled([registerMissingPortDates(env), updateGitHubVersions(env)]));
     },
 
     async fetch(request, env) {
