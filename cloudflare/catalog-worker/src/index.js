@@ -879,16 +879,16 @@ async function handleUpdateLaunchBoxData(request, env) {
 
 function identificarEnlaceSteam(url) {
     const value = String(url || "").trim().toLowerCase();
-    if (/(^|\\/\\/)(store\\.)?steampowered\\.com\\//i.test(value) ||
-        /(^|\\/\\/)steamcommunity\\.com\\//i.test(value)) return "steam";
-    if (/(^|\\/\\/)(www\\.)?gamesdb\\.launchbox-app\\.com\\//i.test(value) ||
-        /(^|\\/\\/)(www\\.)?launchbox-app\\.com\\//i.test(value) ||
-        /(^|\\/\\/)(www\\.)?launchbox\\.com\\//i.test(value)) return "launchbox";
+    if (/(^|\/\/)(store\.)?steampowered\.com\//i.test(value) ||
+        /(^|\/\/)steamcommunity\.com\//i.test(value)) return "steam";
+    if (/(^|\/\/)(www\.)?gamesdb\.launchbox-app\.com\//i.test(value) ||
+        /(^|\/\/)(www\.)?launchbox-app\.com\//i.test(value) ||
+        /(^|\/\/)(www\.)?launchbox\.com\//i.test(value)) return "launchbox";
     return "unknown";
 }
 
 function extraerSteamAppId(url) {
-    const match = String(url || "").trim().match(/store\\.steampowered\\.com\\/app\\/(\\d+)/i);
+    const match = String(url || "").trim().match(/store\.steampowered\.com\/app\/(\d+)/i);
     return match ? match[1] : "";
 }
 
@@ -900,7 +900,7 @@ function decodificarHTMLSteam(text) {
         .replace(/&#39;|&apos;/gi, "'")
         .replace(/&lt;/gi, "<")
         .replace(/&gt;/gi, ">")
-        .replace(/&#(\\d+);/g, (_, code) => {
+        .replace(/&#(\d+);/g, (_, code) => {
             const n = Number(code);
             return n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
         })
@@ -913,22 +913,22 @@ function decodificarHTMLSteam(text) {
 function limpiarDescripcionSteam(text) {
     if (!text) return "";
     let html = String(text)
-        .replace(/<br\\s*\\/?\\s*>/gi, "\\n")
-        .replace(/<\\/p\\s*>/gi, "\\n\\n")
-        .replace(/<p\\b[^>]*>/gi, "")
-        .replace(/<li\\b[^>]*>/gi, "\\n")
-        .replace(/<\\/li\\s*>/gi, "\\n")
+        .replace(/<br\s*\/?\s*>/gi, "\n")
+        .replace(/<\/p\s*>/gi, "\n\n")
+        .replace(/<p\b[^>]*>/gi, "")
+        .replace(/<li\b[^>]*>/gi, "\n")
+        .replace(/<\/li\s*>/gi, "\n")
         .replace(/<[^>]+>/g, " ");
     html = decodificarHTMLSteam(html)
-        .replace(/\\r\\n?/g, "\\n")
-        .replace(/[ \\t]+\\n/g, "\\n")
-        .replace(/\\n[ \\t]+/g, "\\n")
-        .replace(/[ \\t]{2,}/g, " ")
+        .replace(/\r\n?/g, "\n")
+        .replace(/[ \t]+\n/g, "\n")
+        .replace(/\n[ \t]+/g, "\n")
+        .replace(/[ \t]{2,}/g, " ")
         .trim();
-    const paragraphs = html.split(/\\n\\s*\\n/)
-        .map(p => p.replace(/\\s*\\n\\s*/g, " ").trim())
+    const paragraphs = html.split(/\n\s*\n/)
+        .map(p => p.replace(/\s*\n\s*/g, " ").trim())
         .filter(Boolean);
-    return paragraphs.length > 1 ? paragraphs.join("|||") : html.replace(/\\s*\\n\\s*/g, " ").trim();
+    return paragraphs.length > 1 ? paragraphs.join("|||") : html.replace(/\s*\n\s*/g, " ").trim();
 }
 
 async function obtenerMetadatosSteam(appId) {
@@ -948,7 +948,7 @@ async function obtenerMetadatosSteam(appId) {
 
     const game = entry.data;
     const releaseDate = String(game.release_date?.date || "");
-    const yearMatch = releaseDate.match(/\\b(?:19|20)\\d{2}\\b/);
+    const yearMatch = releaseDate.match(/\b(?:19|20)\d{2}\b/);
     const genre = Array.isArray(game.genres)
         ? game.genres.map(item => item?.description || "").filter(Boolean).join(", ")
         : "";
