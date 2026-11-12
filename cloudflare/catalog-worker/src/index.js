@@ -876,6 +876,203 @@ async function handleUpdateLaunchBoxData(request, env) {
     const result = await updateLaunchBoxData(env);
     return jsonResponse(result, 200, { "Cache-Control": "no-store" });
 }
+
+function identificarEnlaceSteam(url) {
+    const value = String(url || "").trim().toLowerCase();
+    if (/(^|\\/\\/)(store\\.)?steampowered\\.com\\//i.test(value) ||
+        /(^|\\/\\/)steamcommunity\\.com\\//i.test(value)) return "steam";
+    if (/(^|\\/\\/)(www\\.)?gamesdb\\.launchbox-app\\.com\\//i.test(value) ||
+        /(^|\\/\\/)(www\\.)?launchbox-app\\.com\\//i.test(value) ||
+        /(^|\\/\\/)(www\\.)?launchbox\\.com\\//i.test(value)) return "launchbox";
+    return "unknown";
+}
+
+function extraerSteamAppId(url) {
+    const match = String(url || "").trim().match(/store\\.steampowered\\.com\\/app\\/(\\d+)/i);
+    return match ? match[1] : "";
+}
+
+function decodificarHTMLSteam(text) {
+    return String(text || "")
+        .replace(/&amp;/gi, "&")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&#(\\d+);/g, (_, code) => {
+            const n = Number(code);
+            return n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+        })
+        .replace(/&#x([0-9a-f]+);/gi, (_, code) => {
+            const n = parseInt(code, 16);
+            return n >= 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "";
+        });
+}
+
+function limpiarDescripcionSteam(text) {
+    if (!text) return "";
+    let html = String(text)
+        .replace(/<br\\s*\\/?\\s*>/gi, "\\n")
+        .replace(/<\\/p\\s*>/gi, "\\n\\n")
+        .replace(/<p\\b[^>]*>/gi, "")
+        .replace(/<li\\b[^>]*>/gi, "\\n")
+        .replace(/<\\/li\\s*>/gi, "\\n")
+        .replace(/<[^>]+>/g, " ");
+    html = decodificarHTMLSteam(html)
+        .replace(/\\r\\n?/g, "\\n")
+        .replace(/[ \\t]+\\n/g, "\\n")
+        .replace(/\\n[ \\t]+/g, "\\n")
+        .replace(/[ \\t]{2,}/g, " ")
+        .trim();
+    const paragraphs = html.split(/\\n\\s*\\n/)
+        .map(p => p.replace(/\\s*\\n\\s*/g, " ").trim())
+        .filter(Boolean);
+    return paragraphs.length > 1 ? paragraphs.join("|||") : html.replace(/\\s*\\n\\s*/g, " ").trim();
+}
+
+async function obtenerMetadatosSteam(appId) {
+    const url = "https://store.steampowered.com/api/appdetails/?appids=" +
+        encodeURIComponent(appId) + "&l=english&cc=us";
+    const response = await fetch(url, {
+        method: "GET",
+        headers: { "Accept": "application/json", "User-Agent": "Mozilla/5.0 (compatible; NAPL/1.0)" },
+        cf: { cacheTtl: 21600, cacheEverything: true }
+    });
+    if (!response.ok) return { error: "steam_http_" + response.status };
+    const payload = await response.json();
+    const entry = payload && payload[String(appId)];
+    if (!entry || !entry.success || !entry.data || entry.data.type !== "game") {
+        return { notFound: true };
+    }
+
+    const game = entry.data;
+    const releaseDate = String(game.release_date?.date || "");
+    const yearMatch = releaseDate.match(/\\b(?:19|20)\\d{2}\\b/);
+    const genre = Array.isArray(game.genres)
+        ? game.genres.map(item => item?.description || "").filter(Boolean).join(", ")
+        : "";
+    const description = limpiarDescripcionSteam(game.about_the_game || game.short_description || "");
+
+    return {
+        metadata: {
+            year: yearMatch ? yearMatch[0] : "",
+            genre,
+            cover: "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/" + appId + "/library_600x900.jpg",
+            description
+        }
+    };
+}
+
+async function updateSteamGameData(env) {
+    const result = await env.DB.prepare(
+        `SELECT slug, name, launchbox_url, year, genre, description, cover_url
+         FROM games
+         WHERE launchbox_url IS NOT NULL AND TRIM(launchbox_url) <> ''
+         ORDER BY name COLLATE NOCASE ASC`
+    ).all();
+
+    const unique = new Map();
+    let launchBoxLinks = 0;
+    let invalidLinks = 0;
+    for (const row of result.results || []) {
+        const url = String(row.launchbox_url || "").trim();
+        const source = identificarEnlaceSteam(url);
+        if (source === "launchbox") {
+            launchBoxLinks++;
+            continue;
+        }
+        if (source !== "steam") {
+            invalidLinks++;
+            continue;
+        }
+        const appId = extraerSteamAppId(url);
+        if (!appId) {
+            invalidLinks++;
+            continue;
+        }
+        const needsData = !String(row.year || "").trim() ||
+            !String(row.genre || "").trim() ||
+            !String(row.cover_url || "").trim() ||
+            !String(row.description || "").trim();
+        if (needsData && !unique.has(appId)) unique.set(appId, row);
+    }
+
+    const candidates = Array.from(unique.entries()).slice(0, 500);
+    const errors = [];
+    let completedGames = 0;
+    let failedGames = 0;
+    let filledFields = 0;
+    const concurrency = 5;
+
+    for (let offset = 0; offset < candidates.length; offset += concurrency) {
+        const batch = candidates.slice(offset, offset + concurrency);
+        const fetched = await Promise.all(batch.map(async ([appId, row]) => {
+            try {
+                return { appId, row, ...(await obtenerMetadatosSteam(appId)) };
+            } catch (error) {
+                return { appId, row, error: String(error?.message || error).slice(0, 180) };
+            }
+        }));
+
+        const statements = [];
+        for (const item of fetched) {
+            if (item.error || item.notFound || !item.metadata) {
+                failedGames++;
+                errors.push({
+                    appId: item.appId,
+                    game: item.row.name,
+                    error: item.error || (item.notFound ? "steam_game_not_found_or_not_a_game" : "empty_response")
+                });
+                continue;
+            }
+            const m = item.metadata;
+            const values = [m.year || null, m.genre || null, m.cover || null, m.description || null];
+            if (!values.some(Boolean)) {
+                failedGames++;
+                errors.push({ appId: item.appId, game: item.row.name, error: "no_metadata_found" });
+                continue;
+            }
+
+            statements.push(env.DB.prepare(
+                `UPDATE games SET
+                    year = CASE WHEN TRIM(COALESCE(year, '')) = '' AND ? IS NOT NULL THEN ? ELSE year END,
+                    genre = CASE WHEN TRIM(COALESCE(genre, '')) = '' AND ? IS NOT NULL THEN ? ELSE genre END,
+                    cover_url = CASE WHEN TRIM(COALESCE(cover_url, '')) = '' AND ? IS NOT NULL THEN ? ELSE cover_url END,
+                    description = CASE WHEN TRIM(COALESCE(description, '')) = '' AND ? IS NOT NULL THEN ? ELSE description END
+                 WHERE slug = ?`
+            ).bind(
+                values[0], values[0], values[1], values[1],
+                values[2], values[2], values[3], values[3], item.row.slug
+            ));
+            completedGames++;
+            filledFields += values.filter(Boolean).length;
+        }
+        if (statements.length) await env.DB.batch(statements);
+        if (offset + concurrency < candidates.length) {
+            await new Promise(resolve => setTimeout(resolve, 600));
+        }
+    }
+
+    return {
+        success: true,
+        scannedGames: (result.results || []).length,
+        steamCandidates: candidates.length,
+        launchBoxLinksSkipped: launchBoxLinks,
+        unrecognizedLinks: invalidLinks,
+        completedGames,
+        failedGames,
+        filledFields,
+        errors
+    };
+}
+
+async function handleUpdateSteamGameData(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const result = await updateSteamGameData(env);
+    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
+}
 async function registerMissingPortDates(env) {
     const result = await env.DB.prepare(
         "UPDATE ports " +
@@ -1556,7 +1753,8 @@ export default {
             registerMissingPortDates(env),
             updateGitHubVersions(env),
             updateDevelopers(env),
-            updateLaunchBoxData(env)
+            updateLaunchBoxData(env),
+            updateSteamGameData(env)
         ]));
     },
 
@@ -1618,6 +1816,10 @@ export default {
 
             if (request.method === "POST" && path === "/admin/update-launchbox-data") {
                 return await handleUpdateLaunchBoxData(request, env);
+            }
+
+            if (request.method === "POST" && path === "/admin/update-steam-data") {
+                return await handleUpdateSteamGameData(request, env);
             }
 
             if (request.method === "POST" && path === "/admin/register-missing-dates") {
