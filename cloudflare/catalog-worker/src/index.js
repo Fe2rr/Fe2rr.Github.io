@@ -660,6 +660,232 @@ async function handleUpdateDevelopers(request, env) {
     const result = await updateDevelopers(env);
     return jsonResponse(result, 200, { "Cache-Control": "no-store" });
 }
+
+function limpiarEntidadesLB(texto) {
+    return String(texto || "")
+        .replace(/&amp;/gi, "&")
+        .replace(/&quot;/gi, '"')
+        .replace(/&#39;|&apos;/gi, "'")
+        .replace(/&nbsp;/gi, " ")
+        .replace(/&lt;/gi, "<")
+        .replace(/&gt;/gi, ">")
+        .replace(/&#(\d+);/g, (_, n) => {
+            const code = Number(n);
+            return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+        })
+        .replace(/&#x([0-9a-f]+);/gi, (_, n) => {
+            const code = parseInt(n, 16);
+            return code >= 0 && code <= 0x10ffff ? String.fromCodePoint(code) : "";
+        });
+}
+
+function limpiarHTMLLB(texto) {
+    return limpiarEntidadesLB(
+        String(texto || "")
+            .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
+            .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
+            .replace(/<br\s*\/?\s*>/gi, " ")
+            .replace(/<\/(?:p|div|li|span)>/gi, " ")
+            .replace(/<[^>]+>/g, " ")
+    ).replace(/\s+/g, " ").trim();
+}
+
+function buscarCampoHTMLLB(html, etiquetas) {
+    for (const etiqueta of etiquetas) {
+        const escaped = etiqueta.replace(/[.*+?^${}()|[\]\\]/g, "\\async function handleUpdateDevelopers(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const result = await updateDevelopers(env);
+    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
+}
+");
+        const patterns = [
+            new RegExp("<[^>]*>\\s*" + escaped + "\\s*:?\\s*</[^>]+>\\s*<[^>]*>([\\s\\S]*?)</[^>]+>", "i"),
+            new RegExp(escaped + "\\s*:\\s*([^<\\r\\n]+)", "i")
+        ];
+        for (const pattern of patterns) {
+            const match = html.match(pattern);
+            if (match?.[1]) {
+                const value = limpiarHTMLLB(match[1]);
+                if (value) return value;
+            }
+        }
+    }
+    return "";
+}
+
+function extraerOverviewLB(html) {
+    const heading = /<h[1-6][^>]*>\s*Overview\s*<\/h[1-6]>/i.exec(html);
+    if (!heading) return "";
+    const start = heading.index + heading[0].length;
+    const rest = html.slice(start);
+    const nextHeading = /<h[1-6][^>]*>[\s\S]*?<\/h[1-6]>/i.exec(rest);
+    const section = nextHeading ? rest.slice(0, nextHeading.index) : rest.slice(0, 12000);
+    const paragraphs = [];
+    const paragraphRegex = /<p\b[^>]*>([\s\S]*?)<\/p>/gi;
+    let match;
+    while ((match = paragraphRegex.exec(section)) !== null) {
+        const value = limpiarHTMLLB(match[1]);
+        if (value) paragraphs.push(value);
+    }
+    return paragraphs.length ? paragraphs.join("|||") : limpiarHTMLLB(section).slice(0, 3000);
+}
+
+function obtenerAtributoLB(tag, name) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\async function handleUpdateDevelopers(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const result = await updateDevelopers(env);
+    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
+}
+");
+    const match = tag.match(new RegExp("\\b" + escaped + "\\s*=\\s*[\"']([^\"']*)[\"']", "i"));
+    return match ? limpiarEntidadesLB(match[1]) : "";
+}
+
+function esURLImagenLB(value) {
+    const url = String(value || "").trim();
+    return /^https?:\/\/[^"'<>\s]+\.(?:jpg|jpeg|png|webp)(?:[?#][^"'<>\s]*)?$/i.test(url);
+}
+
+function extraerPortadaFrontalLB(html) {
+    const images = html.match(/<img\b[^>]*>/gi) || [];
+    for (const tag of images) {
+        const identity = [
+            obtenerAtributoLB(tag, "alt"),
+            obtenerAtributoLB(tag, "title"),
+            obtenerAtributoLB(tag, "data-title")
+        ].join(" ");
+        if (/Box\s*-\s*Front/i.test(identity)) {
+            const url = obtenerAtributoLB(tag, "src") || obtenerAtributoLB(tag, "data-src");
+            if (esURLImagenLB(url)) return url;
+        }
+    }
+
+    const index = html.search(/Box\s*-\s*Front/i);
+    if (index >= 0) {
+        const fragment = html.slice(Math.max(0, index - 2500), Math.min(html.length, index + 2500));
+        const nearbyImages = fragment.match(/<img\b[^>]*>/gi) || [];
+        for (let i = nearbyImages.length - 1; i >= 0; i--) {
+            const tag = nearbyImages[i];
+            const identity = [
+                obtenerAtributoLB(tag, "alt"),
+                obtenerAtributoLB(tag, "title"),
+                obtenerAtributoLB(tag, "data-title")
+            ].join(" ");
+            if (/Box\s*-\s*(Back|3D|Spine)/i.test(identity)) continue;
+            const url = obtenerAtributoLB(tag, "src") || obtenerAtributoLB(tag, "data-src");
+            if (esURLImagenLB(url)) return url;
+        }
+    }
+    return "";
+}
+
+function extraerMetadataLaunchBox(html) {
+    const releaseDate = buscarCampoHTMLLB(html, ["Release Date", "Release Year", "Year"]);
+    const yearMatch = releaseDate.match(/\b(?:19|20)\d{2}\b/);
+    return {
+        year: yearMatch ? yearMatch[0] : "",
+        genre: buscarCampoHTMLLB(html, ["Genre", "Genres"]),
+        description: extraerOverviewLB(html),
+        cover: extraerPortadaFrontalLB(html)
+    };
+}
+
+async function obtenerMetadataLaunchBox(url) {
+    const response = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0 (compatible; NAPL/1.0)", "Accept": "text/html" },
+        cf: { cacheTtl: 0, cacheEverything: false }
+    });
+    if (!response.ok) return { error: "http_" + response.status };
+    const html = await response.text();
+    if (html.length > 3_000_000) return { error: "html_too_large" };
+    return { metadata: extraerMetadataLaunchBox(html) };
+}
+
+async function updateLaunchBoxData(env) {
+    const result = await env.DB.prepare(
+        `SELECT slug, launchbox_url, year, genre, description, cover_url
+         FROM games
+         WHERE launchbox_url IS NOT NULL AND TRIM(launchbox_url) <> ''
+         ORDER BY name COLLATE NOCASE ASC`
+    ).all();
+
+    const unique = new Map();
+    for (const row of result.results || []) {
+        const url = String(row.launchbox_url || "").trim();
+        if (!/^https?:\/\/gamesdb\.launchbox-app\.com\/games\/details\//i.test(url)) continue;
+        const needsData = !String(row.year || "").trim() ||
+            !String(row.genre || "").trim() ||
+            !String(row.description || "").trim() ||
+            !String(row.cover_url || "").trim();
+        if (needsData && !unique.has(url)) unique.set(url, row);
+    }
+
+    const candidates = Array.from(unique.entries()).slice(0, 300);
+    const errors = [];
+    let updatedGames = 0;
+    let filledFields = 0;
+    const concurrency = 5;
+
+    for (let offset = 0; offset < candidates.length; offset += concurrency) {
+        const batch = candidates.slice(offset, offset + concurrency);
+        const fetched = await Promise.all(batch.map(async ([url, row]) => {
+            try {
+                return { url, row, ...(await obtenerMetadataLaunchBox(url)) };
+            } catch (error) {
+                return { url, row, error: String(error?.message || error).slice(0, 180) };
+            }
+        }));
+
+        const statements = [];
+        for (const item of fetched) {
+            if (item.error || !item.metadata) {
+                errors.push({ slug: item.row.slug, error: item.error || "empty_response" });
+                continue;
+            }
+            const m = item.metadata;
+            const values = [m.year || null, m.genre || null, m.description || null, m.cover || null];
+            if (!values.some(Boolean)) {
+                errors.push({ slug: item.row.slug, error: "no_metadata_found" });
+                continue;
+            }
+
+            statements.push(env.DB.prepare(
+                `UPDATE games SET
+                    year = CASE WHEN TRIM(COALESCE(year, '')) = '' AND ? IS NOT NULL THEN ? ELSE year END,
+                    genre = CASE WHEN TRIM(COALESCE(genre, '')) = '' AND ? IS NOT NULL THEN ? ELSE genre END,
+                    description = CASE WHEN TRIM(COALESCE(description, '')) = '' AND ? IS NOT NULL THEN ? ELSE description END,
+                    cover_url = CASE WHEN TRIM(COALESCE(cover_url, '')) = '' AND ? IS NOT NULL THEN ? ELSE cover_url END
+                 WHERE slug = ?`
+            ).bind(
+                values[0], values[0], values[1], values[1],
+                values[2], values[2], values[3], values[3], item.row.slug
+            ));
+            filledFields += values.filter(Boolean).length;
+            updatedGames++;
+        }
+        if (statements.length) await env.DB.batch(statements);
+        if (offset + concurrency < candidates.length) {
+            await new Promise(resolve => setTimeout(resolve, 1500));
+        }
+    }
+
+    return {
+        success: true,
+        candidates: candidates.length,
+        updatedGames,
+        filledFields,
+        errors
+    };
+}
+
+async function handleUpdateLaunchBoxData(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const result = await updateLaunchBoxData(env);
+    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
+}
 async function registerMissingPortDates(env) {
     const result = await env.DB.prepare(
         "UPDATE ports " +
@@ -1339,7 +1565,8 @@ export default {
         ctx.waitUntil(Promise.allSettled([
             registerMissingPortDates(env),
             updateGitHubVersions(env),
-            updateDevelopers(env)
+            updateDevelopers(env),
+            updateLaunchBoxData(env)
         ]));
     },
 
@@ -1397,6 +1624,10 @@ export default {
 
             if (request.method === "POST" && path === "/admin/update-developers") {
                 return await handleUpdateDevelopers(request, env);
+            }
+
+            if (request.method === "POST" && path === "/admin/update-launchbox-data") {
+                return await handleUpdateLaunchBoxData(request, env);
             }
 
             if (request.method === "POST" && path === "/admin/register-missing-dates") {
