@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#071b19">
+  <meta name="description" content="NAPL Experimental — Native Android Port List">
+  <title>NAPL — Experimental</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="ambient ambient-a"></div><div class="ambient ambient-b"></div>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="NAPL home"><span class="brand-mark">N</span><span>NAPL<span class="brand-dot">.</span><small>EXPERIMENTAL</small></span></a>
+    <nav class="top-links"><a class="active" href="./">Discover</a><a href="#catalog">Catalog</a><a href="#about">About</a></nav>
+    <div class="top-actions"><span class="status-pill"><i></i> COMMUNITY DATABASE</span><a class="admin-link" href="admin.html">Admin <span>↗</span></a></div>
+  </header>
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <div class="eyebrow"><span class="eyebrow-line"></span> NATIVE ANDROID PORT DATABASE</div>
+        <h1>Your games.<br><em>Beyond the limits.</em></h1>
+        <p class="hero-lede">Discover native Android ports of your favorite games. Explore projects, check compatibility and find your next install.</p>
+        <div class="hero-actions"><a class="button button-primary" href="#catalog">Explore the catalog <span>↓</span></a><span class="hero-note">A community-built index</span></div>
+      </div>
+      <div class="hero-art" aria-hidden="true">
+        <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+        <div class="device">
+          <div class="device-screen"><div class="screen-top"><span>NAPL / 001</span><span>● ● ●</span></div><div class="screen-symbol">N<span>+</span></div><div class="screen-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div><div class="screen-bottom">PLAY DIFFERENT.</div></div>
+        </div>
+        <div class="float-tag tag-top"><span class="tag-icon">↗</span><span><b>OPEN SOURCE</b><small>Community driven</small></span></div>
+        <div class="float-tag tag-bottom"><span class="pulse-dot"></span><span><b>PORTS DATABASE</b><small>Built for discovery</small></span></div>
+        <div class="hero-index">FIG. 001 — NAPL INTERFACE STUDY</div>
+      </div>
+    </section>
+    <section class="stats-row" aria-label="Catalog statistics">
+      <div class="stat"><strong id="stat-ports">—</strong><span>PORTS INDEXED</span></div>
+      <div class="stat"><strong id="stat-platforms">—</strong><span>PLATFORMS</span></div>
+      <div class="stat"><strong id="stat-working">—</strong><span>MARKED WORKING</span></div>
+      <div class="stat stat-note"><span class="live-indicator"></span><span>EXPERIMENTAL BUILD <b>v0.1</b></span></div>
+    </section>
+    <section class="catalog-section" id="catalog">
+      <div class="section-heading"><div><div class="eyebrow">THE INDEX / 01</div><h2>Find your <em>next port.</em></h2></div><div class="result-count" id="result-count">Loading catalog</div></div>
+      <div class="catalog-tools">
+        <label class="search-box"><span>⌕</span><input id="search-input" type="search" placeholder="Search games, projects, developers..." autocomplete="off"><kbd>/</kbd></label>
+        <div class="filter-group"><select id="platform-filter" aria-label="Filter by platform"><option value="">All platforms</option></select><select id="genre-filter" aria-label="Filter by genre"><option value="">All genres</option></select><select id="sort-filter" aria-label="Sort catalog"><option value="updated">Recently updated</option><option value="added">Recently added</option><option value="name">Name A–Z</option><option value="popular">Most visited</option></select></div>
+      </div>
+      <div class="active-filters" id="active-filters"></div>
+      <div class="port-grid" id="port-grid"><div class="loading-state">Loading ports<span>...</span></div></div>
+      <div class="empty-state" id="empty-state" hidden><div class="empty-icon">⌕</div><h3>No ports found</h3><p>Try another search or clear your filters.</p><button class="text-button" id="clear-filters">Clear filters ↗</button></div>
+    </section>
+    <section class="manifesto" id="about"><div class="manifesto-mark">N<span>/</span></div><div><div class="eyebrow">A LIVING DATABASE / 02</div><h2>Preserving the<br><em>unofficial classics.</em></h2></div><p>NAPL is a community index dedicated to native Android game ports. This experimental rebuild explores a faster catalog, clearer project information and tools that make community contributions easier.</p></section>
+  </main>
+  <footer><a class="brand footer-brand" href="./"><span class="brand-mark">N</span><span>NAPL<span class="brand-dot">.</span><small>EXPERIMENTAL</small></span></a><span>INDEPENDENT PROJECT INDEX · NOT AFFILIATED WITH GAME PUBLISHERS</span><a href="admin.html">Manage database ↗</a></footer>
+  <dialog id="port-dialog" class="port-dialog"><button class="dialog-close" id="dialog-close" aria-label="Close">×</button><div id="dialog-content"></div></dialog>
+  <script src="app.js"></script>
+</body>
+</html>
