@@ -285,43 +285,78 @@ async function handlePostCompatibility(request, env) {
 }
 
 async function handleGetPopular(url, env) {
-    const period = (url.searchParams.get("period") || url.searchParams.get("popular") || "week")
-        .trim()
-        .toLowerCase();
+    const requestedPeriod = (url.searchParams.get("period") || url.searchParams.get("popular") || "week")
+        .trim().toLowerCase();
+    const period = ["week", "month", "alltime"].includes(requestedPeriod) ? requestedPeriod : "week";
 
     let rows;
     if (period === "alltime") {
+        // Historical total comes from Google Sheets. New D1 events are added once.
+        // game_visit_totals is intentionally excluded because it contains old seed values.
         rows = await env.DB.prepare(
-            `SELECT t.game_slug AS slug,
-                    COALESCE(NULLIF(t.game_name, ''), g.name, t.game_slug) AS game,
-                    t.visits + COALESCE(l.visits, 0) AS visits
-             FROM game_visit_totals t
-             LEFT JOIN game_visit_legacy_totals l ON l.game_slug = t.game_slug
-             LEFT JOIN games g ON g.slug = t.game_slug
-             WHERE t.visits + COALESCE(l.visits, 0) > 0
-             UNION ALL
-             SELECT l.game_slug AS slug, COALESCE(g.name, l.game_name, l.game_slug) AS game, l.visits
-             FROM game_visit_legacy_totals l
-             LEFT JOIN games g ON g.slug = l.game_slug
-             WHERE l.visits > 0
-               AND NOT EXISTS (SELECT 1 FROM game_visit_totals t WHERE t.game_slug = l.game_slug)
+            `SELECT slug, MAX(game) AS game, SUM(visits) AS visits
+             FROM (
+                 SELECT l.game_slug AS slug,
+                        COALESCE(NULLIF(g.name, ''), NULLIF(l.game_name, ''), l.game_slug) AS game,
+                        l.visits AS visits
+                 FROM game_visit_legacy_totals l
+                 LEFT JOIN games g ON g.slug = l.game_slug
+                 UNION ALL
+                 SELECT v.game_slug AS slug,
+                        COALESCE(MAX(NULLIF(g.name, '')), MAX(NULLIF(v.game_name, '')), v.game_slug) AS game,
+                        COUNT(*) AS visits
+                 FROM game_visits v
+                 LEFT JOIN games g ON g.slug = v.game_slug
+                 GROUP BY v.game_slug
+             )
+             GROUP BY slug
+             HAVING SUM(visits) > 0
+             ORDER BY visits DESC, slug ASC
+             LIMIT 100`
+        ).all();
+    } else if (period === "month") {
+        // Daily history covers complete days through its latest imported date.
+        // Count live events only after that cutoff to prevent overlap/double counting.
+        rows = await env.DB.prepare(
+            `SELECT slug, MAX(game) AS game, SUM(visits) AS visits
+             FROM (
+                 SELECT h.game_slug AS slug,
+                        COALESCE(MAX(NULLIF(g.name, '')), MAX(NULLIF(h.game_name, '')), h.game_slug) AS game,
+                        SUM(h.visits) AS visits
+                 FROM game_visit_daily_totals h
+                 LEFT JOIN games g ON g.slug = h.game_slug
+                 WHERE h.visit_date >= date('now', '-29 days')
+                 GROUP BY h.game_slug
+                 UNION ALL
+                 SELECT v.game_slug AS slug,
+                        COALESCE(MAX(NULLIF(g.name, '')), MAX(NULLIF(v.game_name, '')), v.game_slug) AS game,
+                        COUNT(*) AS visits
+                 FROM game_visits v
+                 LEFT JOIN games g ON g.slug = v.game_slug
+                 WHERE v.visited_at >= datetime('now', '-30 days')
+                   AND date(v.visited_at) > COALESCE(
+                       (SELECT MAX(visit_date) FROM game_visit_daily_totals),
+                       '0000-00-00'
+                   )
+                 GROUP BY v.game_slug
+             )
+             GROUP BY slug
+             HAVING SUM(visits) > 0
              ORDER BY visits DESC, slug ASC
              LIMIT 100`
         ).all();
     } else {
-        const modifier = period === "month" ? "-30 days" : "-7 days";
+        // Week intentionally starts fresh: only new D1 visit events count.
         rows = await env.DB.prepare(
             `SELECT game_slug AS slug,
                     COALESCE(MAX(NULLIF(game_name, '')), game_slug) AS game,
                     COUNT(*) AS visits
              FROM game_visits
-             WHERE visited_at >= datetime('now', ?)
+             WHERE visited_at >= datetime('now', '-7 days')
              GROUP BY game_slug
              ORDER BY visits DESC, game_slug ASC
              LIMIT 100`
-        )
-            .bind(modifier)
-            .all();
+        ).all();
     }
 
     return jsonResponse(
@@ -335,11 +370,10 @@ async function handleGetPopular(url, env) {
             })),
         },
         200,
-        {
-            "Cache-Control": "public, max-age=30, s-maxage=60",
-        }
+        { "Cache-Control": "public, max-age=30, s-maxage=60" }
     );
 }
+
 
 async function handleRecordVisit(request, url, env) {
     let rawGame = url.searchParams.get("game") || "";
@@ -854,6 +888,107 @@ async function handleImportVisits(request, env) {
     });
 }
 
+async function handleImportDailyVisits(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+        return jsonResponse({ success: false, error: "El archivo debe ser un objeto JSON por fecha." }, 400);
+    }
+
+    const history = body.history && typeof body.history === "object" ? body.history : body;
+    const entries = [];
+    const datePattern = /^\\d{4}-\\d{2}-\\d{2}$/;
+
+    for (const [date, games] of Object.entries(history)) {
+        if (!datePattern.test(date) || !games || typeof games !== "object" || Array.isArray(games)) {
+            return jsonResponse({ success: false, error: "Formato inválido en la fecha: " + date }, 422);
+        }
+        const parsedDate = new Date(date + "T12:00:00Z");
+        if (Number.isNaN(parsedDate.getTime()) || parsedDate.toISOString().slice(0, 10) !== date) {
+            return jsonResponse({ success: false, error: "Fecha inválida: " + date }, 422);
+        }
+        for (const [rawSlug, rawVisits] of Object.entries(games)) {
+            const slug = String(rawSlug || "").trim().toLowerCase();
+            const visits = Number(rawVisits);
+            if (!slug || !/^[a-z0-9-]+$/.test(slug) || !Number.isSafeInteger(visits) || visits < 0) {
+                return jsonResponse({ success: false, error: "Registro inválido para " + date + " / " + rawSlug }, 422);
+            }
+            entries.push({ date, slug, visits });
+        }
+    }
+
+    if (!entries.length) {
+        return jsonResponse({ success: false, error: "No se encontraron registros para importar." }, 422);
+    }
+    if (entries.length > 50000) {
+        return jsonResponse({ success: false, error: "El archivo supera el máximo de 50.000 registros." }, 413);
+    }
+
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS game_visit_daily_totals (
+        game_slug TEXT NOT NULL,
+        game_name TEXT NOT NULL DEFAULT '',
+        visit_date TEXT NOT NULL,
+        visits INTEGER NOT NULL DEFAULT 0,
+        imported_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY (game_slug, visit_date)
+    )`).run();
+    await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_daily_visits_date ON game_visit_daily_totals(visit_date)").run();
+
+    const statements = entries.map((item) =>
+        env.DB.prepare(`INSERT INTO game_visit_daily_totals (game_slug, game_name, visit_date, visits)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(game_slug, visit_date) DO UPDATE SET
+                visits = excluded.visits,
+                imported_at = CURRENT_TIMESTAMP`)
+            .bind(item.slug, item.slug, item.date, item.visits)
+    );
+    for (let i = 0; i < statements.length; i += 50) {
+        await env.DB.batch(statements.slice(i, i + 50));
+    }
+
+    const bounds = await env.DB.prepare(
+        "SELECT MIN(visit_date) AS first_date, MAX(visit_date) AS last_date, COUNT(*) AS records FROM game_visit_daily_totals"
+    ).first();
+
+    return jsonResponse({
+        success: true,
+        importedRecords: entries.length,
+        importedDays: Object.keys(history).length,
+        firstDate: bounds?.first_date || null,
+        lastDate: bounds?.last_date || null,
+        totalStoredRecords: Number(bounds?.records) || 0,
+        message: "Historial diario importado. Repetir la importación actualiza los mismos días sin sumar duplicados."
+    });
+}
+
+function handleImportDailyVisitsPage() {
+    const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NAPL — Importar historial diario</title>
+<body style="font:16px system-ui;max-width:560px;margin:40px auto;padding:0 18px;background:#101810;color:#eef5ee">
+<h2>Importar historial diario</h2>
+<p>Seleccioná el archivo <b>NAPL-visitas-ultimos-30-dias.json</b> exportado desde Apps Script. La importación reemplaza los valores de cada juego y fecha; no los suma si se repite.</p>
+<form id="f">
+<input id="secret" type="password" autocomplete="off" required placeholder="IMPORT_SECRET" style="box-sizing:border-box;width:100%;padding:12px;margin:8px 0;background:#202d20;color:white;border:1px solid #607060;border-radius:6px">
+<input id="file" type="file" accept=".json,application/json" required style="display:block;margin:14px 0">
+<button style="padding:12px 18px">Importar historial</button></form>
+<pre id="result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<script>
+document.getElementById("f").addEventListener("submit",async e=>{
+ e.preventDefault();const out=document.getElementById("result");const file=document.getElementById("file").files[0];
+ if(!file){out.textContent="Seleccioná el archivo JSON.";return;}
+ out.textContent="Leyendo e importando "+file.name+"…";
+ try{
+  const raw=await file.text();const parsed=JSON.parse(raw);
+  const r=await fetch("/admin/import-daily-visits",{method:"POST",headers:{"Authorization":"Bearer "+document.getElementById("secret").value,"Content-Type":"application/json"},body:JSON.stringify(parsed)});
+  const data=await r.json();out.textContent=JSON.stringify(data,null,2);
+ }catch(err){out.textContent="Error: "+err.message;}
+});
+</script></body></html>`;
+    return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
+}
+
 function handleImportVisitsPage() {
     const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NAPL — Recuperar visitas</title><body style="font:16px system-ui;max-width:520px;margin:40px auto;padding:0 18px;background:#101810;color:#eef5ee">
@@ -1025,6 +1160,14 @@ export default {
 
             if (request.method === "GET" && path === "/admin/import") {
                 return handleImportPage();
+            }
+
+            if (request.method === "GET" && path === "/admin/import-daily-visits") {
+                return handleImportDailyVisitsPage();
+            }
+
+            if (request.method === "POST" && path === "/admin/import-daily-visits") {
+                return await handleImportDailyVisits(request, env);
             }
 
             if (request.method === "GET" && path === "/admin/import-visits") {
