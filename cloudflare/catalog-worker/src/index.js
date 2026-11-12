@@ -504,7 +504,7 @@ async function registerMissingPortDates(env) {
         "UPDATE ports " +
         "SET date_added = strftime('%Y-%m-%d %H:%M:%S', 'now', '-3 hours') " +
         "WHERE TRIM(COALESCE(date_added, '')) = '' " +
-        "AND (TRIM(COALESCE(port_id, '')) <> '' OR " +
+        "AND (TRIM(COALESCE(port_id, '')) <> '' OR TRIM(COALESCE(game_slug, '')) <> '' OR " +
         "TRIM(COALESCE(platform, '')) <> '' OR TRIM(COALESCE(project, '')) <> '' OR " +
         "TRIM(COALESCE(link, '')) <> '' OR TRIM(COALESCE(url, '')) <> '' OR " +
         "TRIM(COALESCE(developer, '')) <> '' OR TRIM(COALESCE(version, '')) <> '' OR " +
