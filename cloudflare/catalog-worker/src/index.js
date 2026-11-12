@@ -692,7 +692,7 @@ function limpiarHTMLLB(texto) {
 
 function buscarCampoHTMLLB(html, etiquetas) {
     for (const etiqueta of etiquetas) {
-        const escaped = etiqueta.replace(/[.*+?^${}()|[\]\\]/g, "\\async function handleUpdateDevelopers(request, env) {
+        const escaped = etiqueta;
     const denied = requireAdmin(request, env);
     if (denied) return denied;
     const result = await updateDevelopers(env);
@@ -732,7 +732,7 @@ function extraerOverviewLB(html) {
 }
 
 function obtenerAtributoLB(tag, name) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\async function handleUpdateDevelopers(request, env) {
+    const escaped = name;
     const denied = requireAdmin(request, env);
     if (denied) return denied;
     const result = await updateDevelopers(env);
