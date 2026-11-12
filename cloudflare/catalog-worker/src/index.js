@@ -500,10 +500,10 @@ async function handleReportLink(request, env) {
 }
 
 function normalizeGitHubRepo(value) {
-    const match = String(value || '').trim().match(/^https?:\\/\\/(?:www\\.)?github\\.com\\/([^/?#]+)\\/([^/?#]+)/i);
+    const match = String(value || '').trim().match(/^https?:\/\/(?:www\.)?github\.com\/([^/?#]+)\/([^/?#]+)/i);
     if (!match) return null;
     const owner = match[1];
-    const repo = match[2].replace(/\\.git$/i, '');
+    const repo = match[2].replace(/\.git$/i, '');
     const blockedOwners = ['settings','search','login','logout','signup','explore','marketplace','topics','orgs','users','collections','sponsors','notifications','new'];
     const blockedRepos = /^(issues|pulls|projects|actions|releases|tags|branches|wiki|tree|blob|commit|commits)$/i;
     if (!owner || !repo || blockedOwners.includes(owner.toLowerCase()) || blockedRepos.test(repo)) return null;
