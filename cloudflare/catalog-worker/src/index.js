@@ -693,12 +693,7 @@ function limpiarHTMLLB(texto) {
 function buscarCampoHTMLLB(html, etiquetas) {
     for (const etiqueta of etiquetas) {
         const escaped = etiqueta;
-    const denied = requireAdmin(request, env);
-    if (denied) return denied;
-    const result = await updateDevelopers(env);
-    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
-}
-");
+
         const patterns = [
             new RegExp("<[^>]*>\\s*" + escaped + "\\s*:?\\s*</[^>]+>\\s*<[^>]*>([\\s\\S]*?)</[^>]+>", "i"),
             new RegExp(escaped + "\\s*:\\s*([^<\\r\\n]+)", "i")
@@ -733,12 +728,7 @@ function extraerOverviewLB(html) {
 
 function obtenerAtributoLB(tag, name) {
     const escaped = name;
-    const denied = requireAdmin(request, env);
-    if (denied) return denied;
-    const result = await updateDevelopers(env);
-    return jsonResponse(result, 200, { "Cache-Control": "no-store" });
-}
-");
+
     const match = tag.match(new RegExp("\\b" + escaped + "\\s*=\\s*[\"']([^\"']*)[\"']", "i"));
     return match ? limpiarEntidadesLB(match[1]) : "";
 }
