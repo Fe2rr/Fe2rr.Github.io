@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#071b19"><title>NAPL Admin — Experimental</title><link rel="stylesheet" href="styles.css"><link rel="stylesheet" href="admin.css"></head>
+<body class="admin-page">
+<header class="topbar"><a class="brand" href="./"><span class="brand-mark">N</span><span>NAPL<span class="brand-dot">.</span><small>EXPERIMENTAL ADMIN</small></span></a><div class="top-actions"><span class="status-pill"><i></i> LOCAL DEMO MODE</span><a class="admin-link" href="./">← Public site</a></div></header>
+<main class="admin-main">
+  <div class="admin-heading"><div><div class="eyebrow">CONTROL ROOM / 01</div><h1>Manage the <em>index.</em></h1><p>Prototype content manager. Changes are saved in this browser only.</p></div><button class="button button-primary" id="add-port">＋ Add new port</button></div>
+  <div class="demo-warning"><b>EXPERIMENTAL STORAGE</b><span>This preview uses browser storage. It does not write to the live NAPL database or GitHub. Export your JSON to keep a copy of your changes.</span></div>
+  <section class="admin-stats"><div><strong id="admin-total">0</strong><span>TOTAL PORTS</span></div><div><strong id="admin-platforms">0</strong><span>PLATFORMS</span></div><div><strong id="admin-working">0</strong><span>WORKING</span></div></section>
+  <div class="admin-toolbar"><input id="admin-search" type="search" placeholder="Search catalog..."><select id="admin-platform"><option value="">All platforms</option></select><div class="toolbar-spacer"></div><button class="admin-button" id="export-json">Export JSON ↓</button><label class="admin-button import-button">Import JSON ↑<input id="import-json" type="file" accept="application/json"></label></div>
+  <div class="table-wrap"><table><thead><tr><th>PORT / PROJECT</th><th>PLATFORM</th><th>VERSION</th><th>STATUS</th><th>ID</th><th></th></tr></thead><tbody id="admin-rows"></tbody></table><div class="admin-empty" id="admin-empty" hidden>No ports match your search.</div></div>
+</main>
+<dialog id="edit-dialog" class="edit-dialog"><form id="port-form"><div class="form-heading"><div><div class="eyebrow">DATABASE ENTRY</div><h2 id="form-title">Add port</h2></div><button type="button" class="dialog-close" id="form-close">×</button></div><input type="hidden" id="field-id">
+<div class="form-grid">
+<label>Game title *<input id="field-game" required maxlength="120"></label><label>Platform *<input id="field-platform" required maxlength="60" placeholder="Android"></label>
+<label>Project name<input id="field-project" maxlength="120"></label><label>Developer<input id="field-developer" maxlength="120"></label>
+<label>Source / repository URL<input id="field-link" type="url"></label><label>Project URL<input id="field-url" type="url"></label>
+<label>Version<input id="field-version" maxlength="40"></label><label>Last update<input id="field-updated" type="date"></label>
+<label>Genre<input id="field-genre" maxlength="60"></label><label>Release year<input id="field-year" type="number" min="1970" max="2100"></label>
+<label class="wide">Cover image URL<input id="field-cover" type="url"></label><label class="wide">Description<textarea id="field-description" rows="3"></textarea></label>
+<label class="wide">Notes<textarea id="field-notes" rows="2"></textarea></label>
+<label class="check-label"><input id="field-works" type="checkbox"> Marked as working</label><label class="check-label"><input id="field-controller" type="checkbox"> Controller support</label><label class="check-label"><input id="field-files" type="checkbox"> Requires game files</label>
+</div><div class="form-actions"><button type="button" class="admin-button danger" id="delete-port" hidden>Delete port</button><span></span><button type="button" class="admin-button" id="cancel-form">Cancel</button><button class="button button-primary" type="submit">Save port</button></div></form></dialog>
+<script src="admin.js"></script>
+</body></html>
