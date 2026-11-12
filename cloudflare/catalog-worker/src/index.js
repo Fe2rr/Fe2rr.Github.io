@@ -289,6 +289,11 @@ async function handleGetPopular(url, env) {
         .trim().toLowerCase();
     const period = ["week", "month", "alltime"].includes(requestedPeriod) ? requestedPeriod : "week";
 
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS game_visit_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT NOT NULL
+    )`).run();
+
     let rows;
     if (period === "alltime") {
         // Historical total comes from Google Sheets. New D1 events are added once.
@@ -352,7 +357,10 @@ async function handleGetPopular(url, env) {
                     COALESCE(MAX(NULLIF(game_name, '')), game_slug) AS game,
                     COUNT(*) AS visits
              FROM game_visits
-             WHERE visited_at >= datetime('now', '-7 days')
+             WHERE visited_at >= COALESCE(
+                 (SELECT setting_value FROM game_visit_settings WHERE setting_key = 'week_reset_at'),
+                 datetime('now')
+             )
              GROUP BY game_slug
              ORDER BY visits DESC, game_slug ASC
              LIMIT 100`
@@ -935,6 +943,14 @@ async function handleImportDailyVisits(request, env) {
         PRIMARY KEY (game_slug, visit_date)
     )`).run();
     await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_daily_visits_date ON game_visit_daily_totals(visit_date)").run();
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS game_visit_settings (
+        setting_key TEXT PRIMARY KEY,
+        setting_value TEXT NOT NULL
+    )`).run();
+    // The first successful history import establishes the fresh Week baseline.
+    // Re-importing the same JSON does not reset the Week counter.
+    await env.DB.prepare(`INSERT OR IGNORE INTO game_visit_settings (setting_key, setting_value)
+        VALUES ('week_reset_at', CURRENT_TIMESTAMP)`).run();
 
     const statements = entries.map((item) =>
         env.DB.prepare(`INSERT INTO game_visit_daily_totals (game_slug, game_name, visit_date, visits)
