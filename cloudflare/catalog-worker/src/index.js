@@ -1,8 +1,10 @@
+import { readSheetRows, updateSheetCells, buildCatalogFromSheet, sheetColumnName, writeSheetValues, deleteSheetRow } from "./sheets.js";
+
 /*
  * NAPL — CATALOG CLOUDFLARE WORKER
  *
- * Serves games, ports and platforms from a dedicated D1 database
- * (completely separate from the votes/ratings Worker & DB).
+ * Google Sheets is the catalog source of truth. Cloudflare KV serves the
+ * public catalog cache; D1 remains for community activity and legacy fallback.
  */
 
 const CORS_HEADERS = {
@@ -44,70 +46,88 @@ function mapPortRow(row) {
 }
 
 async function handleGetCatalog(env) {
-    const [platformsResult, gamesResult, portsResult] = await Promise.all([
-        env.DB.prepare(
-            "SELECT name FROM platforms ORDER BY sort_order ASC, id ASC"
-        ).all(),
-        env.DB.prepare(
-            `SELECT slug, name, year, genre, description, cover_url, launchbox_url
-             FROM games
-             ORDER BY name COLLATE NOCASE ASC`
-        ).all(),
-        env.DB.prepare(
-            `SELECT p.*, g.name AS game_name, g.year AS game_year
-             FROM ports p
-             JOIN games g ON g.slug = p.game_slug
-             ORDER BY p.sort_order ASC, p.id ASC`
-        ).all(),
-    ]);
-
-    const gamesMap = new Map();
-
-    for (const g of gamesResult.results || []) {
-        gamesMap.set(g.slug, {
-            slug: g.slug,
-            name: g.name,
-            year: g.year || "",
-            genre: g.genre || "",
-            description: g.description || "",
-            coverUrl: g.cover_url || "",
-            launchboxUrl: g.launchbox_url || "",
-            platforms: [],
-            ports: [],
-        });
+    if (env.CATALOG_KV) {
+        const cached = await env.CATALOG_KV.get("catalog:v1");
+        if (cached) {
+            try {
+                return jsonResponse(JSON.parse(cached), 200, {
+                    "Cache-Control": "public, max-age=60, s-maxage=300"
+                });
+            } catch (error) {
+                console.error("Invalid catalog cache; falling back to D1:", error);
+            }
+        }
     }
 
+    // Transitional fallback until the Sheets catalog has been synchronized to KV.
+    const [platformsResult, gamesResult, portsResult] = await Promise.all([
+        env.DB.prepare("SELECT name FROM platforms ORDER BY sort_order ASC, id ASC").all(),
+        env.DB.prepare("SELECT slug, name, year, genre, description, cover_url, launchbox_url FROM games ORDER BY name COLLATE NOCASE ASC").all(),
+        env.DB.prepare("SELECT p.*, g.name AS game_name, g.year AS game_year FROM ports p JOIN games g ON g.slug = p.game_slug ORDER BY p.sort_order ASC, p.id ASC").all()
+    ]);
+    const gamesMap = new Map();
+    for (const g of gamesResult.results || []) {
+        gamesMap.set(g.slug, {
+            slug: g.slug, name: g.name, year: g.year || "", genre: g.genre || "",
+            description: g.description || "", coverUrl: g.cover_url || "",
+            launchboxUrl: g.launchbox_url || "", platforms: [], ports: []
+        });
+    }
     for (const p of portsResult.results || []) {
         const game = gamesMap.get(p.game_slug);
         if (!game) continue;
-
-        if (p.platform && !game.platforms.includes(p.platform)) {
-            game.platforms.push(p.platform);
-        }
-
+        if (p.platform && !game.platforms.includes(p.platform)) game.platforms.push(p.platform);
         game.ports.push(mapPortRow(p));
     }
+    return jsonResponse({
+        success: true,
+        platforms: (platformsResult.results || []).map((r) => r.name),
+        games: Array.from(gamesMap.values())
+    }, 200, { "Cache-Control": "public, max-age=60, s-maxage=300" });
+}
 
-    const platforms = (platformsResult.results || []).map((r) => r.name);
-    const games = Array.from(gamesMap.values());
-
-    return jsonResponse(
-        {
-            success: true,
-            platforms,
-            games,
-        },
-        200,
-        {
-            "Cache-Control": "public, max-age=120, s-maxage=300",
-        }
-    );
+async function handleSyncCatalogCache(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    if (!env.CATALOG_KV) {
+        return jsonResponse({ success: false, error: "CATALOG_KV is not bound. Create a KV namespace and bind it to this Worker as CATALOG_KV." }, 503);
+    }
+    const sheet = await readSheetRows(env);
+    const catalog = buildCatalogFromSheet(sheet);
+    if (!catalog.games.length) {
+        return jsonResponse({ success: false, error: "The Sheet did not produce any games; the existing cache was left unchanged." }, 422);
+    }
+    const updatedAt = new Date().toISOString();
+    await env.CATALOG_KV.put("catalog:v1", JSON.stringify({ ...catalog, updatedAt }));
+    return jsonResponse({
+        success: true,
+        games: catalog.games.length,
+        ports: catalog.games.reduce((total, game) => total + game.ports.length, 0),
+        platforms: catalog.platforms.length,
+        updatedAt
+    }, 200, { "Cache-Control": "no-store" });
 }
 
 async function handleGetGame(slug, env) {
     const cleanSlug = decodeURIComponent(slug || "").trim().toLowerCase();
     if (!cleanSlug) {
         return jsonResponse({ success: false, error: "Missing game slug." }, 400);
+    }
+
+    if (env.CATALOG_KV) {
+        const cached = await env.CATALOG_KV.get("catalog:v1");
+        if (cached) {
+            try {
+                const catalog = JSON.parse(cached);
+                const game = (catalog.games || []).find((item) => item.slug === cleanSlug);
+                if (!game) return jsonResponse({ success: false, error: "Game not found." }, 404);
+                return jsonResponse({ success: true, game }, 200, {
+                    "Cache-Control": "public, max-age=60, s-maxage=300"
+                });
+            } catch (error) {
+                console.error("Invalid catalog cache in game lookup:", error);
+            }
+        }
     }
 
     const gameRow = await env.DB.prepare(
@@ -165,7 +185,7 @@ async function handleGetGame(slug, env) {
 
 async function handleGetDevices(env) {
     const result = await env.DEVICES_DB.prepare(
-        "SELECT id, name FROM devices ORDER BY name COLLATE NOCASE ASC"
+        "SELECT id, name, manufacturer, model, cpu FROM devices ORDER BY name COLLATE NOCASE ASC"
     ).all();
 
     return jsonResponse(
@@ -294,9 +314,16 @@ async function handleGetPopular(url, env) {
         setting_value TEXT NOT NULL
     )`).run();
 
+    // Establish one shared starting point for the new Week and Month counters.
+    // This key is intentionally separate from any older reset setting.
+    await env.DB.prepare(
+        `INSERT OR IGNORE INTO game_visit_settings (setting_key, setting_value)
+         VALUES ('periods_start_at', CURRENT_TIMESTAMP)`
+    ).run();
+
     let rows;
     if (period === "alltime") {
-        // Historical total comes from Google Sheets. New D1 events are added once.
+        // Preserve the historical total and add every new D1 event exactly once.
         // game_visit_totals is intentionally excluded because it contains old seed values.
         rows = await env.DB.prepare(
             `SELECT slug, MAX(game) AS game, SUM(visits) AS visits
@@ -319,52 +346,26 @@ async function handleGetPopular(url, env) {
              ORDER BY visits DESC, slug ASC
              LIMIT 100`
         ).all();
-    } else if (period === "month") {
-        // Daily history covers complete days through its latest imported date.
-        // Count live events only after that cutoff to prevent overlap/double counting.
-        rows = await env.DB.prepare(
-            `SELECT slug, MAX(game) AS game, SUM(visits) AS visits
-             FROM (
-                 SELECT h.game_slug AS slug,
-                        COALESCE(MAX(NULLIF(g.name, '')), MAX(NULLIF(h.game_name, '')), h.game_slug) AS game,
-                        SUM(h.visits) AS visits
-                 FROM game_visit_daily_totals h
-                 LEFT JOIN games g ON g.slug = h.game_slug
-                 WHERE h.visit_date >= date('now', '-29 days')
-                 GROUP BY h.game_slug
-                 UNION ALL
-                 SELECT v.game_slug AS slug,
-                        COALESCE(MAX(NULLIF(g.name, '')), MAX(NULLIF(v.game_name, '')), v.game_slug) AS game,
-                        COUNT(*) AS visits
-                 FROM game_visits v
-                 LEFT JOIN games g ON g.slug = v.game_slug
-                 WHERE v.visited_at >= datetime('now', '-30 days')
-                   AND date(v.visited_at) > COALESCE(
-                       (SELECT MAX(visit_date) FROM game_visit_daily_totals),
-                       '0000-00-00'
-                   )
-                 GROUP BY v.game_slug
-             )
-             GROUP BY slug
-             HAVING SUM(visits) > 0
-             ORDER BY visits DESC, slug ASC
-             LIMIT 100`
-        ).all();
     } else {
-        // Week intentionally starts fresh: only new D1 visit events count.
+        // Week and Month both start at the first request after this version is deployed.
+        // They count only visits recorded since that shared baseline.
+        const window = period === "month" ? "-30 days" : "-7 days";
         rows = await env.DB.prepare(
-            `SELECT game_slug AS slug,
-                    COALESCE(MAX(NULLIF(game_name, '')), game_slug) AS game,
+            `SELECT v.game_slug AS slug,
+                    COALESCE(MAX(NULLIF(g.name, '')), MAX(NULLIF(v.game_name, '')), v.game_slug) AS game,
                     COUNT(*) AS visits
-             FROM game_visits
-             WHERE visited_at >= COALESCE(
-                 (SELECT setting_value FROM game_visit_settings WHERE setting_key = 'week_reset_at'),
-                 datetime('now')
+             FROM game_visits v
+             LEFT JOIN games g ON g.slug = v.game_slug
+             WHERE v.visited_at >= (
+                 SELECT setting_value
+                 FROM game_visit_settings
+                 WHERE setting_key = 'periods_start_at'
              )
-             GROUP BY game_slug
-             ORDER BY visits DESC, game_slug ASC
+               AND v.visited_at >= datetime('now', ?)
+             GROUP BY v.game_slug
+             ORDER BY visits DESC, v.game_slug ASC
              LIMIT 100`
-        ).all();
+        ).bind(window).all();
     }
 
     return jsonResponse(
@@ -455,6 +456,39 @@ async function handleReportLink(request, env) {
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
+    // Enforce one link report per voter token every 10 minutes.
+    // The limit is checked and reserved atomically in D1, so parallel requests
+    // cannot bypass it by arriving at the same time.
+    await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS link_report_rate_limits (
+            token_hash TEXT PRIMARY KEY,
+            last_report_at INTEGER NOT NULL
+        )
+    `).run();
+
+    const now = Math.floor(Date.now() / 1000);
+    const reservation = await env.DB.prepare(`
+        INSERT INTO link_report_rate_limits (token_hash, last_report_at)
+        VALUES (?, ?)
+        ON CONFLICT(token_hash) DO UPDATE SET last_report_at = excluded.last_report_at
+        WHERE link_report_rate_limits.last_report_at <= ? - 600
+    `).bind(tokenHash, now, now).run();
+
+    if (!reservation.meta?.changes) {
+        const previous = await env.DB.prepare(
+            "SELECT last_report_at FROM link_report_rate_limits WHERE token_hash = ?"
+        ).bind(tokenHash).first();
+        const retryAfter = Math.max(
+            1,
+            600 - (now - Number(previous?.last_report_at || now))
+        );
+        return jsonResponse({
+            success: false,
+            error: `You can submit another report in ${Math.ceil(retryAfter / 60)} minute(s).`,
+            retry_after_seconds: retryAfter
+        }, 429, { "Retry-After": String(retryAfter) });
+    }
+
     const payload = {
         embeds: [
             {
@@ -479,11 +513,17 @@ async function handleReportLink(request, env) {
         });
     } catch (error) {
         console.error("Discord webhook network error:", error);
+        await env.DB.prepare(
+            "DELETE FROM link_report_rate_limits WHERE token_hash = ? AND last_report_at = ?"
+        ).bind(tokenHash, now).run();
         return jsonResponse({ success: false, error: "Could not reach Discord. Please try again." }, 502);
     }
 
     if (!discordResponse.ok) {
         console.error("Discord webhook returned HTTP", discordResponse.status);
+        await env.DB.prepare(
+            "DELETE FROM link_report_rate_limits WHERE token_hash = ? AND last_report_at = ?"
+        ).bind(tokenHash, now).run();
         return jsonResponse({ success: false, error: "Discord rejected the report.", discordStatus: discordResponse.status }, 502);
     }
 
@@ -517,40 +557,79 @@ function githubApiUrl(info, suffix = '') {
 function formatGitHubDate(value) {
     const date = new Date(value);
     if (!Number.isFinite(date.getTime())) return '';
-    const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Montevideo', year: 'numeric', month: 'long', day: 'numeric' }).formatToParts(date);
-    const part = (type) => parts.find((item) => item.type === type)?.value || '';
-    return part('year') + ', ' + part('month') + ' ' + Number(part('day'));
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Montevideo',
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hourCycle: 'h23'
+    }).formatToParts(date);
+    const values = Object.fromEntries(parts.map((item) => [item.type, item.value]));
+    return `${values.year}-${values.month}-${values.day} ${values.hour}:${values.minute}:${values.second}`;
 }
 
 async function githubRequest(url, token) {
     return fetch(url, {
-        headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' },
+        headers: {
+            Authorization: 'Bearer ' + token,
+            Accept: 'application/vnd.github+json',
+            'X-GitHub-Api-Version': '2022-11-28',
+            'User-Agent': 'NAPL-Catalog-Worker'
+        },
         cf: { cacheTtl: 0, cacheEverything: false }
     });
 }
 
+async function githubResponseDetail(response) {
+    const rateRemaining = response.headers.get('x-ratelimit-remaining');
+    const rateReset = response.headers.get('x-ratelimit-reset');
+    const retryAfter = response.headers.get('retry-after');
+    let message = '';
+    try {
+        const body = await response.clone().json();
+        message = String(body.message || body.error || '').slice(0, 240);
+    } catch (_) {}
+    return [
+        message,
+        rateRemaining !== null ? 'rate_remaining=' + rateRemaining : '',
+        rateReset ? 'rate_reset=' + rateReset : '',
+        retryAfter ? 'retry_after=' + retryAfter : ''
+    ].filter(Boolean).join('; ') || 'No response details';
+}
+
 async function resolveGitHubVersion(info, token) {
     let releaseResponse;
-    try { releaseResponse = await githubRequest(githubApiUrl(info, '/releases/latest'), token); }
-    catch (error) { return { key: info.key, error: 'release_network_error' }; }
+    try {
+        releaseResponse = await githubRequest(githubApiUrl(info, '/releases/latest'), token);
+    } catch (error) {
+        return { key: info.key, error: 'release_network_error', detail: String(error?.message || error).slice(0, 240) };
+    }
 
     if (releaseResponse.status === 200) {
         try {
             const release = await releaseResponse.json();
             const version = String(release.tag_name || release.name || '').trim();
             if (version) return { key: info.key, version, date: release.published_at || release.created_at || '', source: 'Release' };
-        } catch (_) {}
+        } catch (error) {
+            return { key: info.key, error: 'invalid_release_json', detail: String(error?.message || error).slice(0, 240) };
+        }
     } else if (releaseResponse.status !== 404) {
-        return { key: info.key, error: 'release_http_' + releaseResponse.status };
+        return { key: info.key, error: 'release_http_' + releaseResponse.status, detail: await githubResponseDetail(releaseResponse) };
     }
 
     let tagsResponse;
-    try { tagsResponse = await githubRequest(githubApiUrl(info, '/tags?per_page=1'), token); }
-    catch (error) { return { key: info.key, error: 'tags_network_error' }; }
-    if (!tagsResponse.ok) return { key: info.key, error: 'tags_http_' + tagsResponse.status };
+    try {
+        tagsResponse = await githubRequest(githubApiUrl(info, '/tags?per_page=1'), token);
+    } catch (error) {
+        return { key: info.key, error: 'tags_network_error', detail: String(error?.message || error).slice(0, 240) };
+    }
+    if (!tagsResponse.ok) {
+        return { key: info.key, error: 'tags_http_' + tagsResponse.status, detail: await githubResponseDetail(tagsResponse) };
+    }
 
     let tags;
-    try { tags = await tagsResponse.json(); } catch (_) { return { key: info.key, error: 'invalid_tags_json' }; }
+    try { tags = await tagsResponse.json(); } catch (error) {
+        return { key: info.key, error: 'invalid_tags_json', detail: String(error?.message || error).slice(0, 240) };
+    }
     if (!Array.isArray(tags) || !tags.length) return { key: info.key, error: 'no_release_or_tag' };
     const version = String(tags[0]?.name || '').trim();
     if (!version) return { key: info.key, error: 'empty_tag' };
@@ -566,91 +645,127 @@ async function resolveGitHubVersion(info, token) {
     return { key: info.key, version, date: pushedAt, source: 'Tag' };
 }
 
-async function updateGitHubVersions(env) {
-    if (!env.GITHUB_TOKEN) throw new Error('GITHUB_TOKEN secret is not configured.');
-    const rowsResult = await env.DB.prepare("SELECT game_slug, port_id, url FROM ports WHERE url IS NOT NULL AND TRIM(url) <> ''").all();
-    const rows = rowsResult.results || [];
+async function updateGitHubVersions(env, offset = 0) {
+    if (!env.GITHUB_TOKEN) throw new Error("GITHUB_TOKEN secret is not configured.");
+    const sheet = await readSheetRows(env);
+    const urlIndex = sheet.headerMap.get("URL");
+    const versionIndex = sheet.headerMap.get("VERSION");
+    const dateIndex = sheet.headerMap.get("LAST UPDATE");
+    if (urlIndex === undefined || versionIndex === undefined || dateIndex === undefined) {
+        throw new Error("The Sheet must contain URL, VERSION and LAST UPDATE columns.");
+    }
+
     const repoMap = new Map();
-    for (const row of rows) {
-        const info = normalizeGitHubRepo(row.url);
+    for (const item of sheet.rows) {
+        const info = normalizeGitHubRepo(item.values[urlIndex]);
         if (info && !repoMap.has(info.key)) repoMap.set(info.key, info);
     }
     const repos = Array.from(repoMap.values());
+    const totalRepositories = repos.length;
+    const startOffset = Math.max(0, Math.min(totalRepositories, Number.parseInt(offset, 10) || 0));
+    const batchSize = 12;
+    const batch = repos.slice(startOffset, startOffset + batchSize);
+    const resolved = await Promise.all(batch.map((info) => resolveGitHubVersion(info, env.GITHUB_TOKEN)));
     const results = new Map();
     const errors = [];
-    const batchSize = 20;
-    for (let offset = 0; offset < repos.length; offset += batchSize) {
-        const batch = repos.slice(offset, offset + batchSize);
-        const resolved = await Promise.all(batch.map((info) => resolveGitHubVersion(info, env.GITHUB_TOKEN)));
-        for (const item of resolved) {
-            if (item.version) results.set(item.key, item);
-            else if (item.error) errors.push({ repository: item.key, error: item.error });
-        }
+    let withoutVersion = 0;
+    for (const item of resolved) {
+        if (item.version) results.set(item.key, item);
+        else if (item.error === "no_release_or_tag") withoutVersion++;
+        else if (item.error) errors.push({ repository: item.key, error: item.error, detail: item.detail || "" });
     }
 
-    const statements = [];
+    const batchKeys = new Set(batch.map((info) => info.key));
+    const updates = [];
     let updatedRows = 0;
     let versionRows = 0;
     let dateRows = 0;
-    for (const row of rows) {
-        const info = normalizeGitHubRepo(row.url);
-        if (!info) continue;
+    for (const item of sheet.rows) {
+        const info = normalizeGitHubRepo(item.values[urlIndex]);
+        if (!info || !batchKeys.has(info.key)) continue;
         const result = results.get(info.key);
         if (!result?.version) continue;
-        const assignments = ['version = ?'];
-        const values = [String(result.version)];
+
+        updates.push({
+            rowNumber: item.rowNumber,
+            column: sheetColumnName(versionIndex),
+            value: String(result.version)
+        });
         versionRows++;
         if (result.date) {
             const formattedDate = formatGitHubDate(result.date);
-            if (formattedDate) { assignments.push('last_update = ?'); values.push(formattedDate); dateRows++; }
+            if (formattedDate) {
+                updates.push({
+                    rowNumber: item.rowNumber,
+                    column: sheetColumnName(dateIndex),
+                    value: formattedDate
+                });
+                dateRows++;
+            }
         }
-        values.push(row.game_slug, row.port_id);
-        statements.push(env.DB.prepare('UPDATE ports SET ' + assignments.join(', ') + ' WHERE game_slug = ? AND port_id = ?').bind(...values));
         updatedRows++;
     }
-    for (let i = 0; i < statements.length; i += 50) await env.DB.batch(statements.slice(i, i + 50));
-    return { success: true, uniqueRepositories: repos.length, repositoriesWithVersion: results.size, updatedRows, versionRows, dateRows, errors };
+
+    if (updates.length) await updateSheetCells(env, updates);
+    const nextOffset = startOffset + batch.length;
+    return {
+        success: true,
+        uniqueRepositories: totalRepositories,
+        processedRepositories: batch.length,
+        nextOffset,
+        complete: nextOffset >= totalRepositories,
+        repositoriesWithVersion: results.size,
+        withoutVersion,
+        updatedRows,
+        versionRows,
+        dateRows,
+        errors
+    };
 }
 
 async function handleUpdateGitHubVersions(request, env) {
     const denied = requireAdmin(request, env);
     if (denied) return denied;
     if (!env.GITHUB_TOKEN) return jsonResponse({ success: false, error: 'GITHUB_TOKEN secret is not configured.' }, 503);
-    const result = await updateGitHubVersions(env);
+    let body = {};
+    try { body = await request.json(); } catch (_) {}
+    const offset = Math.max(0, Number.parseInt(body.offset, 10) || 0);
+    const result = await updateGitHubVersions(env, offset);
+    if (result.complete && env.CATALOG_KV) {
+        await refreshCatalogCache(env);
+    }
     return jsonResponse(result, 200, { 'Cache-Control': 'no-store' });
 }
 
 async function updateDevelopers(env) {
-    const rowsResult = await env.DB.prepare(
-        "SELECT game_slug, port_id, url FROM ports WHERE url IS NOT NULL AND TRIM(url) <> ''"
-    ).all();
+    const sheet = await readSheetRows(env);
+    const urlIndex = sheet.headerMap.get("URL");
+    const developerIndex = sheet.headerMap.get("DEVELOPER");
+    if (urlIndex === undefined || developerIndex === undefined) {
+        throw new Error("The Sheet must contain URL and DEVELOPER columns.");
+    }
 
-    const statements = [];
-    let updatedRows = 0;
-    let uniqueDevelopers = new Set();
-
-    for (const row of rowsResult.results || []) {
-        const info = normalizeGitHubRepo(row.url);
+    const updates = [];
+    const developers = new Set();
+    for (const item of sheet.rows) {
+        const existing = String(item.values[developerIndex] || "").trim();
+        if (existing) continue;
+        const info = normalizeGitHubRepo(item.values[urlIndex]);
         if (!info) continue;
-
-        statements.push(
-            env.DB.prepare(
-                "UPDATE ports SET developer = ? WHERE game_slug = ? AND port_id = ?"
-            ).bind(info.owner, row.game_slug, row.port_id)
-        );
-        uniqueDevelopers.add(info.owner.toLowerCase());
-        updatedRows++;
+        updates.push({
+            rowNumber: item.rowNumber,
+            column: sheetColumnName(developerIndex),
+            value: info.owner
+        });
+        developers.add(info.owner.toLowerCase());
     }
-
-    for (let i = 0; i < statements.length; i += 50) {
-        await env.DB.batch(statements.slice(i, i + 50));
-    }
-
+    if (updates.length) await updateSheetCells(env, updates);
+    if (updates.length && env.CATALOG_KV) await refreshCatalogCache(env);
     return {
         success: true,
-        scannedRows: (rowsResult.results || []).length,
-        updatedRows,
-        uniqueDevelopers: uniqueDevelopers.size
+        scannedRows: sheet.rows.length,
+        updatedRows: updates.length,
+        uniqueDevelopers: developers.size
     };
 }
 
@@ -812,7 +927,7 @@ async function updateLaunchBoxData(env) {
         if (needsData && !unique.has(url)) unique.set(url, row);
     }
 
-    const candidates = Array.from(unique.entries()).slice(0, 300);
+    const candidates = Array.from(unique.entries());
     const errors = [];
     let updatedGames = 0;
     let filledFields = 0;
@@ -998,7 +1113,7 @@ async function updateSteamGameData(env) {
         if (needsData && !unique.has(appId)) unique.set(appId, row);
     }
 
-    const candidates = Array.from(unique.entries()).slice(0, 500);
+    const candidates = Array.from(unique.entries());
     const errors = [];
     let completedGames = 0;
     let failedGames = 0;
@@ -1139,26 +1254,94 @@ function requireAdmin(request, env) {
 async function handleAdminListPorts(request, env) {
     const denied = requireAdmin(request, env);
     if (denied) return denied;
-    const [games, ports] = await Promise.all([
-        env.DB.prepare("SELECT slug, name, year, genre, description, cover_url, launchbox_url FROM games ORDER BY name COLLATE NOCASE").all(),
-        env.DB.prepare("SELECT p.*, g.name AS game_name, g.year AS game_year, g.genre AS game_genre, g.description AS game_description, g.cover_url AS game_cover_url, g.launchbox_url AS game_launchbox_url FROM ports p JOIN games g ON g.slug = p.game_slug ORDER BY g.name COLLATE NOCASE, p.platform COLLATE NOCASE, p.port_id").all()
-    ]);
+    const sheet = await readSheetRows(env);
+    const slugify = (value) => importSlug(value);
+    const gamesMap = new Map();
+    const ports = [];
+    let currentGame = "";
+    let currentYear = "";
+    for (const item of sheet.rows) {
+        const row = item.object;
+        const read = (...names) => {
+            for (const name of names) {
+                const value = row[importNormalizeHeader(name)];
+                if (value !== undefined && String(value).trim() !== "") return String(value).trim();
+            }
+            return "";
+        };
+        if (read("GAME", "GAME NAME", "NAME", "JUEGO")) currentGame = read("GAME", "GAME NAME", "NAME", "JUEGO");
+        if (read("YEAR", "ANO", "AÑO")) currentYear = read("YEAR", "ANO", "AÑO");
+        if (!currentGame) continue;
+        const gameSlug = slugify(currentGame);
+        if (!gameSlug) continue;
+
+        const genre = read("GENRE", "GÉNERO", "GENERO");
+        const description = read("DESCRIPTION", "DESCRIPCIÓN", "DESCRIPCION");
+        const coverUrl = read("COVER_URL", "COVER URL", "COVER", "PORTADA");
+        const launchboxUrl = read("LAUNCHBOX_URL", "LAUNCHBOX URL");
+        if (!gamesMap.has(gameSlug)) {
+            gamesMap.set(gameSlug, {
+                slug: gameSlug, name: currentGame, year: currentYear, genre, description,
+                cover_url: coverUrl, launchbox_url: launchboxUrl, visits: 0
+            });
+        } else {
+            const existingGame = gamesMap.get(gameSlug);
+            if (!existingGame.year && currentYear) existingGame.year = currentYear;
+            if (!existingGame.genre && genre) existingGame.genre = genre;
+            if (!existingGame.description && description) existingGame.description = description;
+            if (!existingGame.cover_url && coverUrl) existingGame.cover_url = coverUrl;
+            if (!existingGame.launchbox_url && launchboxUrl) existingGame.launchbox_url = launchboxUrl;
+        }
+        const portId = read("PORTS_ID", "PORT ID", "PORT_ID") || gameSlug + "-row-" + item.rowNumber;
+        const hasData = ["PLATFORM","PROJECT","LINK","URL","DEVELOPER","VERSION","LAST UPDATE","DATE ADDED","NEEDS GAME FILES?","DATA URL","NOTES","WORKS?","CONTROLLER SUPPORT"]
+            .some((key) => read(key));
+        if (!hasData) continue;
+        ports.push({
+            rowNumber: item.rowNumber,
+            gameSlug, gameName: currentGame, year: currentYear, genre, description,
+            coverUrl, launchboxUrl, visits: 0,
+            portId, platform: read("PLATFORM"), project: read("PROJECT"), link: read("LINK"),
+            url: read("URL"), developer: read("DEVELOPER"), version: read("VERSION"),
+            lastUpdate: read("LAST UPDATE"), dateAdded: read("DATE ADDED"),
+            needsFiles: read("NEEDS GAME FILES?", "NEEDS GAME FILES"),
+            dataUrl: read("DATA URL"), notes: read("NOTES"),
+            inputMethods: read("CONTROLLER SUPPORT", "CONTROLLER", "GAMEPAD")
+        });
+    }
+
+    // Visits remain in D1 and are only loaded for the protected admin screen.
+    try {
+        const [legacy, recent] = await Promise.all([
+            env.DB.prepare("SELECT game_slug, visits FROM game_visit_legacy_totals").all(),
+            env.DB.prepare("SELECT game_slug, COUNT(*) AS visits FROM game_visits GROUP BY game_slug").all()
+        ]);
+        const totals = new Map();
+        for (const row of legacy.results || []) totals.set(row.game_slug, (totals.get(row.game_slug) || 0) + Number(row.visits || 0));
+        for (const row of recent.results || []) totals.set(row.game_slug, (totals.get(row.game_slug) || 0) + Number(row.visits || 0));
+        for (const game of gamesMap.values()) game.visits = totals.get(game.slug) || 0;
+        for (const port of ports) port.visits = totals.get(port.gameSlug) || 0;
+    } catch (error) {
+        console.warn("Admin visit totals could not be loaded:", error);
+    }
+
+    const platforms = [];
+    const seenPlatforms = new Set();
+    for (const port of ports) {
+        const key = port.platform.toLowerCase();
+        if (port.platform && !seenPlatforms.has(key)) {
+            seenPlatforms.add(key);
+            if (!["multi-game apps", "multi game apps"].includes(key)) platforms.push(port.platform);
+        }
+    }
     return jsonResponse({
         success: true,
-        games: games.results || [],
-        ports: (ports.results || []).map((p) => ({
-            gameSlug: p.game_slug, gameName: p.game_name, year: p.game_year || "",
-            genre: p.game_genre || "", description: p.game_description || "",
-            coverUrl: p.game_cover_url || "", launchboxUrl: p.game_launchbox_url || "",
-            portId: p.port_id, platform: p.platform || "", project: p.project || "",
-            link: p.link || "", url: p.url || "", developer: p.developer || "",
-            version: p.version || "", lastUpdate: p.last_update || "",
-            dateAdded: p.date_added || "", needsFiles: p.needs_files || "",
-            dataUrl: p.data_url || "", notes: p.notes || "", works: p.works || "",
-            controllerSupport: p.controller_support || ""
-        }))
+        games: Array.from(gamesMap.values()),
+        platforms,
+        ports
     }, 200, { "Cache-Control": "no-store" });
 }
+
+
 
 async function handleAdminSavePort(request, env) {
     const denied = requireAdmin(request, env);
@@ -1168,62 +1351,211 @@ async function handleAdminSavePort(request, env) {
 
     const clean = (value, max = 2000) => String(value ?? "").trim().slice(0, max);
     const gameName = clean(body.gameName, 180);
-    const requestedSlug = clean(body.gameSlug, 180);
-    const isNewGame = requestedSlug === "__new__";
-    const gameSlug = isNewGame ? importSlug(gameName) : requestedSlug;
-    const portId = clean(body.portId, 120);
+    const requestedGameSlug = clean(body.gameSlug, 180);
+    const gameSlug = requestedGameSlug === "__new__" ? importSlug(gameName) : requestedGameSlug;
+    let portId = clean(body.portId, 120);
+    const originalPortId = clean(body.originalPortId, 120);
     const platform = clean(body.platform, 100);
-    if (!gameName || !gameSlug || !portId || !platform) {
-        return jsonResponse({ success: false, error: "Game name, game, port ID and platform are required." }, 400);
+    if (!gameName || !gameSlug || !platform) {
+        return jsonResponse({ success: false, error: "Game name, game and platform are required." }, 400);
     }
 
-    const game = {
-        slug: gameSlug, name: gameName, year: clean(body.year, 20),
-        genre: clean(body.genre, 120), description: clean(body.description, 4000),
-        coverUrl: clean(body.coverUrl, 1000), launchboxUrl: clean(body.launchboxUrl, 1000)
+    const sheet = await readSheetRows(env);
+    if (!portId) {
+        const ids = new Set(sheet.rows.map((item) => String(item.values[sheet.headerMap.get("PORTS_ID")] || "").trim()));
+        const prefix = gameSlug.slice(0, 85) + (body.isUnofficialPort === true ? "-unofficial-port-" : "-port-");
+        let sequence = 1;
+        while (ids.has(prefix + sequence)) sequence++;
+        portId = prefix + sequence;
+    }
+    const headers = sheet.headers;
+    const indexOf = (...aliases) => {
+        for (const alias of aliases) {
+            const index = sheet.headerMap.get(importNormalizeHeader(alias));
+            if (index !== undefined) return index;
+        }
+        return -1;
     };
-    const port = {
-        portId, platform, project: clean(body.project, 300), link: clean(body.link, 1000),
-        url: clean(body.url, 1000), developer: clean(body.developer, 180),
-        version: clean(body.version, 100), lastUpdate: clean(body.lastUpdate, 100),
-        dateAdded: clean(body.dateAdded, 100) || new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace('T', ' '), needsFiles: clean(body.needsFiles, 100),
-        dataUrl: clean(body.dataUrl, 1000), notes: clean(body.notes, 2000),
-        works: clean(body.works, 100), controllerSupport: clean(body.controllerSupport, 100)
+    const required = ["GAME","PORTS_ID","PLATFORM","PROJECT","LINK","URL","DEVELOPER","VERSION","LAST UPDATE"];
+    const missing = required.filter((key) => indexOf(key) < 0);
+    if (missing.length) return jsonResponse({ success: false, error: "Missing Sheet columns: " + missing.join(", ") }, 422);
+
+    const set = (values, aliases, value) => {
+        const index = indexOf(...aliases);
+        if (index >= 0) values[index] = String(value ?? "");
     };
-
-    const existingGame = await env.DB.prepare("SELECT slug FROM games WHERE slug = ?").bind(gameSlug).first();
-    if (!isNewGame && !existingGame) return jsonResponse({ success: false, error: "Selected game no longer exists. Reload the list." }, 409);
-    if (isNewGame && existingGame) return jsonResponse({ success: false, error: "A game with that name already exists. Select it from the game list instead." }, 409);
-    const sortRow = await env.DB.prepare("SELECT COALESCE(MAX(sort_order), -1) + 1 AS next_order FROM ports").first();
-
-    const statements = [
-        env.DB.prepare("INSERT INTO games (slug, name, year, genre, description, cover_url, launchbox_url) VALUES (?, ?, ?, ?, ?, ?, ?) ON CONFLICT(slug) DO UPDATE SET name = excluded.name, year = excluded.year, genre = excluded.genre, description = excluded.description, cover_url = excluded.cover_url, launchbox_url = excluded.launchbox_url, updated_at = CURRENT_TIMESTAMP")
-            .bind(game.slug, game.name, game.year, game.genre, game.description, game.coverUrl, game.launchboxUrl),
-        env.DB.prepare("INSERT INTO platforms (name, sort_order) VALUES (?, 999) ON CONFLICT(name) DO NOTHING").bind(port.platform),
-        env.DB.prepare("INSERT INTO ports (port_id, game_slug, platform, project, link, url, developer, version, last_update, date_added, needs_files, data_url, notes, works, controller_support, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) ON CONFLICT(game_slug, port_id) DO UPDATE SET platform = excluded.platform, project = excluded.project, link = excluded.link, url = excluded.url, developer = excluded.developer, version = excluded.version, last_update = excluded.last_update, date_added = CASE WHEN TRIM(COALESCE(ports.date_added, '')) <> '' THEN ports.date_added ELSE excluded.date_added END, needs_files = excluded.needs_files, data_url = excluded.data_url, notes = excluded.notes, works = excluded.works, controller_support = excluded.controller_support")
-            .bind(port.portId, game.slug, port.platform, port.project, port.link, port.url, port.developer, port.version, port.lastUpdate, port.dateAdded, port.needsFiles, port.dataUrl, port.notes, port.works, port.controllerSupport, Number(sortRow?.next_order) || 0),
-        env.DB.prepare("DELETE FROM port_developers WHERE game_slug = ? AND port_id = ?").bind(game.slug, port.portId),
-        env.DB.prepare("DELETE FROM game_categories WHERE game_slug = ?").bind(game.slug)
-    ];
-
-    if (port.developer) {
-        const developerSlug = importSlug(port.developer);
-        if (developerSlug) {
-            statements.push(env.DB.prepare("INSERT INTO developers (name, slug) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET slug = excluded.slug").bind(port.developer, developerSlug));
-            statements.push(env.DB.prepare("INSERT INTO port_developers (game_slug, port_id, developer_id) SELECT ?, ?, id FROM developers WHERE slug = ? ON CONFLICT(game_slug, port_id, developer_id) DO NOTHING").bind(game.slug, port.portId, developerSlug));
+    let currentGame = "";
+    let target = null;
+    let firstGameRow = null;
+    const groupRows = [];
+    for (const item of sheet.rows) {
+        const gameCell = String(item.values[indexOf("GAME")] || "").trim();
+        if (gameCell) currentGame = gameCell;
+        if (importSlug(currentGame) === gameSlug) {
+            groupRows.push(item);
+            if (!firstGameRow) firstGameRow = item;
+            const rowPortId = String(item.values[indexOf("PORTS_ID")] || "").trim();
+            if ((body.rowNumber && item.rowNumber === Number(body.rowNumber)) ||
+                rowPortId === (originalPortId || portId)) target = item;
         }
     }
-    if (game.genre) {
-        const categorySlug = importSlug(game.genre);
-        if (categorySlug) {
-            statements.push(env.DB.prepare("INSERT INTO categories (name, slug) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET slug = excluded.slug").bind(game.genre, categorySlug));
-            statements.push(env.DB.prepare("INSERT INTO game_categories (game_slug, category_id) SELECT ?, id FROM categories WHERE slug = ? ON CONFLICT(game_slug, category_id) DO NOTHING").bind(game.slug, categorySlug));
-        }
+    if ((originalPortId || body.rowNumber) && !target) {
+        return jsonResponse({ success: false, error: "Port not found in Google Sheets. Reload the list." }, 409);
     }
 
-    await env.DB.batch(statements);
-    return jsonResponse({ success: true, gameSlug: game.slug, portId: port.portId });
+    const makeValues = (source = []) => {
+        const values = [...source];
+        while (values.length < headers.length) values.push("");
+        return values.slice(0, headers.length);
+    };
+    const now = new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString().slice(0, 19).replace("T", " ");
+    const lastUpdate = clean(body.lastUpdate, 100);
+    const dateAdded = clean(body.dateAdded, 100) || now;
+    const portValues = makeValues(target?.values || []);
+    set(portValues, ["GAME"], gameName);
+    set(portValues, ["YEAR"], clean(body.year, 20));
+    set(portValues, ["GENRE"], clean(body.genre, 120));
+    set(portValues, ["DESCRIPTION"], clean(body.description, 4000));
+    set(portValues, ["COVER_URL","COVER URL"], clean(body.coverUrl, 1000));
+    set(portValues, ["LAUNCHBOX_URL","LAUNCHBOX URL"], clean(body.launchboxUrl, 1000));
+    set(portValues, ["PORTS_ID"], portId);
+    set(portValues, ["PLATFORM"], platform);
+    set(portValues, ["PROJECT"], clean(body.project, 300));
+    set(portValues, ["LINK"], clean(body.link, 1000));
+    set(portValues, ["URL"], clean(body.url, 1000));
+    set(portValues, ["DEVELOPER"], clean(body.developer, 180));
+    set(portValues, ["VERSION"], clean(body.version, 100));
+    set(portValues, ["LAST UPDATE"], lastUpdate);
+    set(portValues, ["DATE ADDED"], dateAdded);
+    set(portValues, ["NEEDS GAME FILES?","NEEDS GAME FILES"], clean(body.needsFiles, 100));
+    set(portValues, ["DATA URL"], clean(body.dataUrl, 1000));
+    set(portValues, ["NOTES"], clean(body.notes, 2000));
+    set(portValues, ["CONTROLLER SUPPORT"], clean(body.inputMethods, 100));
+
+    const { tabName } = sheet;
+    const quotedTab = "'" + tabName.replace(/'/g, "''") + "'";
+    if (target) {
+        const cellUpdates = [];
+        const queue = (rowNumber, aliases, value) => {
+            const columnIndex = indexOf(...aliases);
+            if (columnIndex >= 0) {
+                cellUpdates.push({
+                    rowNumber,
+                    column: sheetColumnName(columnIndex),
+                    value: String(value ?? "")
+                });
+            }
+        };
+        // Game-level fields live on the first row of the game's group.
+        queue(firstGameRow.rowNumber, ["GAME"], gameName);
+        queue(firstGameRow.rowNumber, ["YEAR"], clean(body.year, 20));
+        queue(firstGameRow.rowNumber, ["GENRE"], clean(body.genre, 120));
+        queue(firstGameRow.rowNumber, ["DESCRIPTION"], clean(body.description, 4000));
+        queue(firstGameRow.rowNumber, ["COVER_URL","COVER URL"], clean(body.coverUrl, 1000));
+        queue(firstGameRow.rowNumber, ["LAUNCHBOX_URL","LAUNCHBOX URL"], clean(body.launchboxUrl, 1000));
+
+        // If the sheet repeats the game name on multiple rows, keep those labels consistent.
+        for (const groupRow of groupRows) {
+            if (groupRow.rowNumber === firstGameRow.rowNumber) continue;
+            const existingGameCell = String(groupRow.values[indexOf("GAME")] || "").trim();
+            if (existingGameCell) queue(groupRow.rowNumber, ["GAME"], gameName);
+        }
+
+        // Port-level fields are written only to the selected row, preserving merged
+        // game metadata cells and every unrelated column in the sheet.
+        queue(target.rowNumber, ["PORTS_ID"], portId);
+        queue(target.rowNumber, ["PLATFORM"], platform);
+        queue(target.rowNumber, ["PROJECT"], clean(body.project, 300));
+        queue(target.rowNumber, ["LINK"], clean(body.link, 1000));
+        queue(target.rowNumber, ["URL"], clean(body.url, 1000));
+        queue(target.rowNumber, ["DEVELOPER"], clean(body.developer, 180));
+        queue(target.rowNumber, ["VERSION"], clean(body.version, 100));
+        queue(target.rowNumber, ["LAST UPDATE"], lastUpdate);
+        queue(target.rowNumber, ["DATE ADDED"], dateAdded);
+        queue(target.rowNumber, ["NEEDS GAME FILES?","NEEDS GAME FILES"], clean(body.needsFiles, 100));
+        queue(target.rowNumber, ["DATA URL"], clean(body.dataUrl, 1000));
+        queue(target.rowNumber, ["NOTES"], clean(body.notes, 2000));
+        queue(target.rowNumber, ["CONTROLLER SUPPORT"], clean(body.inputMethods, 100));
+        await updateSheetCells(env, cellUpdates);
+    } else {
+        if (groupRows.length) {
+            const cellUpdates = [];
+            const queue = (aliases, value) => {
+                const columnIndex = indexOf(...aliases);
+                if (columnIndex >= 0) cellUpdates.push({
+                    rowNumber: firstGameRow.rowNumber,
+                    column: sheetColumnName(columnIndex),
+                    value: String(value ?? "")
+                });
+            };
+            queue(["GAME"], gameName);
+            queue(["YEAR"], clean(body.year, 20));
+            queue(["GENRE"], clean(body.genre, 120));
+            queue(["DESCRIPTION"], clean(body.description, 4000));
+            queue(["COVER_URL","COVER URL"], clean(body.coverUrl, 1000));
+            queue(["LAUNCHBOX_URL","LAUNCHBOX URL"], clean(body.launchboxUrl, 1000));
+            await updateSheetCells(env, cellUpdates);
+        }
+        set(portValues, ["GAME"], gameName);
+        await writeSheetValues(env, quotedTab + "!A:Z", [portValues], { append: true });
+    }
+
+    // Preserve the Admin ability to adjust the historical visit baseline.
+    if (body.visits !== undefined && body.visits !== null && body.visits !== "") {
+        await env.DB.prepare(`INSERT INTO game_visit_legacy_totals (game_slug, game_name, visits, imported_at)
+            VALUES (?, ?, MAX(0, ? - COALESCE((SELECT COUNT(*) FROM game_visits WHERE game_slug = ?), 0)), CURRENT_TIMESTAMP)
+            ON CONFLICT(game_slug) DO UPDATE SET
+                game_name = excluded.game_name,
+                visits = excluded.visits,
+                imported_at = CURRENT_TIMESTAMP`)
+            .bind(gameSlug, gameName, Math.max(0, Math.floor(Number(body.visits) || 0)), gameSlug)
+            .run();
+    }
+
+    // Keep the public cache in sync immediately when KV is configured.
+    if (env.CATALOG_KV) {
+        const refreshed = await readSheetRows(env);
+        const catalog = buildCatalogFromSheet(refreshed);
+        await env.CATALOG_KV.put("catalog:v1", JSON.stringify({ ...catalog, updatedAt: new Date().toISOString() }));
+    }
+    return jsonResponse({ success: true, gameSlug, portId });
 }
+
+
+
+async function handleAdminDeletePort(request, env) {
+    const denied = requireAdmin(request, env);
+    if (denied) return denied;
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object") return jsonResponse({ success: false, error: "Invalid JSON body." }, 400);
+
+    const gameSlug = String(body.gameSlug || "").trim().slice(0, 180);
+    const portId = String(body.portId || "").trim().slice(0, 120);
+    if (!gameSlug || !portId) return jsonResponse({ success: false, error: "gameSlug and portId are required." }, 400);
+
+    const sheet = await readSheetRows(env);
+    const gameIndex = sheet.headerMap.get("GAME");
+    const portIndex = sheet.headerMap.get("PORTS_ID");
+    let currentGame = "";
+    const target = sheet.rows.find((item) => {
+        const name = String(item.values[gameIndex] || "").trim();
+        if (name) currentGame = name;
+        const sameGame = importSlug(currentGame) === gameSlug;
+        const sameRow = body.rowNumber && item.rowNumber === Number(body.rowNumber);
+        return sameGame && (sameRow || String(item.values[portIndex] || "").trim() === portId);
+    });
+    if (!target) return jsonResponse({ success: false, error: "Port not found in Google Sheets. Reload the catalog." }, 404);
+
+    await deleteSheetRow(env, target.rowNumber);
+    if (env.CATALOG_KV) {
+        const refreshed = await readSheetRows(env);
+        const catalog = buildCatalogFromSheet(refreshed);
+        await env.CATALOG_KV.put("catalog:v1", JSON.stringify({ ...catalog, updatedAt: new Date().toISOString() }));
+    }
+    return jsonResponse({ success: true, gameSlug, portId, gameDeleted: false });
+}
+
+
 
 // -----------------------------------------------------------------------------
 // Protected one-time migration from the published Google Sheets CSV.
@@ -1615,77 +1947,239 @@ function handleImportVisitsPage() {
 
 
 
-const GOOGLE_PLAY_DEVICES_URL = "https://cdn.jsdelivr.net/gh/bsthen/device-models/devices.json";
+const ANDROID_DEVICE_CATALOG_URL = "https://hossain-khan.github.io/android-device-catalog-parser/catalog-data/android-devices-catalog.min.json";
 
-// Android handhelds whose commercial names are not consistently present in Google Play's catalog.
-// The models are Android-origin devices; Armada's list is used only as a cross-check for model names.
+// Consolas portátiles Android que pueden no figurar en el catálogo de Google Play.
+// No se asigna un procesador si la fuente no lo proporciona.
 const ANDROID_HANDHELD_DEVICES = [
-    // AYN
     "AYN Thor", "AYN Thor Lite", "AYN Odin 2", "AYN Odin 2 Mini",
     "AYN Odin 2 Portal", "AYN Odin 3", "AYN Odin 3 Portal",
-    // Retroid
     "Retroid Pocket 5", "Retroid Pocket 6", "Retroid Pocket Mini",
     "Retroid Pocket Mini V2", "Retroid Pocket Flip 2", "Retroid Pocket Duo",
     "Retroid Pocket Nova",
-    // AYANEO
     "AYANEO Pocket EVO", "AYANEO Pocket S2", "AYANEO Pocket ACE",
     "AYANEO Pocket DS", "AYANEO Pocket DMG", "AYANEO Pocket MICRO 2",
     "AYANEO Pocket S 2K", "AYANEO Pocket S 1K",
-    // KONKR and MANGMI
     "KONKR Pocket FIT (8 Elite)", "KONKR Pocket FIT (G3 Gen 3)",
     "MANGMI AIR Y Pro (8 GB)", "MANGMI Pocket Max",
-    // Anbernic models with official Android firmware or Android preinstalled
     "Anbernic RG353V", "Anbernic RG353M", "Anbernic RG353P",
     "Anbernic RG552", "Anbernic RG DS", "Anbernic RG505",
     "Anbernic RG556", "Anbernic RG Cube", "Anbernic RG405V",
     "Anbernic RG405M", "Anbernic RG406V", "Anbernic RG406H",
     "Anbernic RG557",
-    // Powkiddy Android models
     "Powkiddy X18S", "Powkiddy X28", "Powkiddy RGB10 Max 3 Pro",
-    // Other Android handhelds
     "GPD XP", "GPD XP Plus", "Logitech G Cloud", "Abxylute One",
-    "KT-R1", "Pimax Portal", "ZPG A1 Unicorn", "MOQI i7S",
-    "TJD T80"
+    "KT-R1", "Pimax Portal", "ZPG A1 Unicorn", "MOQI i7S", "TJD T80"
 ];
 
-async function handleImportDevices(request, env) {
+function normalizeDevicePart(value) {
+    return String(value || "").normalize("NFKD").replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function normalizeProcessorName(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+
+    // Alias comercial conocido del catálogo de origen.
+    // QTI SM6225 corresponde al Qualcomm Snapdragon 680.
+    if (/\bSM6225\b/i.test(raw)) return "Snapdragon 680";
+
+    // Evita mostrar Qualcomm como prefijo redundante.
+    return raw.replace(/^Qualcomm\s+/i, "").trim();
+}
+
+function deviceSlug(value) {
+    return normalizeDevicePart(value).replace(/\s+/g, "-").slice(0, 140);
+}
+
+function hashDeviceKey(value) {
+    let hash = 2166136261;
+    for (let i = 0; i < value.length; i++) {
+        hash ^= value.charCodeAt(i);
+        hash = Math.imul(hash, 16777619);
+    }
+    return (hash >>> 0).toString(16).padStart(8, "0");
+}
+
+function handheldManufacturer(name) {
+    if (name.startsWith("KT-R1")) return "KT";
+    if (name.startsWith("TJD ")) return "TJD";
+    const prefixes = ["AYANEO", "Anbernic", "Powkiddy", "Retroid", "Logitech", "Abxylute", "KONKR", "MANGMI", "Pimax", "ZPG", "MOQI", "GPD", "AYN"];
+    const lower = name.toLowerCase();
+    return prefixes.find((prefix) => lower.startsWith(prefix.toLowerCase())) || "Other";
+}
+
+async function loadAndNormalizeDevices() {
+    const response = await fetch(ANDROID_DEVICE_CATALOG_URL, {
+        headers: { "Accept": "application/json" },
+        cf: { cacheTtl: 3600, cacheEverything: false }
+    });
+    if (!response.ok) throw new Error("No se pudo descargar el catálogo de dispositivos (HTTP " + response.status + ").");
+
+    const source = await response.json();
+    if (!Array.isArray(source)) throw new Error("El catálogo de origen no tiene el formato esperado (array).");
+
+    const devices = new Map();
+    const formFactorCounts = { Phone: 0, Tablet: 0 };
+    let missingCpu = 0;
+    let matchingRecords = 0;
+    let invalidRecords = 0;
+
+    for (const item of source) {
+        const formFactor = String(item?.formFactor || "").trim();
+        if (formFactor !== "Phone" && formFactor !== "Tablet") continue;
+        matchingRecords++;
+        formFactorCounts[formFactor]++;
+
+        const manufacturer = String(item?.manufacturer || "").trim();
+        const model = String(item?.modelName || item?.device || "").trim();
+        const sourceCpu = String(item?.processorName || "").trim();
+        const cpu = normalizeProcessorName(sourceCpu);
+        if (!manufacturer || !model) {
+            invalidRecords++;
+            continue;
+        }
+        if (!cpu) missingCpu++;
+
+        const key = [manufacturer, model, cpu].map(normalizeDevicePart).join("|");
+        const displayName = model + (cpu ? " (" + cpu + ")" : "");
+        const id = "catalog:" + deviceSlug(manufacturer + "-" + model + (cpu ? "-" + cpu : "")) + "-" + hashDeviceKey(key);
+        if (!devices.has(key)) {
+            devices.set(key, {
+                id,
+                name: displayName.slice(0, 180),
+                manufacturer: manufacturer.slice(0, 100),
+                model: model.slice(0, 140),
+                cpu: cpu.slice(0, 140)
+            });
+        }
+    }
+
+    const catalogDevices = devices.size;
+    let handheldsAdded = 0;
+    let handheldsAlreadyInCatalog = 0;
+    for (const name of ANDROID_HANDHELD_DEVICES) {
+        const manufacturer = handheldManufacturer(name);
+        const model = name.slice(manufacturer === "Other" ? 0 : manufacturer.length).trim() || name;
+        const key = [manufacturer, model, ""].map(normalizeDevicePart).join("|");
+        if (devices.has(key)) {
+            handheldsAlreadyInCatalog++;
+            continue;
+        }
+        devices.set(key, {
+            id: "handheld:" + deviceSlug(name) + "-" + hashDeviceKey(key),
+            name: name.slice(0, 180),
+            manufacturer: manufacturer.slice(0, 100),
+            model: model.slice(0, 140),
+            cpu: ""
+        });
+        handheldsAdded++;
+    }
+
+    const result = Array.from(devices.values()).sort((a, b) => a.name.localeCompare(b.name));
+    if (!result.length) throw new Error("No se encontraron dispositivos Android compatibles; la base no fue modificada.");
+
+    const manufacturerCounts = {};
+    for (const device of result) {
+        manufacturerCounts[device.manufacturer] = (manufacturerCounts[device.manufacturer] || 0) + 1;
+    }
+    const sortedManufacturerCounts = Object.fromEntries(
+        Object.entries(manufacturerCounts).sort((a, b) => a[0].localeCompare(b[0]))
+    );
+    const ids = new Set();
+    let idCollisionCount = 0;
+    let invalidIdCount = 0;
+    for (const device of result) {
+        if (ids.has(device.id)) idCollisionCount++;
+        ids.add(device.id);
+        if (/[^a-zA-Z0-9:_-]/.test(device.id)) invalidIdCount++;
+    }
+
+    const handheldDevices = result.filter((device) => device.id.startsWith("handheld:"));
+    const redmiDevices = result.filter((device) =>
+        /redmi/i.test(device.model) || /redmi/i.test(device.manufacturer)
+    );
+    const xiaomiDevices = result.filter((device) =>
+        /xiaomi|poco/i.test(device.manufacturer) || /xiaomi|poco/i.test(device.model)
+    );
+
+    return {
+        devices: result,
+        stats: {
+            sourceRecords: source.length,
+            matchingRecords,
+            phones: formFactorCounts.Phone,
+            tablets: formFactorCounts.Tablet,
+            catalogDevices,
+            handheldsInManualList: ANDROID_HANDHELD_DEVICES.length,
+            handheldsAdded,
+            handheldsAlreadyInCatalog,
+            duplicatesGrouped: Math.max(0, matchingRecords - catalogDevices),
+            invalidRecords,
+            missingCpu,
+            total: result.length,
+            redmiCount: redmiDevices.length,
+            xiaomiPocoCount: xiaomiDevices.length,
+            manufacturerCounts: sortedManufacturerCounts,
+            idCollisionCount,
+            invalidIdCount,
+            redmiDevices,
+            xiaomiPocoDevices: xiaomiDevices,
+            handheldDevices,
+            examples: result.slice(0, 12)
+        }
+    };
+}
+
+async function authorizeDeviceImport(request, env) {
     if (!env.IMPORT_SECRET) return jsonResponse({ success: false, error: "Import secret is not configured." }, 503);
     const authorization = request.headers.get("Authorization") || "";
     const supplied = authorization.startsWith("Bearer ") ? authorization.slice(7).trim() : "";
     if (!supplied || supplied !== env.IMPORT_SECRET) return jsonResponse({ success: false, error: "Unauthorized." }, 401);
+    return null;
+}
 
-    const response = await fetch(GOOGLE_PLAY_DEVICES_URL, {
-        headers: { "Accept": "application/json" },
-        cf: { cacheTtl: 0, cacheEverything: false }
-    });
-    if (!response.ok) return jsonResponse({ success: false, error: "Could not download Google Play device data.", upstreamStatus: response.status }, 502);
+async function handlePreviewDevices(request, env) {
+    const denied = await authorizeDeviceImport(request, env);
+    if (denied) return denied;
+    try {
+        const { devices, stats } = await loadAndNormalizeDevices();
+        return jsonResponse({
+            success: true,
+            message: "Vista previa únicamente. La base de datos no fue modificada.",
+            stats,
+            sample: devices.slice(0, 30)
+        });
+    } catch (error) {
+        return jsonResponse({ success: false, error: error.message || "Error al preparar el catálogo." }, 502);
+    }
+}
 
-    const source = await response.json();
-    if (!source || typeof source !== "object" || Array.isArray(source)) {
-        return jsonResponse({ success: false, error: "Google Play device data has an unexpected format." }, 502);
+async function handleImportDevices(request, env) {
+    const denied = await authorizeDeviceImport(request, env);
+    if (denied) return denied;
+
+    let normalized;
+    try {
+        normalized = await loadAndNormalizeDevices();
+    } catch (error) {
+        return jsonResponse({ success: false, error: error.message || "Error al preparar el catálogo." }, 502);
     }
 
-    const devices = new Map();
-    for (const [idValue, item] of Object.entries(source)) {
-        const id = String(idValue || "").trim();
-        const brand = String(item?.brand || "").trim();
-        const model = String(item?.name || "").trim();
-        const name = [brand, model].filter(Boolean).join(" ").trim();
-        if (id && name) devices.set(id, name.slice(0, 180));
-    }
-
-    for (const name of ANDROID_HANDHELD_DEVICES) {
-        const id = "handheld:" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-        devices.set(id, name);
-    }
-
-    if (!devices.size) return jsonResponse({ success: false, error: "No valid Android devices found; database was not changed." }, 502);
-
-    const statements = Array.from(devices, ([id, name]) =>
+    const devices = normalized.devices;
+    const statements = devices.map((device) =>
         env.DEVICES_DB.prepare(
-            "INSERT INTO devices (id, name) VALUES (?, ?) ON CONFLICT(id) DO UPDATE SET name = excluded.name"
-        ).bind(id, name)
+            `INSERT INTO devices (id, name, manufacturer, model, cpu)
+             VALUES (?, ?, ?, ?, ?)
+             ON CONFLICT(id) DO UPDATE SET
+                name = excluded.name,
+                manufacturer = excluded.manufacturer,
+                model = excluded.model,
+                cpu = excluded.cpu`
+        ).bind(device.id, device.name, device.manufacturer, device.model, device.cpu)
     );
+
     for (let i = 0; i < statements.length; i += 50) {
         await env.DEVICES_DB.batch(statements.slice(i, i + 50));
     }
@@ -1693,28 +2187,43 @@ async function handleImportDevices(request, env) {
     const counts = await env.DEVICES_DB.prepare("SELECT COUNT(*) AS total FROM devices").first();
     return jsonResponse({
         success: true,
-        message: "Android device catalog imported. Existing compatibility reports were preserved.",
-        imported: devices.size,
+        message: "Catálogo importado. No se eliminaron dispositivos ni reportes de compatibilidad.",
+        imported: devices.length,
         totalDevices: Number(counts?.total) || 0,
-        handhelds: ANDROID_HANDHELD_DEVICES.length
+        stats: normalized.stats
     });
 }
 
 function handleImportDevicesPage() {
     const html = `<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NAPL — Importar dispositivos Android</title>
-<body style="font:16px system-ui;max-width:520px;margin:40px auto;padding:0 18px;background:#101810;color:#eef5ee">
-<h2>Importar dispositivos Android</h2>
-<p>Se añadirán dispositivos de Google Play y consolas Android portátiles. No se borrarán dispositivos ni reportes existentes.</p>
-<form id="f"><input id="secret" type="password" autocomplete="off" required placeholder="IMPORT_SECRET" style="box-sizing:border-box;width:100%;padding:12px;margin:8px 0;background:#202d20;color:white;border:1px solid #607060;border-radius:6px">
-<button style="padding:12px 18px">Importar dispositivos</button></form><pre id="result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
+<title>NAPL — Catálogo de dispositivos Android</title>
+<body style="font:16px system-ui;max-width:680px;margin:40px auto;padding:0 18px;background:#101810;color:#eef5ee">
+<h2>Catálogo de dispositivos Android</h2>
+<p>Se incluyen teléfonos, tablets y consolas portátiles Android. Las variantes de RAM/almacenamiento se agrupan; los modelos con procesadores diferentes permanecen separados.</p>
+<p>Primero ejecutá una vista previa. Esa acción no modifica la base de datos.</p>
+<form id="f">
+<input id="secret" type="password" autocomplete="off" required placeholder="IMPORT_SECRET" style="box-sizing:border-box;width:100%;padding:12px;margin:8px 0;background:#202d20;color:white;border:1px solid #607060;border-radius:6px">
+<div style="display:flex;gap:10px;flex-wrap:wrap">
+<button type="button" id="preview" style="padding:12px 18px">Vista previa</button>
+<button type="button" id="import" style="padding:12px 18px;background:#315b38;color:white;border:0;border-radius:6px">Importar catálogo</button>
+</div>
+</form><pre id="result" style="white-space:pre-wrap;overflow-wrap:anywhere"></pre>
 <script>
-document.getElementById("f").addEventListener("submit", async function(e) {
- e.preventDefault(); const secret=document.getElementById("secret").value; const out=document.getElementById("result");
- out.textContent="Importando…";
- try { const response=await fetch("/admin/import-devices",{method:"POST",headers:{Authorization:"Bearer "+secret}});
- const data=await response.json(); out.textContent=JSON.stringify(data,null,2);
- } catch(err) { out.textContent="Error de conexión: "+err.message; }
+const secret=()=>document.getElementById("secret").value;
+const out=document.getElementById("result");
+async function run(path,label){
+ if(!secret()){out.textContent="Ingresá IMPORT_SECRET.";return;}
+ out.textContent=label+"…";
+ try{
+  const response=await fetch(path,{method:"POST",headers:{Authorization:"Bearer "+secret()}});
+  const data=await response.json();
+  out.textContent=JSON.stringify(data,null,2);
+ }catch(err){out.textContent="Error de conexión: "+err.message;}
+}
+document.getElementById("preview").addEventListener("click",()=>run("/admin/preview-devices","Generando vista previa"));
+document.getElementById("import").addEventListener("click",()=>{
+ if(!confirm("¿Importar el catálogo a D1? No se borrarán dispositivos ni reportes existentes."))return;
+ run("/admin/import-devices","Importando catálogo");
 });
 </script></body></html>`;
     return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
@@ -1747,14 +2256,44 @@ document.getElementById("f").addEventListener("submit", async function(e) {
     return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 }
 
+async function runScheduledGitHubSync(env) {
+    if (!env.GITHUB_TOKEN || !env.SHEETS_SERVICE_ACCOUNT_EMAIL || !env.SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY) return;
+    await env.DB.prepare(`CREATE TABLE IF NOT EXISTS github_sync_state (
+        state_key TEXT PRIMARY KEY,
+        next_offset INTEGER NOT NULL DEFAULT 0,
+        updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`).run();
+    await env.DB.prepare("INSERT OR IGNORE INTO github_sync_state (state_key, next_offset) VALUES ('catalog', 0)").run();
+    const state = await env.DB.prepare("SELECT next_offset FROM github_sync_state WHERE state_key = 'catalog'").first();
+    const offset = Math.max(0, Number(state?.next_offset) || 0);
+    const result = await updateGitHubVersions(env, offset);
+    const nextOffset = result.complete ? 0 : result.nextOffset;
+    await env.DB.prepare("UPDATE github_sync_state SET next_offset = ?, updated_at = CURRENT_TIMESTAMP WHERE state_key = 'catalog'").bind(nextOffset).run();
+    console.log("Scheduled GitHub sync:", JSON.stringify({
+        offset, nextOffset, complete: result.complete,
+        processedRepositories: result.processedRepositories,
+        uniqueRepositories: result.uniqueRepositories,
+        errors: result.errors.length
+    }));
+}
+
+async function refreshCatalogCache(env) {
+    if (!env.CATALOG_KV || !env.SHEETS_SERVICE_ACCOUNT_EMAIL || !env.SHEETS_SERVICE_ACCOUNT_PRIVATE_KEY) return;
+    const sheet = await readSheetRows(env);
+    const catalog = buildCatalogFromSheet(sheet);
+    if (!catalog.games.length) throw new Error("Sheet catalog is empty; keeping previous KV value.");
+    await env.CATALOG_KV.put("catalog:v1", JSON.stringify({ ...catalog, updatedAt: new Date().toISOString() }));
+}
+
 export default {
     async scheduled(controller, env, ctx) {
-        ctx.waitUntil(Promise.allSettled([
-            registerMissingPortDates(env),
-            updateGitHubVersions(env),
-            updateDevelopers(env),
-            updateLaunchBoxData(env),
-            updateSteamGameData(env)
+        ctx.waitUntil(Promise.all([
+            runScheduledGitHubSync(env).catch((error) => {
+                console.error("Scheduled GitHub-to-Sheets update failed:", error);
+            }),
+            refreshCatalogCache(env).catch((error) => {
+                console.error("Scheduled Sheets-to-KV refresh failed:", error);
+            })
         ]));
     },
 
@@ -1773,9 +2312,16 @@ export default {
             if (request.method === "POST" && path === "/admin/ports/save") {
                 return await handleAdminSavePort(request, env);
             }
+            if (request.method === "POST" && path === "/admin/ports/delete") {
+                return await handleAdminDeletePort(request, env);
+            }
 
             if (request.method === "GET" && path === "/admin/import-devices") {
                 return handleImportDevicesPage();
+            }
+
+            if (request.method === "POST" && path === "/admin/preview-devices") {
+                return await handlePreviewDevices(request, env);
             }
 
             if (request.method === "POST" && path === "/admin/import-devices") {
@@ -1832,6 +2378,10 @@ export default {
 
             if (request.method === "GET" && path === "/catalog") {
                 return await handleGetCatalog(env);
+            }
+
+            if (request.method === "POST" && path === "/admin/sync-catalog-cache") {
+                return await handleSyncCatalogCache(request, env);
             }
 
             if (request.method === "GET" && path.startsWith("/games/")) {

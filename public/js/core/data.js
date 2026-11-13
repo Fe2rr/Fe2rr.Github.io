@@ -128,12 +128,16 @@ export function processRows(rows) {
     for (const row of rows) {
         const gameValue = getColumn(row, ["GAME", "GAME NAME", "NAME", "JUEGO"]);
         const yearValue = getColumn(row, ["YEAR", "ANO", "AÑO"]);
+        const platformValue = getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"]);
+        const projectValue = getColumn(row, ["PROJECT", "PROYECTO"]);
 
         if (gameValue) currentGame = gameValue;
         if (yearValue) currentYear = yearValue;
 
-        const platform = getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"]);
-        const project = getColumn(row, ["PROJECT", "PROYECTO"]);
+        // Match the working V3 behavior: PLATFORM and PROJECT belong only
+        // to the current CSV row. Do not inherit values from previous rows.
+        const platform = platformValue;
+        const project = projectValue;
         const rawPortId = getColumn(row, ["PORTS_ID", "PORT ID", "PORT_ID"]);
         const portId =
             /^unofficial-port(?:-\d+)?$/i.test(rawPortId) && currentGame
@@ -238,14 +242,16 @@ export function groupGames(rows) {
     for (const port of rows) {
         if (!port || !port.game) continue;
 
-        const key = createSlug(port.game);
+        // V3 groups by normalized game name, not by its URL slug.
+        const key = normalizeText(port.game);
         if (!key) continue;
 
         if (!grouped.has(key)) {
             grouped.set(key, {
                 name: port.game,
                 year: port.year || "",
-                slug: key,
+                // Keep grouping by normalized name, but use URL-safe slugs for routes.
+                slug: createSlug(port.game),
                 coverUrl: port.coverUrl || "",
                 genre: port.genre || "",
                 description: port.description || "",
@@ -291,31 +297,66 @@ export async function loadCatalog(force = false) {
         });
 
         if (!response.ok) {
-            throw new Error(
-                `Google Sheets returned HTTP ${response.status}.`
-            );
+            throw new Error(`Google Sheets returned HTTP ${response.status}.`);
         }
 
         const csv = await response.text();
+        const rows = parseCSV(csv);
 
-        if (!csv || !csv.trim()) {
+        if (!rows.length) {
             throw new Error("Google Sheets returned an empty catalog.");
         }
 
-        const sheetRows = parseCSV(csv);
-
-        if (!sheetRows.length) {
-            throw new Error("Could not parse the spreadsheet data.");
+        const allRows = processRows(rows);
+        if (!allRows.length) {
+            throw new Error(
+                "The Community Ports sheet was read, but no valid ports were found."
+            );
         }
 
-        const allRows = processRows(sheetRows);
         const games = groupGames(allRows);
-        const platformOrder = extractPlatformOrder(sheetRows);
+        const platformOrder = extractPlatformOrder(rows);
+
+        // Temporary diagnostics: inspect where catalog entries may be lost.
+        const countBy = (items, getValue) => {
+            const counts = new Map();
+            for (const item of items) {
+                const value = String(getValue(item) || "").trim();
+                if (!value) continue;
+                counts.set(value, (counts.get(value) || 0) + 1);
+            }
+            return Object.fromEntries(
+                [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
+            );
+        };
+
+        const dualScreenPorts = allRows.filter((port) =>
+            normalizeText(port.project).includes("dual screen")
+        );
+
+        console.groupCollapsed("[NAPL] Catalog diagnostics");
+        console.log("CSV characters:", csv.length);
+        console.log("Parsed CSV rows:", rows.length);
+        console.log("Processed port rows:", allRows.length);
+        console.log("Grouped games:", games.length);
+        console.log("Rows discarded during processing:", rows.length - allRows.length);
+        console.log("Platforms in raw CSV:", countBy(rows, (row) =>
+            getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"])
+        ));
+        console.log("Platforms in processed ports:", countBy(allRows, (port) => port.platform));
+        console.log("Dual Screen ports:", dualScreenPorts.length);
+        console.log("Games with Dual Screen:", new Set(dualScreenPorts.map((port) =>
+            normalizeText(port.game)
+        )).size);
+        console.log("Dual Screen project examples:", dualScreenPorts.slice(0, 10).map((port) => ({
+            game: port.game,
+            platform: port.platform,
+            project: port.project
+        })));
+        console.groupEnd();
 
         if (!games.length) {
-            throw new Error(
-                "No games could be extracted from Community Ports."
-            );
+            throw new Error("The Community Ports sheet contains no games.");
         }
 
         return {
@@ -323,9 +364,9 @@ export async function loadCatalog(force = false) {
             platformOrder,
             allRows,
         };
-    })().catch(error => {
+    })().catch((err) => {
         catalogPromise = null;
-        throw error;
+        throw err;
     });
 
     return catalogPromise;

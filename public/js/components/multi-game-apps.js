@@ -16,6 +16,8 @@ export function isDualScreen(game) {
         return false;
     }
 
+    // Keep the same rule as the working V3 implementation:
+    // Dual Screen is identified by the PROJECT column.
     return game.ports.some((port) =>
         normalizeText(port?.project).includes("dual screen")
     );

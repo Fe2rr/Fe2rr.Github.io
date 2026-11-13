@@ -18,7 +18,7 @@
 
     <!-- SEO -->
     <title>NAPL — Native Android Port List</title>
-    <link rel="canonical" href="https://fe2rr.github.io/">
+    <link rel="canonical" href="https://fe2rr.github.io/Napl-prueba/">
 
     <!-- Open Graph -->
     <meta property="og:type" content="website">
@@ -28,7 +28,7 @@
         property="og:description"
         content="Discover, explore and track native Android game ports."
     >
-    <meta property="og:url" content="https://fe2rr.github.io/">
+    <meta property="og:url" content="https://fe2rr.github.io/Napl-prueba/">
 
     <!-- Structured Data -->
     <script type="application/ld+json">
@@ -37,7 +37,7 @@
         "@type": "WebSite",
         "name": "NAPL",
         "alternateName": "NAPL — Native Android Port List",
-        "url": "https://fe2rr.github.io/"
+        "url": "https://fe2rr.github.io/Napl-prueba/"
     }
     </script>
 
@@ -48,11 +48,25 @@
         rel="stylesheet"
     >
 
-    <link rel="stylesheet" href="assets/css/main.css?v=6">
-    <link rel="stylesheet" href="assets/css/components.css?v=6">
-    <link rel="stylesheet" href="assets/css/loading.css?v=6">
-    <link rel="stylesheet" href="assets/css/home.css?v=6">
-    <link rel="stylesheet" href="assets/css/skeleton.css?v=6">
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem("napl_theme_v1");
+                document.documentElement.setAttribute(
+                    "data-theme",
+                    saved === "light" ? "light" : "dark"
+                );
+            } catch (e) {
+                document.documentElement.setAttribute("data-theme", "dark");
+            }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="assets/css/main.css?v=7">
+    <link rel="stylesheet" href="assets/css/components.css?v=7">
+    <link rel="stylesheet" href="assets/css/loading.css?v=7">
+    <link rel="stylesheet" href="assets/css/home.css?v=7">
+    <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
 </head>
 
 <body class="home-page">
@@ -75,6 +89,12 @@
     <h1 id="home-button" role="button" tabindex="0">NAPL</h1>
 
     <div class="header-actions">
+        <button
+            id="theme-toggle"
+            type="button"
+            aria-label="Cambiar a modo oscuro"
+            aria-pressed="true"
+        ></button>
         <button
             id="search-button"
             type="button"
@@ -234,28 +254,31 @@
             autocomplete="off"
         >
 
-        <div class="category-sort" role="group" aria-label="Sort games">
-            <button
-                type="button"
-                class="category-sort-option active"
-                data-sort="updated"
-            >
-                Updated
-            </button>
-            <button
-                type="button"
-                class="category-sort-option"
-                data-sort="name"
-            >
-                A–Z
-            </button>
-            <button
-                type="button"
-                class="category-sort-option"
-                data-sort="popular"
-            >
-                Popular
-            </button>
+        <div class="category-sort-row">
+            <div class="category-sort" role="group" aria-label="Sort games">
+                <button
+                    type="button"
+                    class="category-sort-option active"
+                    data-sort="updated"
+                >
+                    Updated
+                </button>
+                <button
+                    type="button"
+                    class="category-sort-option"
+                    data-sort="name"
+                >
+                    A–Z
+                </button>
+                <button
+                    type="button"
+                    class="category-sort-option"
+                    data-sort="popular"
+                >
+                    Popular
+                </button>
+            </div>
+
             <button
                 type="button"
                 id="category-sort-direction"

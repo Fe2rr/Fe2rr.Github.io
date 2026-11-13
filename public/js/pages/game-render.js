@@ -19,7 +19,24 @@ import {
     setStoredUserDevice,
 } from "../services/compatibility.js";
 
+
 let ratingPopoverEventsInitialized = false;
+
+function parseLastUpdate(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return 0;
+
+    // D1 stores timestamps as Montevideo local time without a timezone suffix.
+    const localMatch = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)$/);
+    if (localMatch) {
+        const time = localMatch[2].length === 5 ? `${localMatch[2]}:00` : localMatch[2];
+        const timestamp = Date.parse(`${localMatch[1]}T${time}-03:00`);
+        return Number.isFinite(timestamp) ? timestamp : 0;
+    }
+
+    const timestamp = Date.parse(raw);
+    return Number.isFinite(timestamp) ? timestamp : 0;
+}
 
 function closeRatingPopover(container) {
     if (!container) return;
@@ -947,6 +964,7 @@ function displayPortCard(
     const details = document.createElement("div");
     details.className = "port-details";
 
+    const lastUpdateDisplay = String(port.lastUpdate || "").replace(/^(\d{4}-\d{2}-\d{2})[ T].*$/, "$1");
     const fields = [
         ["Version", port.version, ""],
         ["Developer", port.developer, ""],
@@ -954,7 +972,7 @@ function displayPortCard(
         ["Port type", port.platform, ""],
         ["Supported inputs", port.controller, ""],
         ["Works?", port.works, ""],
-        ["Last update", port.lastUpdate, ""],
+        ["Last update", lastUpdateDisplay, ""],
     ];
 
     for (const [label, value, url] of fields) {
@@ -1202,6 +1220,12 @@ export function displayGame(
                         (Number(a.rating.avg) || 0);
                     if (avgDiff !== 0) return avgDiff;
                 }
+
+                // When ratings are equal (or neither port has votes),
+                // show the most recently updated port first.
+                const aUpdated = parseLastUpdate(a.port.lastUpdate);
+                const bUpdated = parseLastUpdate(b.port.lastUpdate);
+                if (aUpdated !== bUpdated) return bUpdated - aUpdated;
 
                 return a.originalIndex - b.originalIndex;
             });
