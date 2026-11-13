@@ -1,55 +1,86 @@
 /*
  * NAPL — POPULARITY SERVICE
+ *
+ * Popular rankings are served by the Google Apps Script web app.
+ * This keeps Popular and All Time category sorting independent
+ * from Cloudflare D1 read limits.
  */
 
-import { CATALOG_API_BASE } from "../core/config.js";
 import { createSlug } from "../core/helpers.js";
+
+const POPULAR_URL =
+    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 const allTimePopular = new Map();
 let allTimePopularLoaded = false;
 let allTimePopularPromise = null;
+let callbackSequence = 0;
 
-async function fetchFallbackPopular(period) {
-    const isGitHubPages =
-        typeof window !== "undefined" &&
-        window.location.hostname.endsWith("github.io");
-
-    if (isGitHubPages) {
-        return [];
-    }
-
-    try {
-        const response = await fetch(
-            `/api/popular?popular=${encodeURIComponent(period)}`,
-            { method: "GET", cache: "default" }
-        );
-        if (!response.ok) {
-            return [];
+/**
+ * Load a popularity period through JSONP.
+ * Apps Script supports JSONP and can therefore be called from GitHub Pages
+ * without a CORS proxy or a Cloudflare D1 read.
+ */
+function requestPopular(period) {
+    return new Promise((resolve, reject) => {
+        if (typeof document === "undefined" || typeof window === "undefined") {
+            reject(new Error("Popularity service is only available in a browser."));
+            return;
         }
-        const data = await response.json();
-        return data?.success && Array.isArray(data.games) ? data.games : [];
-    } catch {
-        return [];
-    }
+
+        const callbackName =
+            `naplPopularCallback_${Date.now()}_${++callbackSequence}`;
+        const script = document.createElement("script");
+        let timeoutId = null;
+        let settled = false;
+
+        const cleanup = () => {
+            if (timeoutId !== null) {
+                window.clearTimeout(timeoutId);
+            }
+            delete window[callbackName];
+            script.onerror = null;
+            script.remove();
+        };
+
+        const finish = (error, data) => {
+            if (settled) return;
+            settled = true;
+            cleanup();
+
+            if (error) {
+                reject(error);
+                return;
+            }
+
+            if (!data?.success || !Array.isArray(data.games)) {
+                reject(new Error(data?.error || "Invalid popularity response."));
+                return;
+            }
+
+            resolve(data.games);
+        };
+
+        window[callbackName] = (data) => finish(null, data);
+
+        script.async = true;
+        script.src =
+            `${POPULAR_URL}?popular=${encodeURIComponent(period)}&callback=${callbackName}`;
+
+        script.onerror = () => {
+            finish(new Error("Could not load popular games from Apps Script."));
+        };
+
+        timeoutId = window.setTimeout(() => {
+            finish(new Error("Popularity request timed out."));
+        }, 15000);
+
+        document.head.appendChild(script);
+    });
 }
 
 export async function fetchPopularPeriod(period = "week") {
-    try {
-        const response = await fetch(
-            `${CATALOG_API_BASE}/popular?period=${encodeURIComponent(period)}`,
-            { method: "GET", cache: "no-store" }
-        );
-        if (!response.ok) {
-            return await fetchFallbackPopular(period);
-        }
-        const data = await response.json();
-        if (!data?.success || !Array.isArray(data.games)) {
-            return await fetchFallbackPopular(period);
-        }
-        return data.games;
-    } catch {
-        return await fetchFallbackPopular(period);
-    }
+    return requestPopular(period);
 }
 
 export async function ensureAllTimePopular() {
@@ -64,12 +95,14 @@ export async function ensureAllTimePopular() {
     allTimePopularPromise = fetchPopularPeriod("alltime")
         .then((items) => {
             allTimePopular.clear();
+
             for (const item of items) {
-                allTimePopular.set(
-                    createSlug(item.game),
-                    Number(item.visits) || 0
-                );
+                const key = createSlug(item.game || item.slug || "");
+                if (!key) continue;
+
+                allTimePopular.set(key, Number(item.visits) || 0);
             }
+
             allTimePopularLoaded = true;
             return allTimePopular;
         })
