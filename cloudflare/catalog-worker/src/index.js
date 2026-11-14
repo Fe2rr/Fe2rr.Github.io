@@ -219,16 +219,7 @@ async function handleGetCompatibility(url, env) {
 
     const placeholders = portIds.map(() => "?").join(",");
     const rows = await env.DEVICES_DB.prepare(
-        `WITH port_totals AS (
-            SELECT
-                port_id,
-                SUM(CASE WHEN works = 1 THEN 1 ELSE 0 END) AS yes_count,
-                SUM(CASE WHEN works = 0 THEN 1 ELSE 0 END) AS no_count
-            FROM compatibility_reports
-            WHERE port_id IN (${placeholders})
-            GROUP BY port_id
-         ),
-         ranked_reports AS (
+        `WITH ranked_reports AS (
             SELECT
                 r.port_id,
                 r.works,
@@ -236,6 +227,10 @@ async function handleGetCompatibility(url, env) {
                 r.id,
                 d.id AS device_id,
                 d.name AS device_name,
+                SUM(CASE WHEN r.works = 1 THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY r.port_id) AS yes_count,
+                SUM(CASE WHEN r.works = 0 THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY r.port_id) AS no_count,
                 ROW_NUMBER() OVER (
                     PARTITION BY r.port_id
                     ORDER BY r.updated_at DESC, r.id DESC
@@ -245,19 +240,19 @@ async function handleGetCompatibility(url, env) {
             WHERE r.port_id IN (${placeholders})
          )
          SELECT
-            ranked_reports.port_id,
-            ranked_reports.works,
-            ranked_reports.updated_at,
-            ranked_reports.device_id,
-            ranked_reports.device_name,
-            port_totals.yes_count,
-            port_totals.no_count
+            port_id,
+            works,
+            updated_at,
+            device_id,
+            device_name,
+            yes_count,
+            no_count,
+            id
          FROM ranked_reports
-         JOIN port_totals ON port_totals.port_id = ranked_reports.port_id
-         WHERE ranked_reports.report_rank <= 30
-         ORDER BY ranked_reports.port_id ASC, ranked_reports.updated_at DESC, ranked_reports.id DESC`
+         WHERE report_rank <= 30
+         ORDER BY port_id ASC, updated_at DESC, id DESC`
     )
-        .bind(...portIds, ...portIds)
+        .bind(...portIds)
         .all();
 
     const compatibility = {};
