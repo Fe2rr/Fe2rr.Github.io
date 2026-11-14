@@ -104,7 +104,9 @@
 .home-game-cover-container {
   flex: 0 0 64px;
   width: 64px;
-  height: auto;
+  height: fit-content;
+  min-height: 0;
+  align-self: center;
   border-radius: var(--radius-sm);
   overflow: hidden;
   background: var(--surface-2);
@@ -125,8 +127,11 @@
 
 .home-game-cover {
   display: block;
+  flex: 0 0 auto;
   width: 100%;
-  height: auto;
+  height: auto !important;
+  max-height: none;
+  aspect-ratio: auto;
   object-fit: contain;
 }
 
