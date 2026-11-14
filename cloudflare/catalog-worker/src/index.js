@@ -196,24 +196,61 @@ async function handleGetDevices(env) {
 }
 
 async function handleGetCompatibility(url, env) {
-    const portIdsParam = url.searchParams.get("port_ids") || "";
-    const portIds = portIdsParam
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 50);
+    const portIds = Array.from(new Set(
+        (url.searchParams.get("port_ids") || "")
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+    )).slice(0, 50);
 
     if (portIds.length === 0) {
         return jsonResponse({ success: true, compatibility: {} });
     }
 
+    // Cache identical public lookups briefly to avoid repeating D1 reads
+    // on every visit to a game page. Reports remain fresh within 30 seconds.
+    const cache = typeof caches !== "undefined" ? caches.default : null;
+    const forceFresh = url.searchParams.get("fresh") === "1";
+    const cacheKey = new Request(url.toString(), { method: "GET" });
+    if (cache && !forceFresh) {
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+    }
+
     const placeholders = portIds.map(() => "?").join(",");
     const rows = await env.DEVICES_DB.prepare(
-        `SELECT r.port_id, r.works, r.updated_at, d.id AS device_id, d.name AS device_name
-         FROM compatibility_reports r
-         JOIN devices d ON d.id = r.device_id
-         WHERE r.port_id IN (${placeholders})
-         ORDER BY r.updated_at DESC, r.id DESC`
+        `WITH ranked_reports AS (
+            SELECT
+                r.port_id,
+                r.works,
+                r.updated_at,
+                r.id,
+                d.id AS device_id,
+                d.name AS device_name,
+                SUM(CASE WHEN r.works = 1 THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY r.port_id) AS yes_count,
+                SUM(CASE WHEN r.works = 0 THEN 1 ELSE 0 END)
+                    OVER (PARTITION BY r.port_id) AS no_count,
+                ROW_NUMBER() OVER (
+                    PARTITION BY r.port_id
+                    ORDER BY r.updated_at DESC, r.id DESC
+                ) AS report_rank
+            FROM compatibility_reports r
+            JOIN devices d ON d.id = r.device_id
+            WHERE r.port_id IN (${placeholders})
+         )
+         SELECT
+            port_id,
+            works,
+            updated_at,
+            device_id,
+            device_name,
+            yes_count,
+            no_count,
+            id
+         FROM ranked_reports
+         WHERE report_rank <= 30
+         ORDER BY port_id ASC, updated_at DESC, id DESC`
     )
         .bind(...portIds)
         .all();
@@ -226,21 +263,26 @@ async function handleGetCompatibility(url, env) {
     for (const row of rows.results || []) {
         const entry = compatibility[row.port_id];
         if (!entry) continue;
-        const works = Number(row.works) === 1;
-        if (works) entry.yes += 1;
-        else entry.no += 1;
 
-        if (entry.reports.length < 30) {
-            entry.reports.push({
-                deviceId: row.device_id,
-                deviceName: row.device_name,
-                works,
-                updatedAt: row.updated_at,
-            });
-        }
+        // Aggregate counts include all reports; only the newest 30 devices
+        // are returned for the expandable list.
+        entry.yes = Number(row.yes_count) || 0;
+        entry.no = Number(row.no_count) || 0;
+        entry.reports.push({
+            deviceId: row.device_id,
+            deviceName: row.device_name,
+            works: Number(row.works) === 1,
+            updatedAt: row.updated_at,
+        });
     }
 
-    return jsonResponse({ success: true, compatibility });
+    const response = jsonResponse(
+        { success: true, compatibility },
+        200,
+        { "Cache-Control": "public, max-age=0, s-maxage=30" }
+    );
+    if (cache && !forceFresh) await cache.put(cacheKey, response.clone());
+    return response;
 }
 
 async function handlePostCompatibility(request, env) {
