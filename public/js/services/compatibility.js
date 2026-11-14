@@ -128,7 +128,7 @@ export function setStoredUserDevice(device) {
     }
 }
 
-export async function loadGameCompatibility(portIds) {
+export async function loadGameCompatibility(portIds, fresh = false) {
     const cleanIds = Array.from(
         new Set(
             (portIds || []).map((id) => String(id || "").trim()).filter(Boolean)
@@ -143,6 +143,7 @@ export async function loadGameCompatibility(portIds) {
         const params = new URLSearchParams({
             port_ids: cleanIds.join(","),
         });
+        if (fresh) params.set("fresh", "1");
         const response = await fetch(
             `${COMPATIBILITY_API_URL}?${params.toString()}`,
             {
@@ -170,6 +171,11 @@ export async function loadGameCompatibility(portIds) {
 
 export function createCompatibilityActions() {
     return {
+        async loadSummary(portId) {
+            const summaries = await loadGameCompatibility([portId]);
+            return summaries[portId] || null;
+        },
+
         async submitReport({ portId, deviceId, works }) {
             const token = await getRatingToken();
 
@@ -204,7 +210,7 @@ export function createCompatibilityActions() {
                 );
             }
 
-            const refreshed = await loadGameCompatibility([portId]);
+            const refreshed = await loadGameCompatibility([portId], true);
             return {
                 report: data.report,
                 summary: refreshed[portId] || null,
