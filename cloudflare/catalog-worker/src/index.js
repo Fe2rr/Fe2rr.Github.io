@@ -210,8 +210,9 @@ async function handleGetCompatibility(url, env) {
     // Cache identical public lookups briefly to avoid repeating D1 reads
     // on every visit to a game page. Reports remain fresh within 30 seconds.
     const cache = typeof caches !== "undefined" ? caches.default : null;
+    const forceFresh = url.searchParams.get("fresh") === "1";
     const cacheKey = new Request(url.toString(), { method: "GET" });
-    if (cache) {
+    if (cache && !forceFresh) {
         const cached = await cache.match(cacheKey);
         if (cached) return cached;
     }
@@ -285,7 +286,7 @@ async function handleGetCompatibility(url, env) {
         200,
         { "Cache-Control": "public, max-age=0, s-maxage=30" }
     );
-    if (cache) await cache.put(cacheKey, response.clone());
+    if (cache && !forceFresh) await cache.put(cacheKey, response.clone());
     return response;
 }
 
