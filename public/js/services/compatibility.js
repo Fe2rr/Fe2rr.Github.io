@@ -8,13 +8,49 @@
 import {
     COMPATIBILITY_API_URL,
     REPORT_LINK_API_URL,
-    CATALOG_API_BASE,
     USER_DEVICE_STORAGE_KEY,
 } from "../core/config.js";
 import { getRatingToken } from "./ratings.js";
 
 let devicesCache = null;
 let devicesPromise = null;
+
+const COMPATIBILITY_CACHE_PREFIX = "napl_compatibility_v1:";
+const COMPATIBILITY_CACHE_TTL = 60_000;
+
+function readCachedCompatibility(portId) {
+    try {
+        const raw = localStorage.getItem(COMPATIBILITY_CACHE_PREFIX + portId);
+        if (!raw) return null;
+        const cached = JSON.parse(raw);
+        if (
+            !cached ||
+            typeof cached.savedAt !== "number" ||
+            Date.now() - cached.savedAt > COMPATIBILITY_CACHE_TTL ||
+            !cached.value ||
+            typeof cached.value !== "object"
+        ) {
+            localStorage.removeItem(COMPATIBILITY_CACHE_PREFIX + portId);
+            return null;
+        }
+        return cached.value;
+    } catch {
+        return null;
+    }
+}
+
+function writeCachedCompatibility(data) {
+    try {
+        for (const [portId, value] of Object.entries(data || {})) {
+            localStorage.setItem(
+                COMPATIBILITY_CACHE_PREFIX + portId,
+                JSON.stringify({ savedAt: Date.now(), value })
+            );
+        }
+    } catch {
+        // Storage may be unavailable or full; the API response still works.
+    }
+}
 
 export async function loadDevices() {
     if (devicesCache) {
@@ -23,9 +59,12 @@ export async function loadDevices() {
 
     if (!devicesPromise) {
         devicesPromise = (async () => {
-            const devicesUrl = CATALOG_API_BASE
-                ? `${CATALOG_API_BASE}/devices`
-                : "assets/data/devices.json";
+            // The device catalog is static data. Load it from GitHub Pages instead
+            // of asking D1 to return all 24k+ devices on every page visit.
+            const devicesUrl = new URL(
+                "../../assets/data/devices.json",
+                import.meta.url
+            ).href;
             const response = await fetch(devicesUrl, {
                 cache: "force-cache",
             });
@@ -139,16 +178,30 @@ export async function loadGameCompatibility(portIds, fresh = false) {
         return {};
     }
 
+    const cached = {};
+    const missingIds = [];
+
+    if (!fresh) {
+        for (const id of cleanIds) {
+            const value = readCachedCompatibility(id);
+            if (value) cached[id] = value;
+            else missingIds.push(id);
+        }
+        if (missingIds.length === 0) return cached;
+    }
+
+    const requestedIds = fresh ? cleanIds : missingIds;
+
     try {
         const params = new URLSearchParams({
-            port_ids: cleanIds.join(","),
+            port_ids: requestedIds.join(","),
         });
         if (fresh) params.set("fresh", "1");
         const response = await fetch(
             `${COMPATIBILITY_API_URL}?${params.toString()}`,
             {
                 method: "GET",
-                cache: "no-store",
+                cache: "default",
             }
         );
 
@@ -160,12 +213,14 @@ export async function loadGameCompatibility(portIds, fresh = false) {
 
         const data = await response.json();
         if (!data || typeof data.compatibility !== "object") {
-            return {};
+            return cached;
         }
-        return data.compatibility;
+
+        writeCachedCompatibility(data.compatibility);
+        return { ...cached, ...data.compatibility };
     } catch (error) {
         console.warn("NAPL: could not load compatibility reports.", error);
-        return {};
+        return cached;
     }
 }
 
