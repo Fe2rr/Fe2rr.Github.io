@@ -782,6 +782,18 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
         popover.hidden = false;
         trigger.classList.add("is-open");
         reportButton.setAttribute("aria-expanded", "true");
+
+        // Load public compatibility data only when the user opens this panel.
+        if (compatibilityActions?.loadSummary) {
+            setCompatFeedback("Loading compatibility results...");
+            try {
+                const latestSummary = await compatibilityActions.loadSummary(port.portId);
+                if (latestSummary) renderCompatibilitySummary(latestSummary);
+                setCompatFeedback("Choose Yes/No and select an exact device.");
+            } catch (error) {
+                setCompatFeedback(error.message || "Could not load compatibility results.", "error");
+            }
+        }
         await ensureDevicesLoaded();
     });
 
