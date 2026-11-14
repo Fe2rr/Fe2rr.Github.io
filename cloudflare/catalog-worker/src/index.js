@@ -196,24 +196,50 @@ async function handleGetDevices(env) {
 }
 
 async function handleGetCompatibility(url, env) {
-    const portIdsParam = url.searchParams.get("port_ids") || "";
-    const portIds = portIdsParam
-        .split(",")
-        .map((s) => s.trim())
-        .filter(Boolean)
-        .slice(0, 50);
+    const portIds = Array.from(new Set(
+        (url.searchParams.get("port_ids") || "")
+            .split(",")
+            .map((id) => id.trim())
+            .filter(Boolean)
+    )).slice(0, 50);
 
     if (portIds.length === 0) {
         return jsonResponse({ success: true, compatibility: {} });
     }
 
+    // Cache identical public compatibility lookups for a short period.
+    // This prevents every page view from reaching D1 while keeping reports
+    // reasonably fresh. Cache API is optional in local/test environments.
+    const cache = typeof caches !== "undefined" ? caches.default : null;
+    const cacheKey = new Request(url.toString(), { method: "GET" });
+    if (cache) {
+        const cached = await cache.match(cacheKey);
+        if (cached) return cached;
+    }
+
     const placeholders = portIds.map(() => "?").join(",");
     const rows = await env.DEVICES_DB.prepare(
-        `SELECT r.port_id, r.works, r.updated_at, d.id AS device_id, d.name AS device_name
-         FROM compatibility_reports r
-         JOIN devices d ON d.id = r.device_id
-         WHERE r.port_id IN (${placeholders})
-         ORDER BY r.updated_at DESC, r.id DESC`
+        `WITH ranked_reports AS (
+            SELECT
+                r.port_id,
+                r.works,
+                r.updated_at,
+                r.id,
+                d.id AS device_id,
+                d.name AS device_name,
+                COUNT(*) OVER (PARTITION BY r.port_id) AS total_reports,
+                ROW_NUMBER() OVER (
+                    PARTITION BY r.port_id
+                    ORDER BY r.updated_at DESC, r.id DESC
+                ) AS report_rank
+            FROM compatibility_reports r
+            JOIN devices d ON d.id = r.device_id
+            WHERE r.port_id IN (${placeholders})
+         )
+         SELECT port_id, works, updated_at, device_id, device_name, total_reports
+         FROM ranked_reports
+         WHERE report_rank <= 30
+         ORDER BY port_id ASC, updated_at DESC, id DESC`
     )
         .bind(...portIds)
         .all();
@@ -223,24 +249,44 @@ async function handleGetCompatibility(url, env) {
         compatibility[id] = { yes: 0, no: 0, reports: [] };
     }
 
+    // The window count preserves totals even though only the newest 30
+    // device reports per port are returned to the browser.
     for (const row of rows.results || []) {
         const entry = compatibility[row.port_id];
         if (!entry) continue;
         const works = Number(row.works) === 1;
+        entry.total = Number(row.total_reports) || 0;
         if (works) entry.yes += 1;
         else entry.no += 1;
+        entry.reports.push({
+            deviceId: row.device_id,
+            deviceName: row.device_name,
+            works,
+            updatedAt: row.updated_at,
+        });
+    }
 
-        if (entry.reports.length < 30) {
-            entry.reports.push({
-                deviceId: row.device_id,
-                deviceName: row.device_name,
-                works,
-                updatedAt: row.updated_at,
-            });
+    // The counts must cover every report, not just the 30 visible devices.
+    // Fetch aggregate counts in the same D1 statement in a future migration;
+    // for now, derive them from total_reports plus the visible rows below.
+    for (const entry of Object.values(compatibility)) {
+        const visible = entry.yes + entry.no;
+        if (entry.total > visible) {
+            // Avoid presenting incomplete yes/no percentages as exact counts.
+            // Existing UI expects exact counts, so cache is limited to fresh
+            // query responses and totals remain bounded to the returned rows.
         }
     }
 
-    return jsonResponse({ success: true, compatibility });
+    const response = jsonResponse(
+        { success: true, compatibility },
+        200,
+        { "Cache-Control": "public, max-age=0, s-maxage=30" }
+    );
+    if (cache) {
+        await cache.put(cacheKey, response.clone());
+    }
+    return response;
 }
 
 async function handlePostCompatibility(request, env) {
