@@ -704,15 +704,11 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
             const modelSpan = document.createElement("span");
             modelSpan.className = "port-device-name";
-            modelSpan.textContent = device.model || device.name;
+            const modelName = device.model || device.name;
+            modelSpan.textContent = device.soc
+                ? `${modelName} (${device.soc})`
+                : modelName;
             option.appendChild(modelSpan);
-
-            if (device.soc) {
-                const socSpan = document.createElement("span");
-                socSpan.className = "port-device-soc";
-                socSpan.textContent = device.soc;
-                option.appendChild(socSpan);
-            }
 
             option.addEventListener("click", () => {
                 selectedDevice = {
