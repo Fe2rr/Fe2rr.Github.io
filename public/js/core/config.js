@@ -10,7 +10,9 @@ export const RATINGS_API_BASE =
         ? "https://ports-ratings-worker.federicoxastro.workers.dev"
         : "/api/ratings";
 
-export const RATINGS_API_URL = `${RATINGS_API_BASE}/ratings`;
+export const RATINGS_SUPABASE_API_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
+
+export const RATINGS_API_URL = `${RATINGS_SUPABASE_API_BASE}/ratings`;
 
 export const COMPATIBILITY_API_URL = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
 
