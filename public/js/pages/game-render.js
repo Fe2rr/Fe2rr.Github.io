@@ -17,6 +17,7 @@ import {
     searchDevices,
     getStoredUserDevice,
     setStoredUserDevice,
+    parseDeviceDisplayParts,
 } from "../services/compatibility.js";
 
 
@@ -493,9 +494,25 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
                 const row = document.createElement("div");
                 row.className = "port-compat-row";
 
+                const { model, soc } = parseDeviceDisplayParts(
+                    item.deviceName || item.deviceId,
+                    item.deviceSoc || item.soc || ""
+                );
+
+                const nameWrap = document.createElement("div");
+                nameWrap.className = "port-compat-device-wrap";
+
                 const name = document.createElement("span");
                 name.className = "port-compat-device";
-                name.textContent = item.deviceName || item.deviceId;
+                name.textContent = model;
+                nameWrap.appendChild(name);
+
+                if (soc) {
+                    const socLabel = document.createElement("span");
+                    socLabel.className = "port-compat-soc";
+                    socLabel.textContent = ` · ${soc}`;
+                    nameWrap.appendChild(socLabel);
+                }
 
                 const status = document.createElement("span");
                 status.className = item.works
@@ -503,7 +520,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
                     : "port-compat-status is-no";
                 status.textContent = item.works ? "Works" : "Doesn't work";
 
-                row.append(name, status);
+                row.append(nameWrap, status);
                 listElement.appendChild(row);
             }
         }
@@ -607,10 +624,18 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     function updateSelectedDeviceUI() {
         if (selectedDevice) {
+            const parts = parseDeviceDisplayParts(
+                selectedDevice.model || selectedDevice.name,
+                selectedDevice.soc || ""
+            );
+            const displayModel = selectedDevice.model || parts.model || selectedDevice.name;
+            const displaySoc = selectedDevice.soc || parts.soc;
             selectedNote.hidden = false;
-            selectedNote.textContent = `Selected: ${selectedDevice.name}`;
-            if (deviceInput.value !== selectedDevice.name) {
-                deviceInput.value = selectedDevice.name;
+            selectedNote.textContent = displaySoc
+                ? `Selected: ${displayModel} · ${displaySoc}`
+                : `Selected: ${displayModel}`;
+            if (deviceInput.value !== displayModel) {
+                deviceInput.value = displayModel;
             }
         } else {
             selectedNote.hidden = true;
@@ -676,9 +701,26 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             const option = document.createElement("button");
             option.type = "button";
             option.className = "port-device-option";
-            option.textContent = device.name;
+
+            const modelSpan = document.createElement("span");
+            modelSpan.className = "port-device-name";
+            modelSpan.textContent = device.model || device.name;
+            option.appendChild(modelSpan);
+
+            if (device.soc) {
+                const socSpan = document.createElement("span");
+                socSpan.className = "port-device-soc";
+                socSpan.textContent = device.soc;
+                option.appendChild(socSpan);
+            }
+
             option.addEventListener("click", () => {
-                selectedDevice = { id: device.id, name: device.name };
+                selectedDevice = {
+                    id: device.id,
+                    name: device.name,
+                    model: device.model || device.name,
+                    soc: device.soc || "",
+                };
                 setStoredUserDevice(selectedDevice);
                 resultsBox.hidden = true;
                 updateSelectedDeviceUI();
