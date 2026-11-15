@@ -51,6 +51,60 @@ function getCompatibilityToken() {
     return token;
 }
 
+export function parseDeviceDisplayParts(rawName, explicitSoc = "") {
+    const cleanName = String(rawName || "").trim();
+    let soc = String(explicitSoc || "").trim();
+    let model = cleanName;
+
+    if (cleanName) {
+        const trailing = cleanName.match(/^(.+?)\s*\(([^()]+)\)$/);
+        if (trailing) {
+            const candidateModel = trailing[1].trim();
+            const candidateSoc = trailing[2].trim();
+            if (!soc) {
+                model = candidateModel;
+                soc = candidateSoc;
+            } else if (candidateSoc.toLowerCase() === soc.toLowerCase()) {
+                model = candidateModel;
+            }
+        }
+    }
+
+    return { model, soc };
+}
+
+function normalizeDeviceRecord(device) {
+    const id = String(device?.id || "");
+    const rawName = String(device?.name || "").trim();
+    const manufacturer = String(device?.manufacturer || "").trim();
+    const deviceType = String(device?.deviceType || device?.device_type || "phone").trim() || "phone";
+    const explicitModel = String(device?.model || "").trim();
+    const explicitSoc = String(device?.soc || "").trim();
+
+    const parsed = parseDeviceDisplayParts(rawName, explicitSoc);
+    const model = explicitModel || parsed.model || rawName;
+    const soc = explicitSoc || parsed.soc;
+    const displayName = soc && model && !model.toLowerCase().includes(soc.toLowerCase())
+        ? `${model} (${soc})`
+        : (rawName || model);
+
+    const searchText = [displayName, manufacturer, model, soc]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+    return {
+        id,
+        name: displayName,
+        manufacturer,
+        model,
+        soc,
+        deviceType,
+        lower: searchText,
+        modelLower: model.toLowerCase(),
+    };
+}
+
 export async function loadDevices() {
     if (devicesCache) return devicesCache;
 
@@ -71,11 +125,7 @@ export async function loadDevices() {
                 throw new Error("Device database returned an invalid format.");
             }
 
-            devicesCache = payload.devices.map((device) => ({
-                id: String(device.id || ""),
-                name: String(device.name || ""),
-                lower: String(device.name || "").toLowerCase(),
-            }));
+            devicesCache = payload.devices.map(normalizeDeviceRecord);
             return devicesCache;
         })();
     }
@@ -108,7 +158,7 @@ export function searchDevices(devices, query, limit = 25) {
         }
         if (!allMatch) continue;
 
-        if (device.lower.startsWith(clean)) {
+        if (device.modelLower.startsWith(clean) || device.lower.startsWith(clean)) {
             startsWithMatches.push(device);
         } else {
             otherMatches.push(device);
@@ -137,7 +187,17 @@ export function getStoredUserDevice() {
             typeof parsed.name === "string" &&
             parsed.name.trim()
         ) {
-            return { id: parsed.id, name: parsed.name };
+            const parts = parseDeviceDisplayParts(parsed.name, parsed.soc || "");
+            return {
+                id: parsed.id,
+                name: parsed.name,
+                model: typeof parsed.model === "string" && parsed.model.trim()
+                    ? parsed.model.trim()
+                    : parts.model,
+                soc: typeof parsed.soc === "string" && parsed.soc.trim()
+                    ? parsed.soc.trim()
+                    : parts.soc,
+            };
         }
     } catch {
         // Ignore storage read errors
@@ -153,7 +213,12 @@ export function setStoredUserDevice(device) {
         }
         localStorage.setItem(
             USER_DEVICE_STORAGE_KEY,
-            JSON.stringify({ id: device.id, name: device.name })
+            JSON.stringify({
+                id: device.id,
+                name: device.name,
+                model: device.model || "",
+                soc: device.soc || "",
+            })
         );
     } catch {
         // Ignore storage write errors

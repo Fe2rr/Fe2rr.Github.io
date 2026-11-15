@@ -13,6 +13,7 @@ const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev'
 
 // Load strict Android device list for compatibility validation
 const deviceMap = new Map();
+const devicesCatalog = [];
 try {
   const devicesPath = path.join(__dirname, 'public', 'assets', 'data', 'devices.json');
   const rawDevices = fs.readFileSync(devicesPath, 'utf8');
@@ -20,7 +21,16 @@ try {
   if (Array.isArray(parsedDevices)) {
     for (const d of parsedDevices) {
       if (d && typeof d.id === 'string' && typeof d.name === 'string') {
-        deviceMap.set(d.id, d.name);
+        const entry = {
+          id: d.id,
+          name: d.name,
+          manufacturer: String(d.manufacturer || ''),
+          model: String(d.model || d.name),
+          soc: String(d.soc || ''),
+          deviceType: String(d.device_type || d.deviceType || 'phone'),
+        };
+        deviceMap.set(d.id, entry);
+        devicesCatalog.push(entry);
       }
     }
   }
@@ -28,7 +38,7 @@ try {
   console.warn('Warning: could not load devices.json for compatibility validation:', error);
 }
 
-// In-memory compatibility reports for preview (D1 handles this in production)
+// In-memory compatibility reports for preview (Supabase handles this in production)
 const compatibilityReports = new Map();
 
 app.use(express.json());
@@ -63,8 +73,12 @@ app.all('/api/ratings/*', async (req, res) => {
   }
 });
 
-// Compatibility reports API (preview backend matching Cloudflare Catalog Worker contract)
+// Compatibility reports API (preview backend matching Supabase Edge Function contract)
 app.get('/api/compatibility', (req, res) => {
+  if (req.query.action === 'devices') {
+    return res.json({ success: true, devices: devicesCatalog });
+  }
+
   const portIdsParam = String(req.query.port_ids || '');
   const portIds = portIdsParam
     .split(',')
@@ -92,13 +106,15 @@ app.get('/api/compatibility', (req, res) => {
       entry.reports.push({
         deviceId: report.deviceId,
         deviceName: report.deviceName,
+        deviceSoc: report.deviceSoc || '',
+        deviceType: report.deviceType || 'phone',
         works: report.works,
         updatedAt: report.updatedAt,
       });
     }
   }
 
-  res.json({ success: true, compatibility });
+  return res.json({ success: true, compatibility });
 });
 
 app.post('/api/compatibility', (req, res) => {
@@ -124,8 +140,8 @@ app.post('/api/compatibility', (req, res) => {
     });
   }
 
-  const deviceName = deviceMap.get(deviceId);
-  if (!deviceName) {
+  const device = deviceMap.get(deviceId);
+  if (!device) {
     return res.status(400).json({
       success: false,
       error: 'Invalid device_id. Please select a device from the list.',
@@ -139,19 +155,43 @@ app.post('/api/compatibility', (req, res) => {
     portId,
     token,
     deviceId,
-    deviceName,
+    deviceName: device.model || device.name,
+    deviceSoc: device.soc || '',
+    deviceType: device.deviceType || 'phone',
     works,
     updatedAt,
   });
+
+  const summary = { yes: 0, no: 0, reports: [] };
+  const sorted = Array.from(compatibilityReports.values())
+    .filter((r) => r.portId === portId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  for (const r of sorted) {
+    if (r.works) summary.yes += 1;
+    else summary.no += 1;
+    if (summary.reports.length < 30) {
+      summary.reports.push({
+        deviceId: r.deviceId,
+        deviceName: r.deviceName,
+        deviceSoc: r.deviceSoc,
+        deviceType: r.deviceType,
+        works: r.works,
+        updatedAt: r.updatedAt,
+      });
+    }
+  }
 
   return res.json({
     success: true,
     report: {
       portId,
       deviceId,
-      deviceName,
+      deviceName: device.model || device.name,
+      deviceSoc: device.soc || '',
+      deviceType: device.deviceType || 'phone',
       works,
     },
+    summary,
   });
 });
 
@@ -265,6 +305,202 @@ app.post('/api/visit', async (req, res) => {
   }
 
   return res.json({ success: true, slug });
+});
+
+// Metadata auto-resolution API (GitHub releases/tags & LaunchBox scraping)
+function normalizeGitHubRepo(url) {
+  const raw = String(url || '').trim();
+  const match = raw.match(/(?:https?:\/\/)?(?:www\.)?github\.com\/([^\s/]+)\/([^\s/#?]+)/i);
+  if (!match) return null;
+  const owner = match[1];
+  let repo = match[2].replace(/\.git$/i, '');
+  return { owner, repo, key: `${owner}/${repo}`.toLowerCase() };
+}
+
+function formatGitHubDate(value) {
+  if (!value) return '';
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Montevideo',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  }).formatToParts(date);
+  const part = (type) => parts.find((item) => item.type === type)?.value || '';
+  return `${part('year')}, ${part('month')} ${Number(part('day'))}`;
+}
+
+async function resolveGitHubVersion(info, token = process.env.GITHUB_TOKEN) {
+  const headers = {
+    'Accept': 'application/vnd.github+json',
+    'User-Agent': 'NAPL-Catalog/1.0 (https://github.com/fe2rr/Napl-prueba)'
+  };
+  if (token && typeof token === 'string' && token.trim()) {
+    headers['Authorization'] = 'Bearer ' + token.trim();
+  }
+  const baseUrl = `https://api.github.com/repos/${info.owner}/${info.repo}`;
+
+  try {
+    const relRes = await fetch(`${baseUrl}/releases/latest`, { headers });
+    if (relRes.status === 200) {
+      const rel = await relRes.json();
+      const version = String(rel.tag_name || rel.name || '').trim();
+      if (version) {
+        return {
+          version,
+          date: rel.published_at || rel.created_at || '',
+          source: 'Release'
+        };
+      }
+    }
+  } catch (_) {}
+
+  try {
+    const tagsRes = await fetch(`${baseUrl}/tags?per_page=1`, { headers });
+    if (tagsRes.ok) {
+      const tags = await tagsRes.json();
+      if (Array.isArray(tags) && tags.length && tags[0]?.name) {
+        const version = String(tags[0].name).trim();
+        let date = '';
+        try {
+          const repoRes = await fetch(baseUrl, { headers });
+          if (repoRes.ok) {
+            const repoData = await repoRes.json();
+            date = repoData.pushed_at || '';
+          }
+        } catch (_) {}
+        return { version, date, source: 'Tag' };
+      }
+    }
+  } catch (_) {}
+
+  return null;
+}
+
+function cleanLaunchBoxText(text) {
+  return String(text || '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)))
+    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<br\s*\/?>/gi, ' ')
+    .replace(/<\/(?:p|div|li|span|dd|dt)>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+async function resolveLaunchBoxMetadata(url) {
+  const res = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; NAPL/1.0)',
+      'Accept': 'text/html'
+    }
+  });
+  if (!res.ok) throw new Error(`LaunchBox HTTP ${res.status}`);
+  const html = await res.text();
+
+  let year = '';
+  const dtDdMatch = html.match(/<dt[^>]*>\s*(?:Release Date|Release Year|Year)\s*<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/i);
+  if (dtDdMatch) {
+    const y = dtDdMatch[1].match(/\b(19\d{2}|20\d{2})\b/);
+    if (y) year = y[1];
+  }
+  if (!year) {
+    const legacy = html.match(/(?:Release Date|Release Year|Year)[\s\S]*?<td>([\s\S]*?)<\/td>/i);
+    if (legacy) {
+      const y = legacy[1].match(/\b(19\d{2}|20\d{2})\b/);
+      if (y) year = y[1];
+    }
+  }
+
+  let genre = '';
+  const genreMatch = html.match(/<dt[^>]*>\s*(?:Genre|Genres)\s*<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/i);
+  if (genreMatch) {
+    genre = cleanLaunchBoxText(genreMatch[1]);
+  }
+  if (!genre) {
+    const legacyGenre = html.match(/(?:Genre|Genres)[\s\S]*?<td>([\s\S]*?)<\/td>/i);
+    if (legacyGenre) genre = cleanLaunchBoxText(legacyGenre[1]);
+  }
+
+  let description = '';
+  const modernP = html.match(/<p class="mt-4 text-body-lg[^"]*"[^>]*>([\s\S]*?)<\/p>/i);
+  if (modernP?.[1]) {
+    description = cleanLaunchBoxText(modernP[1]);
+  } else {
+    const heading = /<h[1-6][^>]*>\s*Overview\s*<\/h[1-6]>/i.exec(html);
+    if (heading) {
+      const chunk = html.slice(heading.index, heading.index + 5000);
+      const p = chunk.match(/<p\b[^>]*>([\s\S]*?)<\/p>/i);
+      if (p) description = cleanLaunchBoxText(p[1]);
+    }
+  }
+
+  let coverUrl = '';
+  const frontSection = html.match(/<h3[^>]*>Box\s*-\s*Front<\/h3>[\s\S]*?<img[^>]+src="([^">]+)"/i);
+  if (frontSection?.[1] && /^https?:\/\//i.test(frontSection[1])) {
+    coverUrl = frontSection[1];
+  } else {
+    const altFront = html.match(/<img[^>]+(?:alt|title)="[^"]*Box\s*-\s*Front[^"]*"[^>]+src="([^">]+)"/i);
+    if (altFront?.[1] && /^https?:\/\//i.test(altFront[1])) {
+      coverUrl = altFront[1];
+    } else {
+      const lbImg = html.match(/https:\/\/images\.launchbox-app\.com\/\/[a-f0-9-]+\.(?:jpg|jpeg|png|webp)/i) ||
+                    html.match(/https:\/\/images\.launchbox-app\.com\/[a-f0-9-]+\.(?:jpg|jpeg|png|webp)/i);
+      if (lbImg) coverUrl = lbImg[0];
+    }
+  }
+
+  return { year, genre, description, coverUrl };
+}
+
+app.post(['/admin/resolve-metadata', '/api/admin/resolve-metadata'], async (req, res) => {
+  const targetUrl = String(req.body?.url || '').trim();
+  if (!targetUrl) {
+    return res.status(400).json({ success: false, error: 'URL is required.' });
+  }
+
+  const gh = normalizeGitHubRepo(targetUrl);
+  if (gh) {
+    try {
+      const ghData = await resolveGitHubVersion(gh);
+      const formattedDate = ghData?.date ? formatGitHubDate(ghData.date) : '';
+      return res.json({
+        success: true,
+        source: 'github',
+        data: {
+          developer: gh.owner,
+          version: ghData?.version || '',
+          lastUpdate: formattedDate,
+          error: ghData?.error || null
+        }
+      });
+    } catch (err) {
+      return res.status(502).json({ success: false, error: err.message || 'GitHub resolution error' });
+    }
+  }
+
+  if (/^https?:\/\/gamesdb\.launchbox-app\.com\/games\/details\//i.test(targetUrl)) {
+    try {
+      const metadata = await resolveLaunchBoxMetadata(targetUrl);
+      return res.json({
+        success: true,
+        source: 'launchbox',
+        data: metadata
+      });
+    } catch (err) {
+      return res.status(422).json({ success: false, error: err.message || 'Could not fetch LaunchBox metadata.' });
+    }
+  }
+
+  return res.status(400).json({ success: false, error: 'Enter a valid GitHub repository or LaunchBox URL.' });
 });
 
 app.use(

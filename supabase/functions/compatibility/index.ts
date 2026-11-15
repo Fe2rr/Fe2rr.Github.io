@@ -82,9 +82,19 @@ Deno.serve(async (request: Request) => {
 
     if (request.method === "GET") {
       if (url.searchParams.get("action") === "devices") {
-        const devices = await rpc("get_compatibility_devices", {});
+        const rawDevices = await rpc("get_compatibility_devices", {});
+        const devices = Array.isArray(rawDevices)
+          ? rawDevices.map((device) => ({
+            id: String(device?.id || ""),
+            name: String(device?.name || ""),
+            manufacturer: String(device?.manufacturer || ""),
+            model: String(device?.model || ""),
+            soc: String(device?.soc || ""),
+            deviceType: String(device?.deviceType || device?.device_type || "phone"),
+          }))
+          : [];
         return json(
-          { success: true, devices: Array.isArray(devices) ? devices : [] },
+          { success: true, devices },
           200,
           { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
         );
