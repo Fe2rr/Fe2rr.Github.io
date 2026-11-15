@@ -2,7 +2,7 @@
  * NAPL — COMPATIBILITY SERVICE
  *
  * Manages Works? Yes/No reports paired with strict Android device selection
- * from the AndroidDeviceNames database (public/assets/data/devices.json).
+ * from the Supabase devices catalog and compatibility_reports tables.
  */
 
 import {
@@ -197,7 +197,7 @@ export async function loadGameCompatibility(portIds, fresh = false) {
             `${COMPATIBILITY_API_URL}?${params.toString()}`,
             {
                 method: "GET",
-                cache: "default",
+                cache: fresh ? "no-store" : "default",
             }
         );
 
