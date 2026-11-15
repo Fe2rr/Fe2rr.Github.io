@@ -59,22 +59,18 @@ export async function loadDevices() {
 
     if (!devicesPromise) {
         devicesPromise = (async () => {
-            // The device catalog is static data. Load it from GitHub Pages instead
-            // of asking D1 to return all 24k+ devices on every page visit.
-            const devicesUrl = new URL(
-                "../../assets/data/devices.json",
-                import.meta.url
-            ).href;
-            const response = await fetch(devicesUrl, {
-                cache: "force-cache",
-            });
+            // Device data is served by the Supabase compatibility Edge Function.
+            const response = await fetch(
+                `${COMPATIBILITY_API_URL}?action=devices`,
+                { cache: "force-cache" }
+            );
             if (!response.ok) {
                 throw new Error(
                     `Could not load device database (HTTP ${response.status}).`
                 );
             }
             const payload = await response.json();
-            const data = Array.isArray(payload) ? payload : payload?.devices;
+            const data = payload?.devices;
             if (!Array.isArray(data)) {
                 throw new Error("Device database returned an invalid format.");
             }
