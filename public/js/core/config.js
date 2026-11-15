@@ -17,7 +17,6 @@ export const REPORT_LINK_API_URL = CATALOG_API_BASE
     ? `${CATALOG_API_BASE}/report-link`
     : "/api/report-link";
 
-export const VISIT_API_URL = `${CATALOG_API_BASE}/visit`;
 
 export const RATING_TOKEN_STORAGE_KEY = "napl_rating_token_v1";
 export const USER_DEVICE_STORAGE_KEY = "napl_user_device_v1";
