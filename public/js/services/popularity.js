@@ -2,8 +2,8 @@
  * NAPL — POPULARITY SERVICE
  *
  * Popular rankings are served by the Google Apps Script web app.
- * This keeps Popular and All Time category sorting independent
- * from Cloudflare D1 read limits.
+ * Popular and All Time category sorting are handled independently
+ * through the Apps Script endpoint.
  */
 
 import { createSlug } from "../core/helpers.js";
@@ -19,7 +19,7 @@ let callbackSequence = 0;
 /**
  * Load a popularity period through JSONP.
  * Apps Script supports JSONP and can therefore be called from GitHub Pages
- * without a CORS proxy or a Cloudflare D1 read.
+ * without a CORS proxy.
  */
 function requestPopular(period) {
     return new Promise((resolve, reject) => {
