@@ -6,7 +6,7 @@ export const CATALOG_API_BASE = "https://napl-catalog-worker.federicoxastro.work
 
 export const RATINGS_SUPABASE_API_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
 
-export const RATINGS_API_URL = `${RATINGS_SUPABASE_API_BASE}/ratings`;
+export const RATINGS_API_URL = RATINGS_SUPABASE_API_BASE;
 
 export const COMPATIBILITY_API_URL = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
 
