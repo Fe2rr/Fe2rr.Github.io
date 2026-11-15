@@ -2,8 +2,6 @@
  * NAPL — CORE CONFIGURATION
  */
 
-export const CATALOG_API_BASE = "https://napl-catalog-worker.federicoxastro.workers.dev";
-
 export const RATINGS_API_BASE =
     "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
 
