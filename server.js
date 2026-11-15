@@ -28,7 +28,7 @@ try {
   console.warn('Warning: could not load devices.json for compatibility validation:', error);
 }
 
-// In-memory compatibility reports for preview (D1 handles this in production)
+// In-memory compatibility reports for local preview
 const compatibilityReports = new Map();
 
 app.use(express.json());
