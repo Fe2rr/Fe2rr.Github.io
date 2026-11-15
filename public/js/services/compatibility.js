@@ -52,14 +52,65 @@ function writeCachedCompatibility(data) {
     }
 }
 
-export async function loadDevices() {
-    if (devicesCache) {
-        return devicesCache;
+export function parseDeviceDisplayParts(rawName, explicitSoc = "") {
+    const cleanName = String(rawName || "").trim();
+    let soc = String(explicitSoc || "").trim();
+    let model = cleanName;
+
+    if (cleanName) {
+        const trailing = cleanName.match(/^(.+?)\s*\(([^()]+)\)$/);
+        if (trailing) {
+            const candidateModel = trailing[1].trim();
+            const candidateSoc = trailing[2].trim();
+            if (!soc) {
+                model = candidateModel;
+                soc = candidateSoc;
+            } else if (candidateSoc.toLowerCase() === soc.toLowerCase()) {
+                model = candidateModel;
+            }
+        }
     }
+
+    return { model, soc };
+}
+
+function normalizeDeviceRecord(device) {
+    const id = String(device?.id || "");
+    const rawName = String(device?.name || "").trim();
+    const manufacturer = String(device?.manufacturer || "").trim();
+    const deviceType = String(device?.deviceType || device?.device_type || "phone").trim() || "phone";
+    const explicitModel = String(device?.model || "").trim();
+    const explicitSoc = String(device?.soc || "").trim();
+
+    const parsed = parseDeviceDisplayParts(rawName, explicitSoc);
+    const model = explicitModel || parsed.model || rawName;
+    const soc = explicitSoc || parsed.soc;
+    const displayName = soc && model && !model.toLowerCase().includes(soc.toLowerCase())
+        ? `${model} (${soc})`
+        : (rawName || model);
+
+    const searchText = [displayName, manufacturer, model, soc]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+
+    return {
+        id,
+        name: displayName,
+        manufacturer,
+        model,
+        soc,
+        deviceType,
+        lower: searchText,
+        modelLower: model.toLowerCase(),
+    };
+}
+
+export async function loadDevices() {
+    if (devicesCache) return devicesCache;
 
     if (!devicesPromise) {
         devicesPromise = (async () => {
-            // Device data is served by the Supabase compatibility Edge Function.
             const response = await fetch(
                 `${COMPATIBILITY_API_URL}?action=devices`,
                 { cache: "force-cache" }
@@ -69,16 +120,13 @@ export async function loadDevices() {
                     `Could not load device database (HTTP ${response.status}).`
                 );
             }
+
             const payload = await response.json();
-            const data = payload?.devices;
-            if (!Array.isArray(data)) {
+            if (!payload?.success || !Array.isArray(payload.devices)) {
                 throw new Error("Device database returned an invalid format.");
             }
-            devicesCache = data.map((d) => ({
-                id: String(d.id || ""),
-                name: String(d.name || ""),
-                lower: String(d.name || "").toLowerCase(),
-            }));
+
+            devicesCache = payload.devices.map(normalizeDeviceRecord);
             return devicesCache;
         })();
     }
@@ -88,6 +136,93 @@ export async function loadDevices() {
     } catch (error) {
         devicesPromise = null;
         throw error;
+    }
+}
+
+export function searchDevices(devices, query, limit = 25) {
+    const clean = String(query || "").trim().toLowerCase();
+    if (!clean) return [];
+
+    const terms = clean.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return [];
+
+    const startsWithMatches = [];
+    const otherMatches = [];
+
+    for (const device of devices) {
+        let allMatch = true;
+        for (const term of terms) {
+            if (!device.lower.includes(term)) {
+                allMatch = false;
+                break;
+            }
+        }
+        if (!allMatch) continue;
+
+        if (device.modelLower.startsWith(clean) || device.lower.startsWith(clean)) {
+            startsWithMatches.push(device);
+        } else {
+            otherMatches.push(device);
+        }
+
+        if (
+            startsWithMatches.length >= limit &&
+            otherMatches.length >= limit
+        ) {
+            break;
+        }
+    }
+
+    return [...startsWithMatches, ...otherMatches].slice(0, limit);
+}
+
+export function getStoredUserDevice() {
+    try {
+        const raw = localStorage.getItem(USER_DEVICE_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        if (
+            parsed &&
+            typeof parsed.id === "string" &&
+            parsed.id.trim() &&
+            typeof parsed.name === "string" &&
+            parsed.name.trim()
+        ) {
+            const parts = parseDeviceDisplayParts(parsed.name, parsed.soc || "");
+            return {
+                id: parsed.id,
+                name: parsed.name,
+                model: typeof parsed.model === "string" && parsed.model.trim()
+                    ? parsed.model.trim()
+                    : parts.model,
+                soc: typeof parsed.soc === "string" && parsed.soc.trim()
+                    ? parsed.soc.trim()
+                    : parts.soc,
+            };
+        }
+    } catch {
+        // Ignore storage read errors
+    }
+    return null;
+}
+
+export function setStoredUserDevice(device) {
+    try {
+        if (!device) {
+            localStorage.removeItem(USER_DEVICE_STORAGE_KEY);
+            return;
+        }
+        localStorage.setItem(
+            USER_DEVICE_STORAGE_KEY,
+            JSON.stringify({
+                id: device.id,
+                name: device.name,
+                model: device.model || "",
+                soc: device.soc || "",
+            })
+        );
+    } catch {
+        // Ignore storage write errors
     }
 }
 
