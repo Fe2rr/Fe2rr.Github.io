@@ -1,7 +1,7 @@
 /*
  * NAPL — RATINGS SERVICE
  *
- * Connects to the Cloudflare Workers ratings API.
+ * Connects to the Supabase Edge Function ratings API.
  */
 
 import {
@@ -86,13 +86,38 @@ export async function getRatingToken() {
     return data.token;
 }
 
+function clearStoredRatingToken() {
+    ratingTokenMemory = "";
+
+    try {
+        localStorage.removeItem(RATING_TOKEN_STORAGE_KEY);
+    } catch {
+        // Continue using the in-memory token.
+    }
+}
+
+async function postWithTokenRefresh(endpoint, payload) {
+    let token = await getRatingToken();
+
+    try {
+        return await postRatingRequest(endpoint, { ...payload, token });
+    } catch (error) {
+        if (!(error instanceof Error) || error.message !== "invalid_token") {
+            throw error;
+        }
+
+        clearStoredRatingToken();
+        token = await getRatingToken();
+        return postRatingRequest(endpoint, { ...payload, token });
+    }
+}
+
 async function loadMyVotes(force = false) {
     if (myVotesCache && !force) {
         return myVotesCache;
     }
 
-    const token = await getRatingToken();
-    const data = await postRatingRequest("/my-votes", { token });
+    const data = await postWithTokenRefresh("/my-votes", {});
 
     if (
         !data ||
@@ -160,10 +185,7 @@ export function createRatingActions() {
         },
 
         async submitVote(portId, stars) {
-            const token = await getRatingToken();
-
-            await postRatingRequest("/vote", {
-                token,
+            await postWithTokenRefresh("/vote", {
                 port_id: portId,
                 stars,
             });
