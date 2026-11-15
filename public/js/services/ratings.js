@@ -1,11 +1,10 @@
 /*
  * NAPL — RATINGS SERVICE
  *
- * Connects to the Cloudflare Workers ratings API.
+ * Uses Supabase for rating data and token issuance.
  */
 
 import {
-    RATINGS_API_BASE,
     RATINGS_SUPABASE_API_BASE,
     RATINGS_API_URL,
     RATING_TOKEN_STORAGE_KEY,
@@ -40,13 +39,7 @@ function storeRatingToken(token) {
 }
 
 async function postRatingRequest(endpoint, payload) {
-    // Token issuance stays on the existing Worker for its CAPTCHA and IP rate limit.
-    // Vote storage and all rating reads are handled by the Supabase Edge Function.
-    const apiBase = endpoint === "/token"
-        ? RATINGS_API_BASE
-        : RATINGS_SUPABASE_API_BASE;
-
-    const response = await fetch(apiBase + endpoint, {
+    const response = await fetch(RATINGS_SUPABASE_API_BASE + endpoint, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
