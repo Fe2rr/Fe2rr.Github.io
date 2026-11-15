@@ -46,10 +46,14 @@
 }
 
 .game-summary-cover {
-  flex: 0 0 132px;
+  display: block;
+  flex: 0 0 auto;
   width: 132px;
-  aspect-ratio: 3 / 4;
-  object-fit: cover;
+  height: auto;
+  max-height: 220px;
+  object-fit: contain;
+  object-position: top center;
+  align-self: flex-start;
   border-radius: var(--radius-sm);
   border: 1px solid var(--border-medium);
   background: var(--surface-2);
@@ -771,7 +775,7 @@ a.port-detail-value {
 
 .port-compat-row {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   font-size: 12px;
@@ -822,8 +826,8 @@ a.port-detail-value {
   }
 
   .game-summary-cover {
-    flex: 0 0 96px;
     width: 96px;
+    max-height: 180px;
   }
 
   .port-details {

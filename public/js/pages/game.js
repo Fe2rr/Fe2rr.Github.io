@@ -9,10 +9,7 @@ import { createSlug } from "../core/helpers.js";
 import { loadCatalog } from "../core/data.js";
 import { registerGameVisit } from "../services/visits.js";
 import { loadPortRatings, createRatingActions } from "../services/ratings.js";
-import {
-    loadGameCompatibility,
-    createCompatibilityActions,
-} from "../services/compatibility.js";
+import { createCompatibilityActions } from "../services/compatibility.js";
 import { initNavigation } from "../components/navigation.js";
 import { initSearch } from "../components/search.js";
 import { initThemeToggle } from "../components/theme.js";
@@ -70,18 +67,14 @@ async function loadSelectedGame() {
         document.title = `${game.name} — NAPL`;
         registerGameVisit(game.name);
 
-        const portIds = game.ports.map((p) => p.portId).filter(Boolean);
-        const [ratings, compatibility] = await Promise.all([
-            loadPortRatings(),
-            loadGameCompatibility(portIds),
-        ]);
+        const ratings = await loadPortRatings();
 
         displayGame(
             game,
             catalog.allRows,
             ratings,
             createRatingActions(),
-            compatibility,
+            {},
             createCompatibilityActions()
         );
     } catch (error) {

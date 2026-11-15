@@ -2,19 +2,17 @@
  * NAPL — CORE CONFIGURATION
  */
 
-export const CATALOG_API_BASE = "https://napl-catalog-worker.federicoxastro.workers.dev";
+export const RATINGS_API_BASE =
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
 
-export const RATINGS_SUPABASE_API_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
+export const RATINGS_API_URL = RATINGS_API_BASE;
 
-export const RATINGS_API_URL = RATINGS_SUPABASE_API_BASE;
+export const COMPATIBILITY_API_URL =
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
 
-export const COMPATIBILITY_API_URL = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
+export const REPORT_LINK_API_URL =
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/report-link";
 
-export const REPORT_LINK_API_URL = CATALOG_API_BASE
-    ? `${CATALOG_API_BASE}/report-link`
-    : "/api/report-link";
-
-export const VISIT_API_URL = `${CATALOG_API_BASE}/visit`;
 
 export const RATING_TOKEN_STORAGE_KEY = "napl_rating_token_v1";
 export const USER_DEVICE_STORAGE_KEY = "napl_user_device_v1";

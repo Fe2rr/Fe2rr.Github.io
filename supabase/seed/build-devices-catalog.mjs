@@ -1,4 +1,4 @@
-import { writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import {
     ANDROID_HANDHELDS,
     cleanModelName,
@@ -262,8 +262,38 @@ async function main() {
 
     devices.sort((a, b) => a.name.localeCompare(b.name, "en"));
 
-    const jsonOutUrl = new URL("../../public/assets/data/devices.json", import.meta.url);
-    await writeFile(jsonOutUrl, `${JSON.stringify(devices, null, 2)}\n`, "utf8");
+    // Write the catalog in manageable JSON shards. The manifest keeps the
+    // importer deterministic while avoiding a single oversized GitHub file.
+    const dataDir = new URL("../../public/assets/data/", import.meta.url);
+    const shardsDir = new URL("../../public/assets/data/device-catalog/", import.meta.url);
+    await mkdir(shardsDir, { recursive: true });
+
+    for (const filename of await readdir(shardsDir)) {
+        if (/^devices-part-\\d{3}\\.json$/.test(filename)) {
+            await rm(new URL(filename, shardsDir), { force: true });
+        }
+    }
+
+    const shardSize = 1000;
+    const chunks = [];
+    for (let i = 0; i < devices.length; i += shardSize) {
+        const part = devices.slice(i, i + shardSize);
+        const filename = `devices-part-${String(chunks.length + 1).padStart(3, "0")}.json`;
+        await writeFile(new URL(filename, shardsDir), JSON.stringify(part), "utf8");
+        chunks.push({ file: filename, records: part.length });
+    }
+
+    const manifest = {
+        format: "napl-device-catalog-shards-v1",
+        total: devices.length,
+        chunkSize: shardSize,
+        chunks,
+    };
+    await writeFile(
+        new URL("devices.json", dataDir),
+        `${JSON.stringify(manifest, null, 2)}\\n`,
+        "utf8"
+    );
 
     // Generate compact batched SQL seed for Supabase SQL Editor
     const sqlOutUrl = new URL("./devices_seed.sql", import.meta.url);

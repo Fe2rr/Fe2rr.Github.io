@@ -1,11 +1,11 @@
 /*
  * NAPL — RATINGS SERVICE
  *
- * Uses Supabase for rating data and token issuance.
+ * Connects to the Supabase Edge Function ratings API.
  */
 
 import {
-    RATINGS_SUPABASE_API_BASE,
+    RATINGS_API_BASE,
     RATINGS_API_URL,
     RATING_TOKEN_STORAGE_KEY,
 } from "../core/config.js";
@@ -39,7 +39,7 @@ function storeRatingToken(token) {
 }
 
 async function postRatingRequest(endpoint, payload) {
-    const response = await fetch(RATINGS_SUPABASE_API_BASE + endpoint, {
+    const response = await fetch(RATINGS_API_BASE + endpoint, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
@@ -92,7 +92,7 @@ function clearStoredRatingToken() {
     try {
         localStorage.removeItem(RATING_TOKEN_STORAGE_KEY);
     } catch {
-        // Continue without persistent storage.
+        // Continue using the in-memory token.
     }
 }
 

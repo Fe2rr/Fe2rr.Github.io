@@ -2,7 +2,7 @@
  * NAPL — COMPATIBILITY SERVICE
  *
  * Manages Works? Yes/No reports paired with strict Android device selection
- * from the Supabase devices catalog.
+ * from the Supabase devices catalog and compatibility_reports tables.
  */
 
 import {
@@ -14,41 +14,42 @@ import { getRatingToken } from "./ratings.js";
 
 let devicesCache = null;
 let devicesPromise = null;
-let compatibilityTokenMemory = "";
 
-function getCompatibilityToken() {
-    if (compatibilityTokenMemory) return compatibilityTokenMemory;
+const COMPATIBILITY_CACHE_PREFIX = "napl_compatibility_v1:";
+const COMPATIBILITY_CACHE_TTL = 60_000;
 
-    const storageKey = "napl_compatibility_token_v1";
-
+function readCachedCompatibility(portId) {
     try {
-        const stored = localStorage.getItem(storageKey);
-        if (stored && stored.length >= 32 && stored.length <= 128) {
-            compatibilityTokenMemory = stored;
-            return stored;
+        const raw = localStorage.getItem(COMPATIBILITY_CACHE_PREFIX + portId);
+        if (!raw) return null;
+        const cached = JSON.parse(raw);
+        if (
+            !cached ||
+            typeof cached.savedAt !== "number" ||
+            Date.now() - cached.savedAt > COMPATIBILITY_CACHE_TTL ||
+            !cached.value ||
+            typeof cached.value !== "object"
+        ) {
+            localStorage.removeItem(COMPATIBILITY_CACHE_PREFIX + portId);
+            return null;
+        }
+        return cached.value;
+    } catch {
+        return null;
+    }
+}
+
+function writeCachedCompatibility(data) {
+    try {
+        for (const [portId, value] of Object.entries(data || {})) {
+            localStorage.setItem(
+                COMPATIBILITY_CACHE_PREFIX + portId,
+                JSON.stringify({ savedAt: Date.now(), value })
+            );
         }
     } catch {
-        // Continue with an in-memory token if storage is unavailable.
+        // Storage may be unavailable or full; the API response still works.
     }
-
-    if (!globalThis.crypto?.getRandomValues) {
-        throw new Error("Secure compatibility token generation is unavailable.");
-    }
-
-    const bytes = new Uint8Array(32);
-    globalThis.crypto.getRandomValues(bytes);
-    const token = Array.from(bytes, (byte) =>
-        byte.toString(16).padStart(2, "0")
-    ).join("");
-
-    compatibilityTokenMemory = token;
-    try {
-        localStorage.setItem(storageKey, token);
-    } catch {
-        // Keep the token for this page session.
-    }
-
-    return token;
 }
 
 export function parseDeviceDisplayParts(rawName, explicitSoc = "") {
@@ -111,8 +112,8 @@ export async function loadDevices() {
     if (!devicesPromise) {
         devicesPromise = (async () => {
             const response = await fetch(
-                `${COMPATIBILITY_API_URL}?action=devices`,
-                { cache: "force-cache" }
+                `${COMPATIBILITY_API_URL}?action=devices&catalog_version=2`,
+                { cache: "no-store" }
             );
             if (!response.ok) {
                 throw new Error(
@@ -225,7 +226,7 @@ export function setStoredUserDevice(device) {
     }
 }
 
-export async function loadGameCompatibility(portIds) {
+export async function loadGameCompatibility(portIds, fresh = false) {
     const cleanIds = Array.from(
         new Set(
             (portIds || []).map((id) => String(id || "").trim()).filter(Boolean)
@@ -236,15 +237,30 @@ export async function loadGameCompatibility(portIds) {
         return {};
     }
 
+    const cached = {};
+    const missingIds = [];
+
+    if (!fresh) {
+        for (const id of cleanIds) {
+            const value = readCachedCompatibility(id);
+            if (value) cached[id] = value;
+            else missingIds.push(id);
+        }
+        if (missingIds.length === 0) return cached;
+    }
+
+    const requestedIds = fresh ? cleanIds : missingIds;
+
     try {
         const params = new URLSearchParams({
-            port_ids: cleanIds.join(","),
+            port_ids: requestedIds.join(","),
         });
+        if (fresh) params.set("fresh", "1");
         const response = await fetch(
             `${COMPATIBILITY_API_URL}?${params.toString()}`,
             {
                 method: "GET",
-                cache: "no-store",
+                cache: fresh ? "no-store" : "default",
             }
         );
 
@@ -256,19 +272,26 @@ export async function loadGameCompatibility(portIds) {
 
         const data = await response.json();
         if (!data || typeof data.compatibility !== "object") {
-            return {};
+            return cached;
         }
-        return data.compatibility;
+
+        writeCachedCompatibility(data.compatibility);
+        return { ...cached, ...data.compatibility };
     } catch (error) {
         console.warn("NAPL: could not load compatibility reports.", error);
-        return {};
+        return cached;
     }
 }
 
 export function createCompatibilityActions() {
     return {
+        async loadSummary(portId) {
+            const summaries = await loadGameCompatibility([portId]);
+            return summaries[portId] || null;
+        },
+
         async submitReport({ portId, deviceId, works }) {
-            const token = getCompatibilityToken();
+            const token = await getRatingToken();
 
             const response = await fetch(COMPATIBILITY_API_URL, {
                 method: "POST",
@@ -301,14 +324,26 @@ export function createCompatibilityActions() {
                 );
             }
 
+            const refreshed = await loadGameCompatibility([portId], true);
             return {
                 report: data.report,
-                summary: data.summary || null,
+                summary: refreshed[portId] || null,
             };
         },
 
         async reportBrokenLink({ portId, reason, url }) {
-            const token = await getRatingToken();
+            const storageKey = "napl_link_report_client_v1";
+            let clientId = "";
+
+            try {
+                clientId = localStorage.getItem(storageKey) || "";
+                if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientId)) {
+                    clientId = crypto.randomUUID();
+                    localStorage.setItem(storageKey, clientId);
+                }
+            } catch {
+                clientId = crypto.randomUUID();
+            }
 
             const response = await fetch(REPORT_LINK_API_URL, {
                 method: "POST",
@@ -316,7 +351,7 @@ export function createCompatibilityActions() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    token,
+                    client_id: clientId,
                     port_id: portId,
                     reason,
                     url,
