@@ -112,8 +112,8 @@ export async function loadDevices() {
     if (!devicesPromise) {
         devicesPromise = (async () => {
             const response = await fetch(
-                `${COMPATIBILITY_API_URL}?action=devices`,
-                { cache: "force-cache" }
+                `${COMPATIBILITY_API_URL}?action=devices&catalog_version=2`,
+                { cache: "no-store" }
             );
             if (!response.ok) {
                 throw new Error(
