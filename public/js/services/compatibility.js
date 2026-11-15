@@ -269,7 +269,18 @@ export function createCompatibilityActions() {
         },
 
         async reportBrokenLink({ portId, reason, url }) {
-            const token = await getRatingToken();
+            const storageKey = "napl_link_report_client_v1";
+            let clientId = "";
+
+            try {
+                clientId = localStorage.getItem(storageKey) || "";
+                if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(clientId)) {
+                    clientId = crypto.randomUUID();
+                    localStorage.setItem(storageKey, clientId);
+                }
+            } catch {
+                clientId = crypto.randomUUID();
+            }
 
             const response = await fetch(REPORT_LINK_API_URL, {
                 method: "POST",
@@ -277,7 +288,7 @@ export function createCompatibilityActions() {
                     "Content-Type": "application/json",
                 },
                 body: JSON.stringify({
-                    token,
+                    client_id: clientId,
                     port_id: portId,
                     reason,
                     url,
