@@ -12,9 +12,8 @@ export const RATINGS_API_URL = RATINGS_API_BASE;
 export const COMPATIBILITY_API_URL =
     "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
 
-export const REPORT_LINK_API_URL = CATALOG_API_BASE
-    ? `${CATALOG_API_BASE}/report-link`
-    : "/api/report-link";
+export const REPORT_LINK_API_URL =
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/report-link";
 
 
 export const RATING_TOKEN_STORAGE_KEY = "napl_rating_token_v1";
