@@ -6,6 +6,7 @@
 
 import {
     RATINGS_API_BASE,
+    RATINGS_SUPABASE_API_BASE,
     RATINGS_API_URL,
     RATING_TOKEN_STORAGE_KEY,
 } from "../core/config.js";
@@ -39,7 +40,13 @@ function storeRatingToken(token) {
 }
 
 async function postRatingRequest(endpoint, payload) {
-    const response = await fetch(RATINGS_API_BASE + endpoint, {
+    // Token issuance stays on the existing Worker for its CAPTCHA and IP rate limit.
+    // Vote storage and all rating reads are handled by the Supabase Edge Function.
+    const apiBase = endpoint === "/token"
+        ? RATINGS_API_BASE
+        : RATINGS_SUPABASE_API_BASE;
+
+    const response = await fetch(apiBase + endpoint, {
         method: "POST",
         headers: {
             "Content-Type": "application/json",
