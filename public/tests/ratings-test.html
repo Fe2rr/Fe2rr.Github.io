@@ -121,10 +121,10 @@
 <main>
 
   <h1>NAPL Ratings Test</h1>
-  <p class="subtitle">Worker and database diagnostics</p>
+  <p class="subtitle">Supabase ratings and database diagnostics</p>
 
   <section class="panel">
-    <h2>1. Worker connection</h2>
+    <h2>1. Supabase connection</h2>
     <button id="checkRatings">Check ratings API</button>
     <div id="ratingsResult" class="result">Not tested yet.</div>
   </section>
@@ -178,7 +178,7 @@
 
 <script>
 const API =
-  "https://ports-ratings-worker.federicoxastro.workers.dev";
+  "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
 
 const TOKEN_KEY = "napl_rating_token_v1";
 
@@ -228,8 +228,38 @@ function post(path, body) {
     headers: {
       "Content-Type": "application/json"
     },
-    body: JSON.stringify(body)
+    body: JSON.stringify(body),
+    cache: "no-store"
   });
+}
+
+async function getOrCreateToken(forceNew = false) {
+  let token = forceNew ? "" : localStorage.getItem(TOKEN_KEY);
+
+  if (!token) {
+    const data = await post("/token", {});
+    if (!data || typeof data.token !== "string" || !data.token.trim()) {
+      throw new Error("Token missing from Supabase response.");
+    }
+    token = data.token;
+    localStorage.setItem(TOKEN_KEY, token);
+  }
+
+  return token;
+}
+
+async function postWithTokenRefresh(path, body = {}) {
+  let token = await getOrCreateToken();
+
+  try {
+    return await post(path, { ...body, token });
+  } catch (error) {
+    if (error.message !== "invalid_token") throw error;
+
+    localStorage.removeItem(TOKEN_KEY);
+    token = await getOrCreateToken(true);
+    return post(path, { ...body, token });
+  }
 }
 
 /* GET /ratings */
@@ -257,9 +287,10 @@ $("getToken").addEventListener("click", async () => {
   show("tokenResult", "Requesting token...");
 
   try {
-    let token = localStorage.getItem(TOKEN_KEY);
+    const existingToken = localStorage.getItem(TOKEN_KEY);
+    const token = await getOrCreateToken();
 
-    if (token) {
+    if (existingToken) {
       show(
         "tokenResult",
         "Existing NAPL token found and reused.",
@@ -267,16 +298,6 @@ $("getToken").addEventListener("click", async () => {
       );
       return;
     }
-
-    const data = await post("/token", {});
-
-    if (!data.token) {
-      throw new Error("Token missing from response.");
-    }
-
-    token = data.token;
-
-    localStorage.setItem(TOKEN_KEY, token);
 
     show(
       "tokenResult",
@@ -295,13 +316,7 @@ $("checkVotes").addEventListener("click", async () => {
   show("votesResult", "Loading votes...");
 
   try {
-    const token = localStorage.getItem(TOKEN_KEY);
-
-    if (!token) {
-      throw new Error("Get a token first.");
-    }
-
-    const data = await post("/my-votes", { token });
+    const data = await postWithTokenRefresh("/my-votes");
 
     const count = Object.keys(data.votes || {}).length;
 
@@ -328,14 +343,7 @@ $("submitVote").addEventListener("click", async () => {
     return;
   }
 
-  const token = localStorage.getItem(TOKEN_KEY);
-
-  if (!token) {
-    show("voteResult", "Get a token first.", "error");
-    return;
-  }
-
-  const confirmed = confirm(
+    const confirmed = confirm(
     `Submit ${stars} stars for port:\n${portId}\n\n` +
     "This is a real public rating. Continue?"
   );
@@ -345,8 +353,7 @@ $("submitVote").addEventListener("click", async () => {
   show("voteResult", "Submitting vote...");
 
   try {
-    const data = await post("/vote", {
-      token,
+    const data = await postWithTokenRefresh("/vote", {
       port_id: portId,
       stars
     });
