@@ -10,7 +10,42 @@ if (!serviceRoleKey) {
 }
 
 const sourceUrl = new URL("../../public/assets/data/devices.json", import.meta.url);
-const devices = JSON.parse(await readFile(sourceUrl, "utf8"));
+const manifest = JSON.parse(await readFile(sourceUrl, "utf8"));
+
+let devices;
+if (Array.isArray(manifest)) {
+    // Backward compatibility with an unsharded catalog.
+    devices = manifest;
+} else if (
+    manifest?.format === "napl-device-catalog-shards-v1" &&
+    Array.isArray(manifest.chunks) &&
+    manifest.chunks.length > 0
+) {
+    devices = [];
+    for (const chunk of manifest.chunks) {
+        const filename = String(chunk?.file || "");
+        if (!/^devices-part-\\d{3}\\.json$/.test(filename)) {
+            throw new Error(`Invalid device catalog chunk name: ${filename}`);
+        }
+        const chunkUrl = new URL(
+            `../../public/assets/data/device-catalog/${filename}`,
+            import.meta.url
+        );
+        const records = JSON.parse(await readFile(chunkUrl, "utf8"));
+        if (!Array.isArray(records)) {
+            throw new Error(`Device catalog chunk ${filename} is not an array.`);
+        }
+        if (Number(chunk.records) !== records.length) {
+            throw new Error(`Device catalog chunk ${filename} has an unexpected record count.`);
+        }
+        devices.push(...records);
+    }
+    if (Number(manifest.total) !== devices.length) {
+        throw new Error("Device catalog manifest total does not match the loaded chunks.");
+    }
+} else {
+    throw new Error("The device source manifest has an invalid format.");
+}
 
 if (!Array.isArray(devices) || devices.length === 0) {
     throw new Error("The device source file is empty or has an invalid format.");
