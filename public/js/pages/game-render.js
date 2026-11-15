@@ -13,6 +13,9 @@ import {
     createGamesUsingAppSection,
 } from "../components/multi-game-apps.js";
 import {
+    COMPAT_STATUSES,
+    getCompatStatusMeta,
+    normalizeCompatSummary,
     loadDevices,
     searchDevices,
     getStoredUserDevice,
@@ -407,11 +410,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     const container = document.createElement("div");
     container.className = "port-compat";
 
-    let summary = compatibility?.[port.portId] || {
-        yes: 0,
-        no: 0,
-        reports: [],
-    };
+    let summary = normalizeCompatSummary(compatibility?.[port.portId]);
 
     const bar = document.createElement("div");
     bar.className = "port-compat-bar";
@@ -421,7 +420,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     const summaryTitle = document.createElement("span");
     summaryTitle.className = "port-compat-title";
-    summaryTitle.textContent = "Works";
+    summaryTitle.textContent = "Compatibility";
 
     const summaryText = document.createElement("span");
     summaryText.className = "port-compat-summary";
@@ -440,46 +439,58 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     meter.className = "port-compat-meter";
     meter.setAttribute("role", "img");
 
-    const meterYes = document.createElement("div");
-    meterYes.className = "port-compat-meter-yes";
+    const meter60 = document.createElement("div");
+    meter60.className = "port-compat-meter-segment is-playable-60";
 
-    const meterNo = document.createElement("div");
-    meterNo.className = "port-compat-meter-no";
+    const meter30 = document.createElement("div");
+    meter30.className = "port-compat-meter-segment is-playable-30";
 
-    meter.append(meterYes, meterNo);
+    const meterLow = document.createElement("div");
+    meterLow.className = "port-compat-meter-segment is-low-fps";
+
+    const meterCrash = document.createElement("div");
+    meterCrash.className = "port-compat-meter-segment is-crash";
+
+    meter.append(meter60, meter30, meterLow, meterCrash);
 
     const listElement = document.createElement("div");
     listElement.className = "port-compat-list";
     listElement.hidden = true;
 
     function renderCompatibilitySummary(nextSummary) {
-        summary = nextSummary || { yes: 0, no: 0, reports: [] };
-        const yesCount = Number(summary.yes) || 0;
-        const noCount = Number(summary.no) || 0;
-        const total = yesCount + noCount;
+        summary = normalizeCompatSummary(nextSummary);
+        const { counts, total, reports } = summary;
 
         if (total === 0) {
-            summaryText.textContent = "No votes yet";
+            summaryText.textContent = "No reports yet";
             summaryText.classList.add("is-empty");
             meter.classList.add("is-empty");
-            meterYes.style.width = "50%";
-            meterNo.style.width = "50%";
-            meter.setAttribute("aria-label", "No compatibility votes yet");
+            meter60.style.width = "25%";
+            meter30.style.width = "25%";
+            meterLow.style.width = "25%";
+            meterCrash.style.width = "25%";
+            meter.setAttribute("aria-label", "No compatibility reports yet");
         } else {
-            const yesPct = Math.round((yesCount / total) * 100);
-            const noPct = 100 - yesPct;
-            summaryText.textContent = `${yesPct}% (${yesCount} Yes · ${noCount} No)`;
+            const playablePct = Math.round(
+                ((counts.playable_60 + counts.playable_30) / total) * 100
+            );
+            const parts = COMPAT_STATUSES.filter((tier) => counts[tier.id] > 0).map(
+                (tier) => `${counts[tier.id]} ${tier.shortLabel}`
+            );
+
+            summaryText.textContent = `${playablePct}% playable (${parts.join(" · ")})`;
             summaryText.classList.remove("is-empty");
             meter.classList.remove("is-empty");
-            meterYes.style.width = `${yesPct}%`;
-            meterNo.style.width = `${noPct}%`;
+            meter60.style.width = `${(counts.playable_60 / total) * 100}%`;
+            meter30.style.width = `${(counts.playable_30 / total) * 100}%`;
+            meterLow.style.width = `${(counts.low_fps / total) * 100}%`;
+            meterCrash.style.width = `${(counts.crash / total) * 100}%`;
             meter.setAttribute(
                 "aria-label",
-                `${yesPct}% works (${yesCount} yes, ${noCount} no)`
+                `${playablePct}% playable (${parts.join(", ")})`
             );
         }
 
-        const reports = Array.isArray(summary.reports) ? summary.reports : [];
         if (reports.length === 0) {
             toggleListButton.hidden = true;
             listElement.hidden = true;
@@ -514,11 +525,10 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
                     nameWrap.appendChild(socLabel);
                 }
 
+                const tier = getCompatStatusMeta(item.status, item.works);
                 const status = document.createElement("span");
-                status.className = item.works
-                    ? "port-compat-status is-yes"
-                    : "port-compat-status is-no";
-                status.textContent = item.works ? "Works" : "Doesn't work";
+                status.className = `port-compat-status is-${tier.id.replace(/_/g, "-")}`;
+                status.textContent = tier.label;
 
                 row.append(nameWrap, status);
                 listElement.appendChild(row);
@@ -551,34 +561,42 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     const subtitle = document.createElement("p");
     subtitle.className = "port-rating-popover-description";
-    subtitle.textContent = "Does it work on your Android device?";
+    subtitle.textContent = "How does this port run on your Android device?";
 
-    const binaryGroup = document.createElement("div");
-    binaryGroup.className = "port-compat-binary";
+    const tiersGroup = document.createElement("div");
+    tiersGroup.className = "port-compat-tiers";
 
-    const yesBtn = document.createElement("button");
-    yesBtn.type = "button";
-    yesBtn.className = "port-compat-choice";
-    yesBtn.textContent = "Yes, works";
+    let selectedStatus = "";
+    const statusButtons = new Map();
 
-    const noBtn = document.createElement("button");
-    noBtn.type = "button";
-    noBtn.className = "port-compat-choice";
-    noBtn.textContent = "No, fails";
-
-    binaryGroup.append(yesBtn, noBtn);
+    for (const tier of COMPAT_STATUSES) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `port-compat-choice is-${tier.id.replace(/_/g, "-")}`;
+        btn.textContent = tier.label;
+        btn.addEventListener("click", () => {
+            if (submitting) return;
+            selectedStatus = tier.id;
+            for (const [id, otherBtn] of statusButtons.entries()) {
+                otherBtn.classList.toggle("selected", id === tier.id);
+            }
+            updateCompatSubmitState();
+        });
+        statusButtons.set(tier.id, btn);
+        tiersGroup.appendChild(btn);
+    }
 
     const deviceField = document.createElement("div");
     deviceField.className = "port-device-field";
 
     const deviceLabel = document.createElement("label");
     deviceLabel.className = "port-device-label";
-    deviceLabel.textContent = "Phone / tablet model (select from list)";
+    deviceLabel.textContent = "Device model / SoC (select from list)";
 
     const deviceInput = document.createElement("input");
     deviceInput.type = "text";
     deviceInput.className = "port-device-input";
-    deviceInput.placeholder = "Search model (e.g. Poco F5, Galaxy S23)";
+    deviceInput.placeholder = "Search model or SoC (e.g. Poco F5, Odin 2, Snapdragon 8 Gen 2)";
     deviceInput.autocomplete = "off";
 
     const resultsBox = document.createElement("div");
@@ -599,18 +617,17 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     const feedback = document.createElement("p");
     feedback.className = "port-rating-feedback";
-    feedback.textContent = "Choose Yes/No and select an exact device.";
+    feedback.textContent = "Choose a performance level and select an exact device.";
 
     popover.append(
         title,
         subtitle,
-        binaryGroup,
+        tiersGroup,
         deviceField,
         submitBtn,
         feedback
     );
 
-    let selectedWorks = null;
     let selectedDevice = getStoredUserDevice();
     let devicesList = null;
     let loadingDevices = false;
@@ -646,29 +663,13 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     function updateCompatSubmitState() {
         submitBtn.disabled =
             submitting ||
-            selectedWorks === null ||
+            !selectedStatus ||
             !selectedDevice ||
             !selectedDevice.id;
     }
 
     updateSelectedDeviceUI();
     updateCompatSubmitState();
-
-    yesBtn.addEventListener("click", () => {
-        if (submitting) return;
-        selectedWorks = true;
-        yesBtn.classList.add("selected", "is-yes");
-        noBtn.classList.remove("selected", "is-no");
-        updateCompatSubmitState();
-    });
-
-    noBtn.addEventListener("click", () => {
-        if (submitting) return;
-        selectedWorks = false;
-        noBtn.classList.add("selected", "is-no");
-        yesBtn.classList.remove("selected", "is-yes");
-        updateCompatSubmitState();
-    });
 
     async function ensureDevicesLoaded() {
         if (devicesList) return devicesList;
@@ -677,7 +678,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
         setCompatFeedback("Loading Android device database...");
         try {
             devicesList = await loadDevices();
-            setCompatFeedback("Choose Yes/No and select an exact device.");
+            setCompatFeedback("Choose a performance level and select an exact device.");
             return devicesList;
         } catch (error) {
             setCompatFeedback(
@@ -704,11 +705,15 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
             const modelSpan = document.createElement("span");
             modelSpan.className = "port-device-name";
-            const modelName = device.model || device.name;
-            modelSpan.textContent = device.soc
-                ? `${modelName} (${device.soc})`
-                : modelName;
+            modelSpan.textContent = device.model || device.name;
             option.appendChild(modelSpan);
+
+            if (device.soc) {
+                const socSpan = document.createElement("span");
+                socSpan.className = "port-device-soc";
+                socSpan.textContent = device.soc;
+                option.appendChild(socSpan);
+            }
 
             option.addEventListener("click", () => {
                 selectedDevice = {
@@ -761,7 +766,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     submitBtn.addEventListener("click", async () => {
         if (
             submitting ||
-            selectedWorks === null ||
+            !selectedStatus ||
             !selectedDevice ||
             !compatibilityActions?.submitReport
         ) {
@@ -776,7 +781,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             const result = await compatibilityActions.submitReport({
                 portId: port.portId,
                 deviceId: selectedDevice.id,
-                works: selectedWorks,
+                status: selectedStatus,
             });
 
             if (result?.summary) {

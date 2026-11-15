@@ -15,8 +15,102 @@ import { getRatingToken } from "./ratings.js";
 let devicesCache = null;
 let devicesPromise = null;
 
-const COMPATIBILITY_CACHE_PREFIX = "napl_compatibility_v1:";
+const COMPATIBILITY_CACHE_PREFIX = "napl_compatibility_v2:";
 const COMPATIBILITY_CACHE_TTL = 60_000;
+
+export const COMPAT_STATUSES = [
+    {
+        id: "playable_60",
+        label: "Playable (60fps)",
+        shortLabel: "60fps",
+        score: 4,
+        works: true,
+    },
+    {
+        id: "playable_30",
+        label: "Playable (30fps)",
+        shortLabel: "30fps",
+        score: 3,
+        works: true,
+    },
+    {
+        id: "low_fps",
+        label: "Boots (low FPS)",
+        shortLabel: "Low FPS",
+        score: 2,
+        works: false,
+    },
+    {
+        id: "crash",
+        label: "Doesn't boot / Crash",
+        shortLabel: "Crash",
+        score: 1,
+        works: false,
+    },
+];
+
+export const COMPAT_STATUS_MAP = Object.fromEntries(
+    COMPAT_STATUSES.map((item) => [item.id, item])
+);
+
+export function normalizeCompatStatus(rawStatus, fallbackWorks = null) {
+    const clean = String(rawStatus || "").trim();
+    if (COMPAT_STATUS_MAP[clean]) return clean;
+    if (fallbackWorks === true) return "playable_30";
+    if (fallbackWorks === false) return "crash";
+    return "crash";
+}
+
+export function getCompatStatusMeta(rawStatus, fallbackWorks = null) {
+    return COMPAT_STATUS_MAP[normalizeCompatStatus(rawStatus, fallbackWorks)];
+}
+
+export function normalizeCompatSummary(summary) {
+    const reports = Array.isArray(summary?.reports)
+        ? summary.reports.map((report) => {
+              const status = normalizeCompatStatus(
+                  report?.status,
+                  report?.works
+              );
+              const works =
+                  status === "playable_30" || status === "playable_60";
+              return { ...report, status, works };
+          })
+        : [];
+
+    const rawCounts = summary?.counts || {};
+    const hasExplicitCounts =
+        rawCounts &&
+        (rawCounts.playable_60 !== undefined ||
+            rawCounts.playable_30 !== undefined ||
+            rawCounts.low_fps !== undefined ||
+            rawCounts.crash !== undefined);
+
+    const counts = hasExplicitCounts
+        ? {
+              playable_60: Number(rawCounts.playable_60) || 0,
+              playable_30: Number(rawCounts.playable_30) || 0,
+              low_fps: Number(rawCounts.low_fps) || 0,
+              crash: Number(rawCounts.crash) || 0,
+          }
+        : {
+              playable_60: 0,
+              playable_30: Number(summary?.yes) || 0,
+              low_fps: 0,
+              crash: Number(summary?.no) || 0,
+          };
+
+    const playableCount = counts.playable_60 + counts.playable_30;
+    const unplayableCount = counts.low_fps + counts.crash;
+
+    return {
+        yes: playableCount,
+        no: unplayableCount,
+        total: playableCount + unplayableCount,
+        counts,
+        reports,
+    };
+}
 
 function readCachedCompatibility(portId) {
     try {
@@ -176,6 +270,107 @@ export function searchDevices(devices, query, limit = 25) {
     return [...startsWithMatches, ...otherMatches].slice(0, limit);
 }
 
+export function buildHardwareIndex(devices) {
+    const socMap = new Map();
+    for (const device of devices || []) {
+        const soc = String(device?.soc || "").trim();
+        if (!soc) continue;
+        const key = soc.toLowerCase();
+        const existing = socMap.get(key);
+        if (existing) {
+            existing.count += 1;
+        } else {
+            socMap.set(key, {
+                soc,
+                count: 1,
+                lower: soc.toLowerCase(),
+            });
+        }
+    }
+
+    const socs = Array.from(socMap.values()).sort((a, b) =>
+        b.count - a.count || a.soc.localeCompare(b.soc, "en")
+    );
+
+    return { devices: devices || [], socs };
+}
+
+export function searchHardwareCatalog(
+    hardwareIndex,
+    query,
+    { socLimit = 6, deviceLimit = 18 } = {}
+) {
+    const clean = String(query || "").trim().toLowerCase();
+    if (!clean) return { socs: [], devices: [] };
+
+    const terms = clean.split(/\s+/).filter(Boolean);
+    if (terms.length === 0) return { socs: [], devices: [] };
+
+    const socStarts = [];
+    const socContains = [];
+
+    for (const entry of hardwareIndex?.socs || []) {
+        if (!terms.every((t) => entry.lower.includes(t))) continue;
+        if (entry.lower.startsWith(clean)) socStarts.push(entry);
+        else socContains.push(entry);
+    }
+
+    const socs = [...socStarts, ...socContains].slice(0, socLimit);
+    const devices = searchDevices(
+        hardwareIndex?.devices || [],
+        query,
+        deviceLimit
+    );
+
+    return { socs, devices };
+}
+
+export async function searchCompatibilityByHardware({
+    deviceId = "",
+    soc = "",
+    query = "",
+    limit = 500,
+} = {}) {
+    const params = new URLSearchParams({ action: "search" });
+    if (deviceId) params.set("device_id", deviceId);
+    if (soc) params.set("soc", soc);
+    if (query) params.set("q", query);
+    if (limit) params.set("limit", String(limit));
+
+    const response = await fetch(
+        `${COMPATIBILITY_API_URL}?${params.toString()}`,
+        {
+            method: "GET",
+            cache: "no-store",
+        }
+    );
+
+    if (!response.ok) {
+        throw new Error(
+            `Compatibility search failed (HTTP ${response.status}).`
+        );
+    }
+
+    const payload = await response.json();
+    if (!payload?.success || !Array.isArray(payload.reports)) {
+        throw new Error("Compatibility search returned an invalid response.");
+    }
+
+    return payload.reports.map((report) => {
+        const status = normalizeCompatStatus(report?.status, report?.works);
+        return {
+            portId: String(report?.portId || "").trim(),
+            deviceId: String(report?.deviceId || "").trim(),
+            deviceName: String(report?.deviceName || report?.deviceId || "").trim(),
+            deviceSoc: String(report?.deviceSoc || "").trim(),
+            deviceType: String(report?.deviceType || "phone").trim() || "phone",
+            status,
+            works: status === "playable_30" || status === "playable_60",
+            updatedAt: String(report?.updatedAt || ""),
+        };
+    });
+}
+
 export function getStoredUserDevice() {
     try {
         const raw = localStorage.getItem(USER_DEVICE_STORAGE_KEY);
@@ -290,8 +485,12 @@ export function createCompatibilityActions() {
             return summaries[portId] || null;
         },
 
-        async submitReport({ portId, deviceId, works }) {
+        async submitReport({ portId, deviceId, status, works }) {
             const token = await getRatingToken();
+            const resolvedStatus = normalizeCompatStatus(status, works);
+            const resolvedWorks =
+                resolvedStatus === "playable_30" ||
+                resolvedStatus === "playable_60";
 
             const response = await fetch(COMPATIBILITY_API_URL, {
                 method: "POST",
@@ -302,7 +501,8 @@ export function createCompatibilityActions() {
                     token,
                     port_id: portId,
                     device_id: deviceId,
-                    works: Boolean(works),
+                    status: resolvedStatus,
+                    works: resolvedWorks,
                 }),
                 cache: "no-store",
             });
@@ -327,7 +527,7 @@ export function createCompatibilityActions() {
             const refreshed = await loadGameCompatibility([portId], true);
             return {
                 report: data.report,
-                summary: refreshed[portId] || null,
+                summary: refreshed[portId] || data.summary || null,
             };
         },
 
