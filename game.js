@@ -24,7 +24,7 @@ const VISIT_TRACKING_URL =
     "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
 const RATINGS_API_BASE =
-    "https://ports-ratings-worker.federicoxastro.workers.dev";
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
 
 const RATINGS_API_URL =
     RATINGS_API_BASE + "/ratings";
@@ -281,11 +281,6 @@ async function getRatingToken() {
         return existingToken;
     }
 
-    /*
-     * REQUIRE_CAPTCHA is currently false
-     * in the Cloudflare Worker configuration.
-     */
-
     const data = await postRatingRequest(
         "/token",
         {}
@@ -307,6 +302,50 @@ async function getRatingToken() {
 }
 
 
+function clearStoredRatingToken() {
+    ratingTokenMemory = "";
+
+    try {
+        localStorage.removeItem(RATING_TOKEN_STORAGE_KEY);
+    } catch (error) {
+        // Continue without persistent storage.
+    }
+}
+
+
+async function postWithTokenRefresh(endpoint, payload) {
+    let token = await getRatingToken();
+
+    try {
+        return await postRatingRequest(
+            endpoint,
+            {
+                ...payload,
+                token
+            }
+        );
+    } catch (error) {
+        if (
+            !(error instanceof Error) ||
+            error.message !== "invalid_token"
+        ) {
+            throw error;
+        }
+
+        clearStoredRatingToken();
+        token = await getRatingToken();
+
+        return postRatingRequest(
+            endpoint,
+            {
+                ...payload,
+                token
+            }
+        );
+    }
+}
+
+
 /* ==================================================
    LOAD PREVIOUS VOTES
    ================================================== */
@@ -316,13 +355,9 @@ async function loadMyVotes(force = false) {
         return myVotesCache;
     }
 
-    const token = await getRatingToken();
-
-    const data = await postRatingRequest(
+    const data = await postWithTokenRefresh(
         "/my-votes",
-        {
-            token
-        }
+        {}
     );
 
     if (
@@ -373,12 +408,9 @@ function createRatingActions() {
 
 
         async submitVote(portId, stars) {
-            const token = await getRatingToken();
-
-            await postRatingRequest(
+            await postWithTokenRefresh(
                 "/vote",
                 {
-                    token,
                     port_id: portId,
                     stars
                 }
