@@ -12,6 +12,13 @@ The project brings together port information, community ratings, and device/SoC 
 - Search Android devices and SoCs for community-submitted compatibility reports.
 - Compare reported playability across tested devices.
 
+## Data sources
+
+- **Google Sheets — Community Ports:** The main catalog of Android ports, including port projects, platforms, links, versions, and community-maintained information. [View the spreadsheet](https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/).
+- **LaunchBox Games Database:** Used as a reference for game information and associated media, such as game metadata and artwork. [Visit the LaunchBox Games Database](https://gamesdb.launchbox-app.com/).
+
+Game information and media remain the property of their respective owners and contributors. NAPL is not affiliated with Google or LaunchBox.
+
 ## Technology
 
 The project uses a combination of:
