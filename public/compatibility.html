@@ -1,13 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Adcash Video Slider -->
-    <script id="aclib" type="text/javascript" src="//acscdn.com/script/aclib.js"></script>
-    <script type="text/javascript">
-        aclib.runVideoSlider({
-            zoneId: '12452974',
-        });
-    </script>
+    <!-- Adcash AutoTag -->
     <!-- Google AdSense -->
     <script async
         src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6826586907052847"
@@ -47,10 +41,10 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="assets/css/main.css?v=8">
-    <link rel="stylesheet" href="assets/css/components.css?v=11">
+    <link rel="stylesheet" href="assets/css/main.css?v=11">
+    <link rel="stylesheet" href="assets/css/components.css?v=13">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
-    <link rel="stylesheet" href="assets/css/compatibility.css?v=7">
+    <link rel="stylesheet" href="assets/css/compatibility.css?v=6">
     <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
     <!-- Google Tag Manager -->
     <script>
@@ -114,7 +108,7 @@
     <div class="side-menu-header">
         <div class="side-menu-brand">
             <span class="side-menu-title">NAPL</span>
-            <span class="side-menu-subtitle">Android Port Index</span>
+            <span class="side-menu-subtitle">Native Android Port List</span>
         </div>
         <button id="menu-close" type="button" aria-label="Close menu">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -252,6 +246,9 @@
                     <button type="button" class="compat-sort-option" data-sort="reports">
                         Most Reports
                     </button>
+                    <button type="button" class="compat-sort-option" data-sort="recent">
+                        Recently Tested
+                    </button>
                     <button type="button" class="compat-sort-option" data-sort="name">
                         A–Z
                     </button>
@@ -268,19 +265,19 @@
         </div>
 
         <div class="compat-status-filters" role="group" aria-label="Filter by performance status">
-            <button type="button" class="compat-status-filter active" data-status="all" aria-pressed="true">
-                All
+            <button type="button" class="compat-status-filter active" data-status="all">
+                All tiers
             </button>
-            <button type="button" class="compat-status-filter active" data-status="playable_60" aria-pressed="true">
+            <button type="button" class="compat-status-filter" data-status="playable_60">
                 Playable (60fps)
             </button>
-            <button type="button" class="compat-status-filter active" data-status="playable_30" aria-pressed="true">
+            <button type="button" class="compat-status-filter" data-status="playable_30">
                 Playable (30fps)
             </button>
-            <button type="button" class="compat-status-filter active" data-status="low_fps" aria-pressed="true">
+            <button type="button" class="compat-status-filter" data-status="low_fps">
                 Boots (low FPS)
             </button>
-            <button type="button" class="compat-status-filter active" data-status="crash" aria-pressed="true">
+            <button type="button" class="compat-status-filter" data-status="crash">
                 Doesn't boot / Crash
             </button>
         </div>
@@ -303,6 +300,6 @@
     <p>Native Android Port List</p>
 </footer>
 
-<script type="module" src="js/pages/compatibility.js"></script>
+<script type="module" src="js/pages/compatibility.js?v=17"></script>
 </body>
 </html>

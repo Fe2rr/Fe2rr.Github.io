@@ -16,7 +16,7 @@ import {
     searchCompatibilityByHardware,
     groupIdenticalCompatReports,
 } from "../services/compatibility.js";
-import { initNavigation } from "../components/navigation.js";
+import { initNavigation } from "../components/navigation.js?v=17";
 import { initSearch } from "../components/search.js";
 import { initThemeToggle } from "../components/theme.js";
 
@@ -64,7 +64,7 @@ const state = {
     selection: null, // { type: 'soc'|'device'|'query', device?: object, soc?: string, query?: string }
     rawReports: [],
     filterQuery: "",
-    statusFilters: new Set(COMPAT_STATUSES.map((status) => status.id)),
+    statusFilter: "all",
     sortBy: "best",
     sortDescending: false,
     loadingReports: false,
@@ -255,7 +255,7 @@ function renderLoadingSkeletons() {
 
 function computeGroupedGames() {
     const query = normalizeText(state.filterQuery);
-    const statusFilters = state.statusFilters;
+    const statusFilter = state.statusFilter;
 
     // Group reports by portId first, filtering by statusFilter if active
     const portGroupsMap = new Map();
@@ -279,7 +279,7 @@ function computeGroupedGames() {
             developer: "",
         };
 
-        if (!statusFilters.has(report.status)) {
+        if (statusFilter !== "all" && report.status !== statusFilter) {
             continue;
         }
 
@@ -389,6 +389,9 @@ function computeGroupedGames() {
         switch (state.sortBy) {
             case "reports":
                 diff = b.totalReports - a.totalReports;
+                break;
+            case "recent":
+                diff = b.latestTimestamp - a.latestTimestamp;
                 break;
             case "name":
                 diff = a.game.name.localeCompare(b.game.name, "en", {
@@ -508,7 +511,7 @@ function renderGroupedResults() {
         info.className = "compat-game-info";
 
         const gameHref = game.slug
-            ? `game.html?game=${encodeURIComponent(game.slug)}&return=${encodeURIComponent(window.location.href)}`
+            ? `game.html?game=${encodeURIComponent(game.slug)}`
             : "";
 
         const titleEl = gameHref
@@ -908,37 +911,16 @@ sortDirectionBtn?.addEventListener("click", () => {
     renderGroupedResults();
 });
 
-function updateStatusFilterUI() {
-    const allSelected =
-        state.statusFilters.size === COMPAT_STATUSES.length;
-
-    statusFilterBtns.forEach((btn) => {
-        const status = btn.dataset.status || "all";
-        const selected =
-            status === "all"
-                ? allSelected
-                : state.statusFilters.has(status);
-
-        btn.classList.toggle("active", selected);
-        btn.setAttribute("aria-pressed", selected ? "true" : "false");
-    });
-}
-
 statusFilterBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
         const nextStatus = btn.dataset.status || "all";
-
-        if (nextStatus === "all") {
-            state.statusFilters = new Set(
-                COMPAT_STATUSES.map((status) => status.id)
+        state.statusFilter = nextStatus;
+        statusFilterBtns.forEach((other) => {
+            other.classList.toggle(
+                "active",
+                (other.dataset.status || "all") === nextStatus
             );
-        } else if (state.statusFilters.has(nextStatus)) {
-            state.statusFilters.delete(nextStatus);
-        } else {
-            state.statusFilters.add(nextStatus);
-        }
-
-        updateStatusFilterUI();
+        });
         renderGroupedResults();
     });
 });

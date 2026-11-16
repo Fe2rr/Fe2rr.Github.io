@@ -33,6 +33,162 @@ export function normalizePlatformLabel(value) {
         .replace(/\s+/g, " ");
 }
 
+const UNKNOWN_DEVELOPER_VALUES = new Set([
+    "-",
+    "unknown",
+    "n/a",
+    "na",
+    "none",
+    "?",
+]);
+
+export function normalizeDeveloperName(value) {
+    const collapsed = String(value ?? "")
+        .trim()
+        .replace(/\s+/g, " ");
+    const normalized = normalizeText(collapsed);
+    if (!normalized || UNKNOWN_DEVELOPER_VALUES.has(normalized)) {
+        return "";
+    }
+    return normalized;
+}
+
+export function getDeveloperPortCounts(rows) {
+    const counts = new Map();
+    if (!Array.isArray(rows)) return counts;
+
+    for (const row of rows) {
+        const key = normalizeDeveloperName(row?.developer);
+        if (!key) continue;
+        counts.set(key, (counts.get(key) || 0) + 1);
+    }
+
+    return counts;
+}
+
+export function getDeveloperGameCounts(rows) {
+    const gamesByDev = new Map();
+    if (!Array.isArray(rows)) return new Map();
+
+    for (const row of rows) {
+        const devKey = normalizeDeveloperName(row?.developer);
+        const gameKey = normalizeText(row?.game);
+        if (!devKey || !gameKey) continue;
+
+        let gameSet = gamesByDev.get(devKey);
+        if (!gameSet) {
+            gameSet = new Set();
+            gamesByDev.set(devKey, gameSet);
+        }
+        gameSet.add(gameKey);
+    }
+
+    const counts = new Map();
+    for (const [devKey, gameSet] of gamesByDev.entries()) {
+        counts.set(devKey, gameSet.size);
+    }
+    return counts;
+}
+
+export function getMatchingDeveloperPort(game, developer, preferredPlatform = "") {
+    const targetKey = normalizeDeveloperName(developer);
+    if (!targetKey || !game || !Array.isArray(game.ports)) {
+        return null;
+    }
+
+    const matchingPorts = game.ports.filter(
+        (port) => port && normalizeDeveloperName(port.developer) === targetKey
+    );
+    if (matchingPorts.length === 0) return null;
+
+    const platformKey = normalizeText(preferredPlatform);
+    const platformMatched = platformKey
+        ? matchingPorts.filter(
+              (port) => normalizeText(port.platform) === platformKey
+          )
+        : [];
+    const candidates = platformMatched.length > 0 ? platformMatched : matchingPorts;
+
+    const namedPorts = candidates.filter(
+        (port) => String(port.project || "").trim() !== ""
+    );
+    const pool = namedPorts.length > 0 ? namedPorts : candidates;
+
+    let bestPort = pool[0];
+    let bestDate = parseLastUpdate(bestPort.lastUpdate);
+
+    for (let i = 1; i < pool.length; i++) {
+        const candidate = pool[i];
+        const candidateDate = parseLastUpdate(candidate.lastUpdate);
+        if (candidateDate && (!bestDate || candidateDate > bestDate)) {
+            bestPort = candidate;
+            bestDate = candidateDate;
+        }
+    }
+
+    return bestPort;
+}
+
+export function getMatchingPlatformPort(game, platform) {
+    const platformKey = normalizeText(platform);
+    if (!platformKey || !game || !Array.isArray(game.ports)) {
+        return null;
+    }
+
+    const matchingPorts = game.ports.filter(
+        (port) => port && normalizeText(port.platform) === platformKey
+    );
+    if (matchingPorts.length === 0) return null;
+
+    const namedPorts = matchingPorts.filter(
+        (port) => String(port.project || "").trim() !== ""
+    );
+    const pool = namedPorts.length > 0 ? namedPorts : matchingPorts;
+
+    let bestPort = pool[0];
+    let bestDate = parseLastUpdate(bestPort.lastUpdate);
+
+    for (let i = 1; i < pool.length; i++) {
+        const candidate = pool[i];
+        const candidateDate = parseLastUpdate(candidate.lastUpdate);
+        if (candidateDate && (!bestDate || candidateDate > bestDate)) {
+            bestPort = candidate;
+            bestDate = candidateDate;
+        }
+    }
+
+    return bestPort;
+}
+
+const UNKNOWN_GENRE_VALUES = new Set([
+    "-",
+    "unknown",
+    "n/a",
+    "na",
+    "none",
+    "?",
+    "no information available",
+]);
+
+export function extractGameGenres(genreValue) {
+    const raw = String(genreValue ?? "").trim();
+    if (!raw) return [];
+
+    const seen = new Set();
+    const genres = [];
+
+    for (const part of raw.split(/\s*[,/|·•]+\s*/)) {
+        const clean = part.trim().replace(/\s+/g, " ");
+        const normalized = normalizeText(clean);
+        if (!normalized || UNKNOWN_GENRE_VALUES.has(normalized)) continue;
+        if (seen.has(normalized)) continue;
+        seen.add(normalized);
+        genres.push(clean);
+    }
+
+    return genres;
+}
+
 export function restoreDescriptionLineBreaks(description) {
     return String(description ?? "")
         .replace(/\s*\|\|\|\s*/g, "\n")
