@@ -277,7 +277,7 @@ export async function loadDevices() {
                 manifest.chunks.map(async (chunk) => {
                     const filename = String(chunk?.file || "");
                     if (
-                        !/^devices-part-\\d{3}\\.json$/.test(filename) ||
+                        !/^devices-part-\d{3}\.json$/.test(filename) ||
                         !Number.isInteger(chunk?.records) ||
                         chunk.records < 1
                     ) {
