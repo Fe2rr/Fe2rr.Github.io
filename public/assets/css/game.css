@@ -509,13 +509,15 @@ a.port-detail-value {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 8px 12px;
 }
 
 .port-compat-summary-group {
-  display: inline-flex;
+  display: flex;
+  flex: 1 1 160px;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 2px 8px;
   min-width: 0;
 }
 
@@ -553,7 +555,60 @@ a.port-detail-value {
 }
 
 .port-compat-meter.is-empty {
-  opacity: 0.72;
+  position: relative;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    rgba(255, 255, 255, 0.05) 6px 12px
+  );
+  border: 1px dashed var(--border-medium);
+}
+
+.port-compat-meter.is-empty::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.12) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  animation: port-compat-empty-sweep 2.8s ease-in-out infinite;
+}
+
+html[data-theme="light"] .port-compat-meter.is-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    rgba(17, 34, 27, 0.06) 6px 12px
+  );
+}
+
+html[data-theme="light"] .port-compat-meter.is-empty::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(17, 34, 27, 0.09) 50%,
+    transparent 100%
+  );
+}
+
+@keyframes port-compat-empty-sweep {
+  0% {
+    transform: translateX(-100%);
+  }
+  65%,
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .port-compat-meter.is-empty::after {
+    animation: none;
+  }
 }
 
 .port-compat-meter-segment {
@@ -563,23 +618,31 @@ a.port-detail-value {
 }
 
 .port-compat-meter-segment.is-playable-60 {
-  background: var(--accent);
+  background: #16a34a;
 }
 
 .port-compat-meter-segment.is-playable-30 {
-  background: #2dd4bf;
+  background: #86efac;
 }
 
 .port-compat-meter-segment.is-low-fps {
-  background: var(--gold);
+  background: #facc15;
 }
 
 .port-compat-meter-segment.is-crash {
-  background: #f87171;
+  background: #ef4444;
+}
+
+html[data-theme="light"] .port-compat-meter-segment.is-playable-60 {
+  background: #15803d;
 }
 
 html[data-theme="light"] .port-compat-meter-segment.is-playable-30 {
-  background: #0d9488;
+  background: #4ade80;
+}
+
+html[data-theme="light"] .port-compat-meter-segment.is-low-fps {
+  background: #eab308;
 }
 
 html[data-theme="light"] .port-compat-meter-segment.is-crash {
@@ -588,8 +651,10 @@ html[data-theme="light"] .port-compat-meter-segment.is-crash {
 
 .port-compat-actions {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
 }
 
 .port-compat-toggle {
@@ -682,33 +747,51 @@ html[data-theme="light"] .port-compat-meter-segment.is-crash {
 }
 
 .port-compat-choice.selected.is-playable-60 {
-  border-color: var(--accent);
-  background: rgba(16, 185, 129, 0.16);
-  color: var(--accent);
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.2);
+  color: #4ade80;
+}
+
+html[data-theme="light"] .port-compat-choice.selected.is-playable-60 {
+  border-color: #15803d;
+  background: rgba(21, 128, 61, 0.14);
+  color: #15803d;
 }
 
 .port-compat-choice.selected.is-playable-30 {
-  border-color: #2dd4bf;
-  background: rgba(45, 212, 191, 0.14);
-  color: #2dd4bf;
+  border-color: #86efac;
+  background: rgba(134, 239, 172, 0.14);
+  color: #86efac;
 }
 
 html[data-theme="light"] .port-compat-choice.selected.is-playable-30 {
-  border-color: #0d9488;
-  background: rgba(13, 148, 136, 0.12);
-  color: #0f766e;
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.18);
+  color: #16a34a;
 }
 
 .port-compat-choice.selected.is-low-fps {
-  border-color: var(--gold);
-  background: rgba(245, 196, 81, 0.16);
-  color: var(--gold);
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.16);
+  color: #facc15;
+}
+
+html[data-theme="light"] .port-compat-choice.selected.is-low-fps {
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.16);
+  color: #a16207;
 }
 
 .port-compat-choice.selected.is-crash {
-  border-color: var(--error-text);
-  background: rgba(248, 113, 113, 0.14);
-  color: var(--error-text);
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+}
+
+html[data-theme="light"] .port-compat-choice.selected.is-crash {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .port-device-field {
@@ -842,23 +925,35 @@ html[data-theme="light"] .port-compat-choice.selected.is-playable-30 {
 }
 
 .port-compat-status.is-playable-60 {
-  color: var(--accent);
+  color: #22c55e;
+}
+
+html[data-theme="light"] .port-compat-status.is-playable-60 {
+  color: #15803d;
 }
 
 .port-compat-status.is-playable-30 {
-  color: #2dd4bf;
+  color: #86efac;
 }
 
 html[data-theme="light"] .port-compat-status.is-playable-30 {
-  color: #0f766e;
+  color: #16a34a;
 }
 
 .port-compat-status.is-low-fps {
-  color: var(--gold);
+  color: #facc15;
+}
+
+html[data-theme="light"] .port-compat-status.is-low-fps {
+  color: #a16207;
 }
 
 .port-compat-status.is-crash {
-  color: var(--error-text);
+  color: #f87171;
+}
+
+html[data-theme="light"] .port-compat-status.is-crash {
+  color: #dc2626;
 }
 
 @media (max-width: 720px) {

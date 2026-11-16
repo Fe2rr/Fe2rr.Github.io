@@ -21,6 +21,7 @@ import {
     getStoredUserDevice,
     setStoredUserDevice,
     parseDeviceDisplayParts,
+    groupIdenticalCompatReports,
 } from "../services/compatibility.js";
 
 
@@ -465,10 +466,10 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             summaryText.textContent = "No reports yet";
             summaryText.classList.add("is-empty");
             meter.classList.add("is-empty");
-            meter60.style.width = "25%";
-            meter30.style.width = "25%";
-            meterLow.style.width = "25%";
-            meterCrash.style.width = "25%";
+            meter60.style.width = "0%";
+            meter30.style.width = "0%";
+            meterLow.style.width = "0%";
+            meterCrash.style.width = "0%";
             meter.setAttribute("aria-label", "No compatibility reports yet");
         } else {
             const playablePct = Math.round(
@@ -501,27 +502,26 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             toggleListButton.textContent = `Devices (${reports.length})`;
             listElement.replaceChildren();
 
-            for (const item of reports.slice(0, 15)) {
+            const groupedReports = groupIdenticalCompatReports(reports);
+            for (const item of groupedReports.slice(0, 15)) {
                 const row = document.createElement("div");
                 row.className = "port-compat-row";
-
-                const { model, soc } = parseDeviceDisplayParts(
-                    item.deviceName || item.deviceId,
-                    item.deviceSoc || item.soc || ""
-                );
 
                 const nameWrap = document.createElement("div");
                 nameWrap.className = "port-compat-device-wrap";
 
                 const name = document.createElement("span");
                 name.className = "port-compat-device";
-                name.textContent = model;
+                name.textContent =
+                    item.count > 1
+                        ? `${item.model} (${item.count})`
+                        : item.model;
                 nameWrap.appendChild(name);
 
-                if (soc) {
+                if (item.soc) {
                     const socLabel = document.createElement("span");
                     socLabel.className = "port-compat-soc";
-                    socLabel.textContent = ` · ${soc}`;
+                    socLabel.textContent = ` · ${item.soc}`;
                     nameWrap.appendChild(socLabel);
                 }
 
@@ -832,7 +832,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             try {
                 const latestSummary = await compatibilityActions.loadSummary(port.portId);
                 if (latestSummary) renderCompatibilitySummary(latestSummary);
-                setCompatFeedback("Choose Yes/No and select an exact device.");
+                setCompatFeedback("Choose a performance level and select an exact device.");
             } catch (error) {
                 setCompatFeedback(error.message || "Could not load compatibility results.", "error");
             }

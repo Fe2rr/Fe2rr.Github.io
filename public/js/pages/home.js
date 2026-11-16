@@ -384,5 +384,32 @@ lastUpdatedMore?.addEventListener("click", () => {
     displayLastUpdated();
 });
 
+const FEATURE_BANNER_STORAGE_KEY = "napl_compat_banner_dismissed_v1";
+const homeFeatureBanner = document.getElementById("home-feature-banner");
+const homeFeatureDismiss = document.getElementById("home-feature-dismiss");
+
+function initFeatureBanner() {
+    if (!homeFeatureBanner) return;
+    try {
+        if (localStorage.getItem(FEATURE_BANNER_STORAGE_KEY) === "1") {
+            homeFeatureBanner.dataset.dismissed = "true";
+            homeFeatureBanner.hidden = true;
+        }
+    } catch {
+        // Ignore storage read errors
+    }
+
+    homeFeatureDismiss?.addEventListener("click", () => {
+        homeFeatureBanner.dataset.dismissed = "true";
+        homeFeatureBanner.hidden = true;
+        try {
+            localStorage.setItem(FEATURE_BANNER_STORAGE_KEY, "1");
+        } catch {
+            // Ignore storage write errors
+        }
+    });
+}
+
+initFeatureBanner();
 showHomeSection("last-added");
 initHomePage();

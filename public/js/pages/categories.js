@@ -26,6 +26,7 @@ export function createCategoryController(state) {
     const categorySortOptions = document.querySelectorAll(".category-sort-option");
     const categorySortDirection = document.getElementById("category-sort-direction");
     const homeTabsNav = document.getElementById("home-tabs");
+    const homeFeatureBanner = document.getElementById("home-feature-banner");
 
     function updateCategorySortDirection() {
         if (!categorySortDirection) return;
@@ -35,6 +36,9 @@ export function createCategoryController(state) {
     function showHomeSections(activeHomeSectionFn) {
         if (categoryControls) categoryControls.hidden = true;
         if (homeTabsNav) homeTabsNav.hidden = false;
+        if (homeFeatureBanner && homeFeatureBanner.dataset.dismissed !== "true") {
+            homeFeatureBanner.hidden = false;
+        }
         activeHomeSectionFn?.();
     }
 
@@ -44,6 +48,7 @@ export function createCategoryController(state) {
         });
         if (categoryControls) categoryControls.hidden = false;
         if (homeTabsNav) homeTabsNav.hidden = true;
+        if (homeFeatureBanner) homeFeatureBanner.hidden = true;
     }
 
     function resetCategoryControls() {

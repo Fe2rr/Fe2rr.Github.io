@@ -168,6 +168,50 @@ export function parseDeviceDisplayParts(rawName, explicitSoc = "") {
     return { model, soc };
 }
 
+export function groupIdenticalCompatReports(reports) {
+    const grouped = new Map();
+
+    for (const item of reports || []) {
+        if (!item) continue;
+        const tier = getCompatStatusMeta(item.status, item.works);
+        const { model, soc } = parseDeviceDisplayParts(
+            item.deviceName || item.deviceId,
+            item.deviceSoc || item.soc || ""
+        );
+        const deviceKey = String(item.deviceId || model || "")
+            .trim()
+            .toLowerCase();
+        const key = `${deviceKey}::${tier.id}`;
+
+        const existing = grouped.get(key);
+        if (existing) {
+            existing.count += 1;
+            const prevTs = Date.parse(existing.updatedAt || "") || 0;
+            const nextTs = Date.parse(item.updatedAt || "") || 0;
+            if (nextTs > prevTs) {
+                existing.updatedAt = item.updatedAt;
+            }
+        } else {
+            grouped.set(key, {
+                ...item,
+                status: tier.id,
+                works: tier.works,
+                model,
+                soc,
+                count: 1,
+            });
+        }
+    }
+
+    return Array.from(grouped.values()).sort((a, b) => {
+        const tsDiff =
+            (Date.parse(b.updatedAt || "") || 0) -
+            (Date.parse(a.updatedAt || "") || 0);
+        if (tsDiff !== 0) return tsDiff;
+        return b.count - a.count;
+    });
+}
+
 function normalizeDeviceRecord(device) {
     const id = String(device?.id || "");
     const rawName = String(device?.name || "").trim();

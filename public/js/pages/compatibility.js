@@ -14,7 +14,7 @@ import {
     buildHardwareIndex,
     searchHardwareCatalog,
     searchCompatibilityByHardware,
-    parseDeviceDisplayParts,
+    groupIdenticalCompatReports,
 } from "../services/compatibility.js";
 import { initNavigation } from "../components/navigation.js";
 import { initSearch } from "../components/search.js";
@@ -534,14 +534,6 @@ function renderGroupedResults() {
         lead.append(coverWrap, info);
         header.appendChild(lead);
 
-        if (gameHref) {
-            const openLink = document.createElement("a");
-            openLink.className = "compat-game-open";
-            openLink.href = gameHref;
-            openLink.textContent = "Open game →";
-            header.appendChild(openLink);
-        }
-
         card.appendChild(header);
 
         const portListEl = document.createElement("div");
@@ -583,6 +575,27 @@ function renderGroupedResults() {
                 portIdentity.append(portMeta);
             }
 
+            const portRight = document.createElement("div");
+            portRight.className = "compat-port-right";
+
+            const portUrl = String(port.url || "").trim();
+            if (/^https?:\/\/\S+$/i.test(portUrl)) {
+                const downloadLink = document.createElement("a");
+                downloadLink.className = "compat-port-download";
+                downloadLink.href = portUrl;
+                downloadLink.target = "_blank";
+                downloadLink.rel = "noopener noreferrer";
+                downloadLink.textContent = port.link || "Download";
+
+                const arrow = document.createElement("span");
+                arrow.setAttribute("aria-hidden", "true");
+                arrow.textContent = "↗";
+                downloadLink.appendChild(arrow);
+                portRight.appendChild(downloadLink);
+            }
+
+            portTop.append(portIdentity, portRight);
+
             const playablePct =
                 total > 0
                     ? Math.round(
@@ -593,12 +606,6 @@ function renderGroupedResults() {
             const summaryParts = COMPAT_STATUSES.filter(
                 (t) => counts[t.id] > 0
             ).map((t) => `${counts[t.id]} ${t.shortLabel}`);
-
-            const portSummary = document.createElement("span");
-            portSummary.className = "compat-port-summary";
-            portSummary.textContent = `${playablePct}% playable (${summaryParts.join(" · ")})`;
-
-            portTop.append(portIdentity, portSummary);
 
             const meter = document.createElement("div");
             meter.className = "compat-meter";
@@ -617,30 +624,77 @@ function renderGroupedResults() {
                 meter.appendChild(seg);
             }
 
+            const portFooter = document.createElement("div");
+            portFooter.className = "compat-port-footer";
+
+            const portSummary = document.createElement("span");
+            portSummary.className = "compat-port-summary";
+            portSummary.textContent = `${playablePct}% playable (${summaryParts.join(" · ")})`;
+
+            const reportsTrigger = document.createElement("div");
+            reportsTrigger.className = "compat-reports-trigger";
+
+            const toggleReportsBtn = document.createElement("button");
+            toggleReportsBtn.type = "button";
+            toggleReportsBtn.className = "compat-reports-toggle";
+            toggleReportsBtn.setAttribute("aria-expanded", "false");
+
+            const toggleLabel = document.createElement("span");
+            toggleLabel.textContent = `Devices (${total})`;
+
+            const toggleChevron = document.createElement("span");
+            toggleChevron.className = "compat-reports-chevron";
+            toggleChevron.setAttribute("aria-hidden", "true");
+            toggleChevron.textContent = "▾";
+
+            toggleReportsBtn.append(toggleLabel, toggleChevron);
+
+            const reportsPopover = document.createElement("div");
+            reportsPopover.className = "compat-reports-popover";
+            reportsPopover.hidden = true;
+
+            const popoverHeader = document.createElement("div");
+            popoverHeader.className = "compat-reports-popover-title";
+            popoverHeader.textContent = `Reported devices (${total})`;
+
             const reportsEl = document.createElement("div");
             reportsEl.className = "compat-report-rows";
 
-            for (const item of reports) {
+            reportsPopover.append(popoverHeader, reportsEl);
+            reportsTrigger.append(toggleReportsBtn, reportsPopover);
+
+            toggleReportsBtn.addEventListener("click", (event) => {
+                event.stopPropagation();
+                const willOpen = reportsPopover.hidden;
+                closeAllReportPopovers(willOpen ? reportsTrigger : null);
+                reportsPopover.hidden = !willOpen;
+                reportsTrigger.classList.toggle("is-open", willOpen);
+                toggleReportsBtn.setAttribute(
+                    "aria-expanded",
+                    willOpen ? "true" : "false"
+                );
+            });
+
+            const groupedReports = groupIdenticalCompatReports(reports);
+            for (const item of groupedReports) {
                 const row = document.createElement("div");
                 row.className = "compat-report-row";
-
-                const { model, soc } = parseDeviceDisplayParts(
-                    item.deviceName || item.deviceId,
-                    item.deviceSoc || ""
-                );
 
                 const devWrap = document.createElement("div");
                 devWrap.className = "compat-report-device-wrap";
 
                 const devName = document.createElement("span");
                 devName.className = "compat-report-device";
-                devName.textContent = model;
+                devName.textContent =
+                    item.count > 1
+                        ? `${item.model} (${item.count})`
+                        : item.model;
                 devWrap.appendChild(devName);
 
-                if (soc) {
+                if (item.soc) {
                     const devSoc = document.createElement("span");
                     devSoc.className = "compat-report-soc";
-                    devSoc.textContent = ` · ${soc}`;
+                    devSoc.textContent = ` · ${item.soc}`;
                     devWrap.appendChild(devSoc);
                 }
 
@@ -665,7 +719,8 @@ function renderGroupedResults() {
                 reportsEl.appendChild(row);
             }
 
-            portSection.append(portTop, meter, reportsEl);
+            portFooter.append(portSummary, reportsTrigger);
+            portSection.append(portTop, meter, portFooter);
             portListEl.appendChild(portSection);
         }
 
@@ -870,20 +925,39 @@ statusFilterBtns.forEach((btn) => {
     });
 });
 
+function closeAllReportPopovers(exceptTrigger = null) {
+    document.querySelectorAll(".compat-reports-trigger").forEach((trigger) => {
+        if (trigger === exceptTrigger) return;
+        const pop = trigger.querySelector(".compat-reports-popover");
+        const btn = trigger.querySelector(".compat-reports-toggle");
+        if (pop) pop.hidden = true;
+        if (btn) btn.setAttribute("aria-expanded", "false");
+        trigger.classList.remove("is-open");
+    });
+}
+
 document.addEventListener("click", (event) => {
-    if (!suggestionsBox || suggestionsBox.hidden) return;
     if (
+        suggestionsBox &&
+        !suggestionsBox.hidden &&
         !suggestionsBox.contains(event.target) &&
         event.target !== hardwareInput
     ) {
         closeSuggestions();
     }
+
+    const clickedTrigger = event.target.closest(".compat-reports-trigger");
+    if (!clickedTrigger) {
+        closeAllReportPopovers();
+    }
 });
 
 document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && suggestionsBox && !suggestionsBox.hidden) {
+    if (event.key !== "Escape") return;
+    if (suggestionsBox && !suggestionsBox.hidden) {
         closeSuggestions();
     }
+    closeAllReportPopovers();
 });
 
 async function initPage() {
