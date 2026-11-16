@@ -83,22 +83,13 @@ Deno.serve(async (request: Request) => {
     if (request.method === "GET") {
       const action = url.searchParams.get("action") || "";
 
+      // The device catalog is now served from versioned static JSON files.
+      // Retire the legacy endpoint so old clients cannot trigger a full database export.
       if (action === "devices") {
-        const rawDevices = await rpc("get_compatibility_devices", {});
-        const devices = Array.isArray(rawDevices)
-          ? rawDevices.map((device) => ({
-            id: String(device?.id || ""),
-            name: String(device?.name || ""),
-            manufacturer: String(device?.manufacturer || ""),
-            model: String(device?.model || ""),
-            soc: String(device?.soc || ""),
-            deviceType: String(device?.deviceType || device?.device_type || "phone"),
-          }))
-          : [];
         return json(
-          { success: true, devices },
-          200,
-          { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
+          { success: false, error: "The device catalog is served from static JSON." },
+          410,
+          { "Cache-Control": "no-store" },
         );
       }
 
