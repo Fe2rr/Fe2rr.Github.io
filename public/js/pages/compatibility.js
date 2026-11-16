@@ -511,7 +511,7 @@ function renderGroupedResults() {
         info.className = "compat-game-info";
 
         const gameHref = game.slug
-            ? `game.html?game=${encodeURIComponent(game.slug)}`
+            ? `game.html?game=${encodeURIComponent(game.slug)}&return=${encodeURIComponent(window.location.href)}`
             : "";
 
         const titleEl = gameHref
