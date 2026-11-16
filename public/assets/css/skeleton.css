@@ -123,23 +123,29 @@
 /* Game Detail Summary & Port Card Placeholders */
 .skeleton-summary-card {
   display: flex;
-  align-items: flex-start;
-  gap: 28px;
-  padding: 24px;
-  margin-bottom: 32px;
+  flex-direction: column;
+  gap: 20px;
+  padding: 26px 28px;
+  margin-bottom: 28px;
   background: var(--surface-1);
   border: 1px solid var(--border-medium);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   pointer-events: none;
   user-select: none;
 }
 
+.skeleton-summary-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 28px;
+}
+
 .skeleton-summary-cover {
-  flex: 0 0 156px;
-  width: 156px;
+  flex: 0 0 164px;
+  width: 164px;
   aspect-ratio: 3 / 4;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
 }
 
@@ -170,10 +176,12 @@
 
 @media (max-width: 720px) {
   .skeleton-summary-card {
-    flex-direction: row;
-    align-items: flex-start;
     gap: 16px;
-    padding: 16px;
+    padding: 18px;
+  }
+
+  .skeleton-summary-top {
+    gap: 16px;
   }
 
   .skeleton-summary-cover {

@@ -28,13 +28,15 @@ export function renderGameDetailSkeletons(gameHeader, portList, portCount = 2) {
     if (gameHeader) {
         gameHeader.innerHTML = `
             <div class="skeleton-summary-card" aria-hidden="true">
-                <div class="skeleton skeleton-summary-cover"></div>
-                <div class="skeleton-content">
-                    <div class="skeleton skeleton-title skeleton-w-md"></div>
-                    <div class="skeleton skeleton-meta skeleton-w-sm"></div>
-                    <div class="skeleton skeleton-text skeleton-w-full"></div>
-                    <div class="skeleton skeleton-text skeleton-w-lg"></div>
-                    <div class="skeleton skeleton-text skeleton-w-md"></div>
+                <div class="skeleton-summary-top">
+                    <div class="skeleton skeleton-summary-cover"></div>
+                    <div class="skeleton-content">
+                        <div class="skeleton skeleton-title skeleton-w-md"></div>
+                        <div class="skeleton skeleton-meta skeleton-w-sm"></div>
+                        <div class="skeleton skeleton-text skeleton-w-full"></div>
+                        <div class="skeleton skeleton-text skeleton-w-lg"></div>
+                        <div class="skeleton skeleton-text skeleton-w-md"></div>
+                    </div>
                 </div>
             </div>
         `;

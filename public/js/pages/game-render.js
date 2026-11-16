@@ -13,11 +13,15 @@ import {
     createGamesUsingAppSection,
 } from "../components/multi-game-apps.js";
 import {
+    COMPAT_STATUSES,
+    getCompatStatusMeta,
+    normalizeCompatSummary,
     loadDevices,
     searchDevices,
     getStoredUserDevice,
     setStoredUserDevice,
     parseDeviceDisplayParts,
+    groupIdenticalCompatReports,
 } from "../services/compatibility.js";
 
 
@@ -148,15 +152,18 @@ function createRatingStars(average) {
     return stars;
 }
 
-function createPortRating(port, ratings, ratingActions) {
+function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) {
     if (!port.portId) return null;
 
     const container = document.createElement("div");
     container.className = "port-rating";
 
+    const summaryElement = document.createElement("div");
+    summaryElement.className = "port-rating-summary";
+
     let currentRating = ratings?.[port.portId] || {};
     let starsElement = createRatingStars(Number(currentRating.avg) || 0);
-    container.appendChild(starsElement);
+    summaryElement.appendChild(starsElement);
 
     const averageElement = document.createElement("span");
     averageElement.className = "port-rating-average";
@@ -179,7 +186,8 @@ function createPortRating(port, ratings, ratingActions) {
     }
 
     updateRatingDisplay(currentRating);
-    container.append(averageElement, countElement);
+    summaryElement.append(averageElement, countElement);
+    container.appendChild(summaryElement);
 
     const rateButton = document.createElement("button");
     rateButton.type = "button";
@@ -346,6 +354,7 @@ function createPortRating(port, ratings, ratingActions) {
 
             if (result?.rating) {
                 updateRatingDisplay(result.rating);
+                onRatingUpdated?.(port.portId, result.rating);
             }
 
             setFeedback("Your rating has been saved!", "success");
@@ -401,17 +410,18 @@ function createPortRating(port, ratings, ratingActions) {
     return container;
 }
 
-function createPortCompatibility(port, compatibility, compatibilityActions) {
+function createPortCompatibility(
+    port,
+    compatibility,
+    compatibilityActions,
+    onCompatibilityUpdated = null
+) {
     if (!port.portId) return null;
 
     const container = document.createElement("div");
     container.className = "port-compat";
 
-    let summary = compatibility?.[port.portId] || {
-        yes: 0,
-        no: 0,
-        reports: [],
-    };
+    let summary = normalizeCompatSummary(compatibility?.[port.portId]);
 
     const bar = document.createElement("div");
     bar.className = "port-compat-bar";
@@ -421,7 +431,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     const summaryTitle = document.createElement("span");
     summaryTitle.className = "port-compat-title";
-    summaryTitle.textContent = "Works";
+    summaryTitle.textContent = "Compatibility";
 
     const summaryText = document.createElement("span");
     summaryText.className = "port-compat-summary";
@@ -440,46 +450,58 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     meter.className = "port-compat-meter";
     meter.setAttribute("role", "img");
 
-    const meterYes = document.createElement("div");
-    meterYes.className = "port-compat-meter-yes";
+    const meter60 = document.createElement("div");
+    meter60.className = "port-compat-meter-segment is-playable-60";
 
-    const meterNo = document.createElement("div");
-    meterNo.className = "port-compat-meter-no";
+    const meter30 = document.createElement("div");
+    meter30.className = "port-compat-meter-segment is-playable-30";
 
-    meter.append(meterYes, meterNo);
+    const meterLow = document.createElement("div");
+    meterLow.className = "port-compat-meter-segment is-low-fps";
+
+    const meterCrash = document.createElement("div");
+    meterCrash.className = "port-compat-meter-segment is-crash";
+
+    meter.append(meter60, meter30, meterLow, meterCrash);
 
     const listElement = document.createElement("div");
     listElement.className = "port-compat-list";
     listElement.hidden = true;
 
     function renderCompatibilitySummary(nextSummary) {
-        summary = nextSummary || { yes: 0, no: 0, reports: [] };
-        const yesCount = Number(summary.yes) || 0;
-        const noCount = Number(summary.no) || 0;
-        const total = yesCount + noCount;
+        summary = normalizeCompatSummary(nextSummary);
+        const { counts, total, reports } = summary;
 
         if (total === 0) {
-            summaryText.textContent = "No votes yet";
+            summaryText.textContent = "No reports yet";
             summaryText.classList.add("is-empty");
             meter.classList.add("is-empty");
-            meterYes.style.width = "50%";
-            meterNo.style.width = "50%";
-            meter.setAttribute("aria-label", "No compatibility votes yet");
+            meter60.style.width = "0%";
+            meter30.style.width = "0%";
+            meterLow.style.width = "0%";
+            meterCrash.style.width = "0%";
+            meter.setAttribute("aria-label", "No compatibility reports yet");
         } else {
-            const yesPct = Math.round((yesCount / total) * 100);
-            const noPct = 100 - yesPct;
-            summaryText.textContent = `${yesPct}% (${yesCount} Yes · ${noCount} No)`;
+            const playablePct = Math.round(
+                ((counts.playable_60 + counts.playable_30) / total) * 100
+            );
+            const parts = COMPAT_STATUSES.filter((tier) => counts[tier.id] > 0).map(
+                (tier) => `${counts[tier.id]} ${tier.shortLabel}`
+            );
+
+            summaryText.textContent = `${playablePct}% playable (${parts.join(" · ")})`;
             summaryText.classList.remove("is-empty");
             meter.classList.remove("is-empty");
-            meterYes.style.width = `${yesPct}%`;
-            meterNo.style.width = `${noPct}%`;
+            meter60.style.width = `${(counts.playable_60 / total) * 100}%`;
+            meter30.style.width = `${(counts.playable_30 / total) * 100}%`;
+            meterLow.style.width = `${(counts.low_fps / total) * 100}%`;
+            meterCrash.style.width = `${(counts.crash / total) * 100}%`;
             meter.setAttribute(
                 "aria-label",
-                `${yesPct}% works (${yesCount} yes, ${noCount} no)`
+                `${playablePct}% playable (${parts.join(", ")})`
             );
         }
 
-        const reports = Array.isArray(summary.reports) ? summary.reports : [];
         if (reports.length === 0) {
             toggleListButton.hidden = true;
             listElement.hidden = true;
@@ -490,35 +512,33 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             toggleListButton.textContent = `Devices (${reports.length})`;
             listElement.replaceChildren();
 
-            for (const item of reports.slice(0, 15)) {
+            const groupedReports = groupIdenticalCompatReports(reports);
+            for (const item of groupedReports.slice(0, 15)) {
                 const row = document.createElement("div");
                 row.className = "port-compat-row";
-
-                const { model, soc } = parseDeviceDisplayParts(
-                    item.deviceName || item.deviceId,
-                    item.deviceSoc || item.soc || ""
-                );
 
                 const nameWrap = document.createElement("div");
                 nameWrap.className = "port-compat-device-wrap";
 
                 const name = document.createElement("span");
                 name.className = "port-compat-device";
-                name.textContent = model;
+                name.textContent =
+                    item.count > 1
+                        ? `${item.model} (${item.count})`
+                        : item.model;
                 nameWrap.appendChild(name);
 
-                if (soc) {
+                if (item.soc) {
                     const socLabel = document.createElement("span");
                     socLabel.className = "port-compat-soc";
-                    socLabel.textContent = ` · ${soc}`;
+                    socLabel.textContent = ` · ${item.soc}`;
                     nameWrap.appendChild(socLabel);
                 }
 
+                const tier = getCompatStatusMeta(item.status, item.works);
                 const status = document.createElement("span");
-                status.className = item.works
-                    ? "port-compat-status is-yes"
-                    : "port-compat-status is-no";
-                status.textContent = item.works ? "Works" : "Doesn't work";
+                status.className = `port-compat-status is-${tier.id.replace(/_/g, "-")}`;
+                status.textContent = tier.label;
 
                 row.append(nameWrap, status);
                 listElement.appendChild(row);
@@ -551,34 +571,42 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     const subtitle = document.createElement("p");
     subtitle.className = "port-rating-popover-description";
-    subtitle.textContent = "Does it work on your Android device?";
+    subtitle.textContent = "How does this port run on your Android device?";
 
-    const binaryGroup = document.createElement("div");
-    binaryGroup.className = "port-compat-binary";
+    const tiersGroup = document.createElement("div");
+    tiersGroup.className = "port-compat-tiers";
 
-    const yesBtn = document.createElement("button");
-    yesBtn.type = "button";
-    yesBtn.className = "port-compat-choice";
-    yesBtn.textContent = "Yes, works";
+    let selectedStatus = "";
+    const statusButtons = new Map();
 
-    const noBtn = document.createElement("button");
-    noBtn.type = "button";
-    noBtn.className = "port-compat-choice";
-    noBtn.textContent = "No, fails";
-
-    binaryGroup.append(yesBtn, noBtn);
+    for (const tier of COMPAT_STATUSES) {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = `port-compat-choice is-${tier.id.replace(/_/g, "-")}`;
+        btn.textContent = tier.label;
+        btn.addEventListener("click", () => {
+            if (submitting) return;
+            selectedStatus = tier.id;
+            for (const [id, otherBtn] of statusButtons.entries()) {
+                otherBtn.classList.toggle("selected", id === tier.id);
+            }
+            updateCompatSubmitState();
+        });
+        statusButtons.set(tier.id, btn);
+        tiersGroup.appendChild(btn);
+    }
 
     const deviceField = document.createElement("div");
     deviceField.className = "port-device-field";
 
     const deviceLabel = document.createElement("label");
     deviceLabel.className = "port-device-label";
-    deviceLabel.textContent = "Phone / tablet model (select from list)";
+    deviceLabel.textContent = "Device model / SoC (select from list)";
 
     const deviceInput = document.createElement("input");
     deviceInput.type = "text";
     deviceInput.className = "port-device-input";
-    deviceInput.placeholder = "Search model (e.g. Poco F5, Galaxy S23)";
+    deviceInput.placeholder = "Search model or SoC (e.g. Poco F5, Odin 2, Snapdragon 8 Gen 2)";
     deviceInput.autocomplete = "off";
 
     const resultsBox = document.createElement("div");
@@ -599,18 +627,17 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
     const feedback = document.createElement("p");
     feedback.className = "port-rating-feedback";
-    feedback.textContent = "Choose Yes/No and select an exact device.";
+    feedback.textContent = "Choose a performance level and select an exact device.";
 
     popover.append(
         title,
         subtitle,
-        binaryGroup,
+        tiersGroup,
         deviceField,
         submitBtn,
         feedback
     );
 
-    let selectedWorks = null;
     let selectedDevice = getStoredUserDevice();
     let devicesList = null;
     let loadingDevices = false;
@@ -646,29 +673,13 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     function updateCompatSubmitState() {
         submitBtn.disabled =
             submitting ||
-            selectedWorks === null ||
+            !selectedStatus ||
             !selectedDevice ||
             !selectedDevice.id;
     }
 
     updateSelectedDeviceUI();
     updateCompatSubmitState();
-
-    yesBtn.addEventListener("click", () => {
-        if (submitting) return;
-        selectedWorks = true;
-        yesBtn.classList.add("selected", "is-yes");
-        noBtn.classList.remove("selected", "is-no");
-        updateCompatSubmitState();
-    });
-
-    noBtn.addEventListener("click", () => {
-        if (submitting) return;
-        selectedWorks = false;
-        noBtn.classList.add("selected", "is-no");
-        yesBtn.classList.remove("selected", "is-yes");
-        updateCompatSubmitState();
-    });
 
     async function ensureDevicesLoaded() {
         if (devicesList) return devicesList;
@@ -677,7 +688,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
         setCompatFeedback("Loading Android device database...");
         try {
             devicesList = await loadDevices();
-            setCompatFeedback("Choose Yes/No and select an exact device.");
+            setCompatFeedback("Choose a performance level and select an exact device.");
             return devicesList;
         } catch (error) {
             setCompatFeedback(
@@ -704,11 +715,15 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
 
             const modelSpan = document.createElement("span");
             modelSpan.className = "port-device-name";
-            const modelName = device.model || device.name;
-            modelSpan.textContent = device.soc
-                ? `${modelName} (${device.soc})`
-                : modelName;
+            modelSpan.textContent = device.model || device.name;
             option.appendChild(modelSpan);
+
+            if (device.soc) {
+                const socSpan = document.createElement("span");
+                socSpan.className = "port-device-soc";
+                socSpan.textContent = device.soc;
+                option.appendChild(socSpan);
+            }
 
             option.addEventListener("click", () => {
                 selectedDevice = {
@@ -761,7 +776,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     submitBtn.addEventListener("click", async () => {
         if (
             submitting ||
-            selectedWorks === null ||
+            !selectedStatus ||
             !selectedDevice ||
             !compatibilityActions?.submitReport
         ) {
@@ -776,11 +791,12 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             const result = await compatibilityActions.submitReport({
                 portId: port.portId,
                 deviceId: selectedDevice.id,
-                works: selectedWorks,
+                status: selectedStatus,
             });
 
             if (result?.summary) {
                 renderCompatibilitySummary(result.summary);
+                onCompatibilityUpdated?.(port.portId, result.summary);
             }
 
             setCompatFeedback("Report saved!", "success");
@@ -827,7 +843,7 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
             try {
                 const latestSummary = await compatibilityActions.loadSummary(port.portId);
                 if (latestSummary) renderCompatibilitySummary(latestSummary);
-                setCompatFeedback("Choose Yes/No and select an exact device.");
+                setCompatFeedback("Choose a performance level and select an exact device.");
             } catch (error) {
                 setCompatFeedback(error.message || "Could not load compatibility results.", "error");
             }
@@ -843,9 +859,91 @@ function createPortCompatibility(port, compatibility, compatibilityActions) {
     return container;
 }
 
-function createPortDetail(label, value, url = "") {
-    if (!String(value || "").trim()) return null;
+function createInputSvg(kind) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("width", "18");
+    svg.setAttribute("height", "18");
+    svg.setAttribute("fill", "none");
+    svg.setAttribute("stroke", "currentColor");
+    svg.setAttribute("stroke-width", "1.9");
+    svg.setAttribute("stroke-linecap", "round");
+    svg.setAttribute("stroke-linejoin", "round");
+    svg.setAttribute("aria-hidden", "true");
 
+    if (kind === "controller") {
+        const lines = [
+            { x1: "6", y1: "11", x2: "10", y2: "11" },
+            { x1: "8", y1: "9", x2: "8", y2: "13" },
+            { x1: "15", y1: "12", x2: "15.01", y2: "12" },
+            { x1: "18", y1: "10", x2: "18.01", y2: "10" },
+        ];
+        for (const attrs of lines) {
+            const line = document.createElementNS(svgNS, "line");
+            for (const [k, v] of Object.entries(attrs)) line.setAttribute(k, v);
+            svg.appendChild(line);
+        }
+        const path = document.createElementNS(svgNS, "path");
+        path.setAttribute(
+            "d",
+            "M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"
+        );
+        svg.appendChild(path);
+        return svg;
+    }
+
+    const touchPaths = [
+        "M18 11v-1a2 2 0 0 0-2-2a2 2 0 0 0-2 2",
+        "M14 10V9a2 2 0 0 0-2-2a2 2 0 0 0-2 2v1",
+        "M10 9.5V4a2 2 0 0 0-2-2a2 2 0 0 0-2 2v10",
+        "M18 11a2 2 0 1 1 4 0v3a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15",
+    ];
+    for (const d of touchPaths) {
+        const path = document.createElementNS(svgNS, "path");
+        path.setAttribute("d", d);
+        svg.appendChild(path);
+    }
+    return svg;
+}
+
+function createSupportedInputsValue(rawValue) {
+    const text = String(rawValue || "").trim();
+    if (!text || text === "-") return "-";
+
+    const normalized = text.toLowerCase();
+    const hasController = normalized.includes("controller") || normalized.includes("gamepad");
+    const hasTouch = normalized.includes("touch");
+
+    if (!hasController && !hasTouch) {
+        return text;
+    }
+
+    const wrapper = document.createElement("div");
+    wrapper.className = "port-detail-value port-inputs-icons";
+    wrapper.setAttribute("aria-label", text);
+    wrapper.title = text;
+
+    if (hasController) {
+        const item = document.createElement("span");
+        item.className = "port-input-icon";
+        item.title = "Controller";
+        item.appendChild(createInputSvg("controller"));
+        wrapper.appendChild(item);
+    }
+
+    if (hasTouch) {
+        const item = document.createElement("span");
+        item.className = "port-input-icon";
+        item.title = "Touch controls";
+        item.appendChild(createInputSvg("touch"));
+        wrapper.appendChild(item);
+    }
+
+    return wrapper;
+}
+
+function createPortDetail(label, value, url = "") {
     const detail = document.createElement("div");
     detail.className = "port-detail";
 
@@ -853,13 +951,21 @@ function createPortDetail(label, value, url = "") {
     labelElement.className = "port-detail-label";
     labelElement.textContent = label;
 
-    const hasUrl = /^https?:\/\/\S+$/i.test(String(url || "").trim());
+    if (typeof Node !== "undefined" && value instanceof Node) {
+        detail.append(labelElement, value);
+        return detail;
+    }
+
+    const textValue = String(value ?? "").trim() || "-";
+    const hasUrl =
+        textValue !== "-" &&
+        /^https?:\/\/\S+$/i.test(String(url || "").trim());
     const valueElement = hasUrl
         ? document.createElement("a")
         : document.createElement("div");
 
     valueElement.className = "port-detail-value";
-    valueElement.textContent = value;
+    valueElement.textContent = textValue;
 
     if (hasUrl) {
         valueElement.href = url;
@@ -929,12 +1035,35 @@ function createExpandableDescription(description) {
     return container;
 }
 
+function formatShortDateDisplay(value) {
+    const raw = String(value || "").trim();
+    if (!raw) return "";
+    return raw.replace(/^(\d{4}-\d{2}-\d{2})[ T].*$/, "$1");
+}
+
+function createCoverFallback(gameName) {
+    const fallback = document.createElement("div");
+    fallback.className = "game-cover-fallback";
+    fallback.setAttribute("aria-hidden", "true");
+    fallback.innerHTML =
+        '<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><line x1="6" y1="11" x2="10" y2="11"/><line x1="8" y1="9" x2="8" y2="13"/><line x1="15" y1="12" x2="15.01" y2="12"/><line x1="18" y1="10" x2="18.01" y2="10"/><path d="M17.32 5H6.68a4 4 0 0 0-3.978 3.59c-.006.052-.01.101-.017.152C2.604 9.416 2 14.456 2 16a3 3 0 0 0 3 3c1 0 1.5-.5 2-1l1.414-1.414A2 2 0 0 1 9.828 16h4.344a2 2 0 0 1 1.414.586L17 18c.5.5 1 1 2 1a3 3 0 0 0 3-3c0-1.545-.604-6.584-.685-7.258-.007-.05-.011-.1-.017-.151A4 4 0 0 0 17.32 5z"/></svg>';
+
+    const caption = document.createElement("span");
+    caption.className = "game-cover-fallback-title";
+    caption.textContent = gameName;
+    fallback.appendChild(caption);
+    return fallback;
+}
+
 function displayGameSummary(game, parentElement) {
     parentElement.replaceChildren();
-    parentElement.className = "game-header game-summary-card";
+    parentElement.className = "game-header game-summary-card game-hero";
 
-    const topRow = document.createElement("div");
-    topRow.className = "game-summary-top";
+    const heroGrid = document.createElement("div");
+    heroGrid.className = "game-summary-top";
+
+    const media = document.createElement("div");
+    media.className = "game-hero-media";
 
     const coverUrl = String(game.coverUrl || "").trim();
     if (/^https?:\/\/\S+$/i.test(coverUrl)) {
@@ -945,46 +1074,66 @@ function displayGameSummary(game, parentElement) {
         cover.loading = "eager";
         cover.decoding = "async";
         cover.referrerPolicy = "no-referrer";
-        cover.addEventListener("error", () => cover.remove(), { once: true });
-        topRow.appendChild(cover);
+        cover.addEventListener(
+            "error",
+            () => {
+                cover.replaceWith(createCoverFallback(game.name));
+            },
+            { once: true }
+        );
+        media.appendChild(cover);
+    } else {
+        media.appendChild(createCoverFallback(game.name));
     }
 
-    const info = document.createElement("div");
-    info.className = "game-summary-info";
+    const headerInfo = document.createElement("div");
+    headerInfo.className = "game-summary-info";
 
     const title = document.createElement("h1");
     title.id = "game-title";
     title.className = "game-summary-title";
     title.textContent = game.name;
-    info.appendChild(title);
+    headerInfo.appendChild(title);
 
     const metadata = document.createElement("div");
     metadata.className = "game-summary-metadata";
 
-    if (game.year) {
-        const year = document.createElement("span");
-        year.className = "game-summary-year";
-        year.textContent = game.year;
-        metadata.append(year);
-    }
+    const metaParts = [];
+    if (game.year) metaParts.push({ className: "game-summary-year", text: String(game.year) });
+    if (game.genre) metaParts.push({ className: "game-summary-genre", text: String(game.genre) });
 
-    if (game.genre) {
-        const genre = document.createElement("span");
-        genre.className = "game-summary-genre";
-        genre.textContent = game.genre;
-        metadata.append(genre);
-    }
+    metaParts.forEach((part, idx) => {
+        if (idx > 0) {
+            const sep = document.createElement("span");
+            sep.className = "game-summary-meta-sep";
+            sep.setAttribute("aria-hidden", "true");
+            sep.textContent = "·";
+            metadata.appendChild(sep);
+        }
+        const span = document.createElement("span");
+        span.className = part.className;
+        span.textContent = part.text;
+        metadata.appendChild(span);
+    });
 
     if (metadata.children.length > 0) {
-        info.appendChild(metadata);
+        headerInfo.appendChild(metadata);
     }
 
-    topRow.appendChild(info);
-    parentElement.appendChild(topRow);
-
+    const heroBody = document.createElement("div");
+    heroBody.className = "game-hero-body";
     if (game.description) {
-        parentElement.appendChild(createExpandableDescription(game.description));
+        heroBody.appendChild(createExpandableDescription(game.description));
+    } else {
+        const emptyDesc = document.createElement("p");
+        emptyDesc.className = "game-summary-description is-muted";
+        emptyDesc.textContent =
+            "Compare available native Android ports, community ratings, and device compatibility reports below.";
+        heroBody.appendChild(emptyDesc);
     }
+
+    heroGrid.append(media, headerInfo, heroBody);
+    parentElement.appendChild(heroGrid);
 }
 
 function displayPortCard(
@@ -994,35 +1143,65 @@ function displayPortCard(
     ratings,
     ratingActions,
     compatibility,
-    compatibilityActions
+    compatibilityActions,
+    options = {}
 ) {
+    const {
+        isSpotlight = false,
+        spotlightLabel = "",
+        onRatingUpdated = null,
+        onCompatibilityUpdated = null,
+    } = options;
+
     const card = document.createElement("article");
     card.className = "port port-card";
+    if (isSpotlight) {
+        card.classList.add("is-spotlight");
+    }
 
     const top = document.createElement("div");
     top.className = "port-top";
 
+    if (spotlightLabel) {
+        const kicker = document.createElement("div");
+        kicker.className = "port-spotlight-kicker";
+        if (spotlightLabel.startsWith("Top Rated")) {
+            kicker.classList.add("is-gold");
+        }
+        kicker.textContent = spotlightLabel;
+        top.appendChild(kicker);
+    }
+
+    const topRow = document.createElement("div");
+    topRow.className = "port-top-row";
+
     const title = document.createElement("h3");
     title.className = "port-title";
     title.textContent = port.project || `Port ${index + 1}`;
-    top.appendChild(title);
+    topRow.appendChild(title);
 
-    const rating = createPortRating(port, ratings, ratingActions);
-    if (rating) top.appendChild(rating);
+    const rating = createPortRating(
+        port,
+        ratings,
+        ratingActions,
+        onRatingUpdated
+    );
+    if (rating) topRow.appendChild(rating);
+    top.appendChild(topRow);
     card.appendChild(top);
 
     const details = document.createElement("div");
     details.className = "port-details";
 
-    const lastUpdateDisplay = String(port.lastUpdate || "").replace(/^(\d{4}-\d{2}-\d{2})[ T].*$/, "$1");
+    const lastUpdateDisplay = formatShortDateDisplay(port.lastUpdate);
+    const supportedInputsValue = createSupportedInputsValue(port.controller);
     const fields = [
-        ["Version", port.version, ""],
-        ["Developer", port.developer, ""],
-        ["Need files?", port.files, port.dataUrl],
         ["Port type", port.platform, ""],
-        ["Supported inputs", port.controller, ""],
-        ["Works?", port.works, ""],
+        ["Developer", port.developer, ""],
+        ["Version", port.version, ""],
         ["Last update", lastUpdateDisplay, ""],
+        ["Supported inputs", supportedInputsValue, ""],
+        ["Need game files?", port.files, port.dataUrl],
     ];
 
     for (const [label, value, url] of fields) {
@@ -1032,15 +1211,6 @@ function displayPortCard(
 
     if (details.childElementCount > 0) {
         card.appendChild(details);
-    }
-
-    const compatSection = createPortCompatibility(
-        port,
-        compatibility,
-        compatibilityActions
-    );
-    if (compatSection) {
-        card.appendChild(compatSection);
     }
 
     if (port.notes) {
@@ -1057,6 +1227,20 @@ function displayPortCard(
 
         notes.append(label, text);
         card.appendChild(notes);
+    }
+
+    const compatSection = createPortCompatibility(
+        port,
+        compatibility,
+        compatibilityActions,
+        onCompatibilityUpdated
+    );
+    if (compatSection) {
+        const separator = document.createElement("div");
+        separator.className = "port-compat-separator";
+        separator.setAttribute("aria-hidden", "true");
+        card.appendChild(separator);
+        card.appendChild(compatSection);
     }
 
     const portUrl = String(port.url || "").trim();
@@ -1223,6 +1407,7 @@ export function displayGame(
     compatibilityActions = null
 ) {
     const gameHeader = document.getElementById("game-header");
+    const portsHeader = document.getElementById("ports-header");
     const portList = document.getElementById("port-list");
     const statusElement = document.getElementById("status");
 
@@ -1232,14 +1417,45 @@ export function displayGame(
     }
 
     initializeRatingPopoverEvents();
+
+    const ratingsState = { ...(ratings || {}) };
+    const compatibilityState = { ...(compatibility || {}) };
+
     displayGameSummary(game, gameHeader);
 
     const portCount = game.ports.length;
     statusElement.textContent = `${portCount} ${
         portCount === 1 ? "port" : "ports"
     }`;
+    statusElement.classList.add("sr-only");
+
+    if (portsHeader) {
+        portsHeader.replaceChildren();
+        portsHeader.hidden = false;
+
+        const headingGroup = document.createElement("div");
+        headingGroup.className = "ports-section-heading";
+
+        const heading = document.createElement("h2");
+        heading.className = "ports-section-title";
+        heading.textContent =
+            portCount === 1 ? "Available Port" : "Available Ports";
+
+        const subtitle = document.createElement("p");
+        subtitle.className = "ports-section-description";
+        subtitle.textContent =
+            portCount > 1
+                ? `${portCount} native builds sorted by community score & recency`
+                : portCount === 1
+                ? "1 native Android build listed"
+                : "No native Android ports listed yet";
+
+        headingGroup.append(heading, subtitle);
+        portsHeader.appendChild(headingGroup);
+    }
 
     portList.replaceChildren();
+    portList.classList.remove("has-spotlight-full");
 
     if (portCount === 0) {
         const emptyMessage = document.createElement("p");
@@ -1252,7 +1468,7 @@ export function displayGame(
             .map((port, originalIndex) => ({
                 port,
                 originalIndex,
-                rating: ratings?.[port.portId] || {},
+                rating: ratingsState?.[port.portId] || {},
             }))
             .sort((a, b) => {
                 const aVotes = Number(a.rating.votes) || 0;
@@ -1271,8 +1487,6 @@ export function displayGame(
                     if (avgDiff !== 0) return avgDiff;
                 }
 
-                // When ratings are equal (or neither port has votes),
-                // show the most recently updated port first.
                 const aUpdated = parseLastUpdate(a.port.lastUpdate);
                 const bUpdated = parseLastUpdate(b.port.lastUpdate);
                 if (aUpdated !== bUpdated) return bUpdated - aUpdated;
@@ -1280,16 +1494,33 @@ export function displayGame(
                 return a.originalIndex - b.originalIndex;
             });
 
-        sortedPorts.forEach(({ port }, index) => {
+        portList.classList.toggle(
+            "has-spotlight-full",
+            sortedPorts.length === 1 || sortedPorts.length >= 3
+        );
+
+        sortedPorts.forEach(({ port, rating }, index) => {
+            const isTopPort = index === 0 && sortedPorts.length > 1;
+            const hasRating = (Number(rating?.votes) || 0) > 0;
+            const spotlightLabel = isTopPort
+                ? hasRating
+                    ? "★ Top Rated Port"
+                    : "Latest Port"
+                : "";
+
             portList.appendChild(
                 displayPortCard(
                     port,
                     index,
                     allRows,
-                    ratings,
+                    ratingsState,
                     ratingActions,
-                    compatibility,
-                    compatibilityActions
+                    compatibilityState,
+                    compatibilityActions,
+                    {
+                        isSpotlight: isTopPort,
+                        spotlightLabel,
+                    }
                 )
             );
         });
@@ -1298,9 +1529,12 @@ export function displayGame(
     if (isMultiGameApp(game)) {
         const gamesList = findGamesUsingApp(game.name, allRows);
         if (gamesList.length > 0) {
-            portList.appendChild(
-                createGamesUsingAppSection("Games using this app", gamesList)
+            const appSection = createGamesUsingAppSection(
+                "Games using this app",
+                gamesList
             );
+            appSection.classList.add("games-using-app-full");
+            portList.appendChild(appSection);
         }
     }
 }

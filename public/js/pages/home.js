@@ -384,5 +384,65 @@ lastUpdatedMore?.addEventListener("click", () => {
     displayLastUpdated();
 });
 
+const COMPAT_BANNER_STORAGE_KEY = "napl_compat_banner_dismissed_v1";
+const RATE_BANNER_STORAGE_KEY = "napl_rate_banner_dismissed_v1";
+
+const homeBannersContainer = document.getElementById("home-banners");
+const homeFeatureBanner = document.getElementById("home-feature-banner");
+const homeFeatureDismiss = document.getElementById("home-feature-dismiss");
+const homeRateBanner = document.getElementById("home-rate-banner");
+const homeRateDismiss = document.getElementById("home-rate-dismiss");
+const homeRateCta = document.getElementById("home-rate-cta");
+
+function syncHomeBannersContainer() {
+    if (!homeBannersContainer) return;
+    const anyVisible = Array.from(
+        homeBannersContainer.querySelectorAll(".home-feature-banner")
+    ).some((banner) => !banner.hidden);
+    homeBannersContainer.hidden = !anyVisible;
+}
+
+function setupDismissibleBanner(bannerEl, dismissBtn, storageKey) {
+    if (!bannerEl) return;
+    try {
+        if (localStorage.getItem(storageKey) === "1") {
+            bannerEl.dataset.dismissed = "true";
+            bannerEl.hidden = true;
+        }
+    } catch {
+        // Ignore storage read errors
+    }
+
+    dismissBtn?.addEventListener("click", () => {
+        bannerEl.dataset.dismissed = "true";
+        bannerEl.hidden = true;
+        syncHomeBannersContainer();
+        try {
+            localStorage.setItem(storageKey, "1");
+        } catch {
+            // Ignore storage write errors
+        }
+    });
+}
+
+function initFeatureBanners() {
+    setupDismissibleBanner(
+        homeFeatureBanner,
+        homeFeatureDismiss,
+        COMPAT_BANNER_STORAGE_KEY
+    );
+    setupDismissibleBanner(
+        homeRateBanner,
+        homeRateDismiss,
+        RATE_BANNER_STORAGE_KEY
+    );
+    syncHomeBannersContainer();
+
+    homeRateCta?.addEventListener("click", () => {
+        openCategory("all-games");
+    });
+}
+
+initFeatureBanners();
 showHomeSection("last-added");
 initHomePage();

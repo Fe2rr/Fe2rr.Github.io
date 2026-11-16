@@ -74,9 +74,13 @@ export function initNavigation(options = {}) {
     const menuOverlay = document.getElementById("menu-overlay");
     const platformList = document.getElementById("platform-list");
     const allGamesButton = document.getElementById("all-games-button");
+    const checkCompatibilityLink = document.getElementById("check-compatibility-link");
+    const isSubPage = mode !== "home";
 
     const homeButton = document.getElementById("home-button");
     const backButton = document.getElementById("back-button");
+
+    checkCompatibilityLink?.addEventListener("click", closeMenu);
 
     function openMenu() {
         onBeforeOpenMenu?.();
@@ -107,7 +111,7 @@ export function initNavigation(options = {}) {
     function addMenuItem(label, href, onClick) {
         if (!platformList) return;
 
-        if (mode === "game") {
+        if (isSubPage) {
             const link = document.createElement("a");
             link.className = "platform-button";
             link.href = href;
@@ -190,7 +194,7 @@ export function initNavigation(options = {}) {
 
     if (homeButton) {
         const triggerHome = () => {
-            if (mode === "game") {
+            if (isSubPage) {
                 window.location.href = "index.html";
             } else {
                 onActionResetSearch?.();
@@ -210,7 +214,7 @@ export function initNavigation(options = {}) {
 
     if (backButton) {
         backButton.addEventListener("click", () => {
-            if (mode === "game") {
+            if (isSubPage) {
                 const params = new URLSearchParams(window.location.search);
                 const returnPath = params.get("return");
 
@@ -243,13 +247,13 @@ export function initNavigation(options = {}) {
         });
     }
 
-    if (allGamesButton && mode === "home") {
+    if (allGamesButton && !isSubPage) {
         allGamesButton.addEventListener("click", () => {
             onActionResetSearch?.();
             onSelectAllGames?.();
             closeMenu();
         });
-    } else if (allGamesButton && mode === "game") {
+    } else if (allGamesButton && isSubPage) {
         allGamesButton.addEventListener("click", () => {
             closeMenu();
             window.location.href = "index.html?view=all-games";
@@ -261,7 +265,7 @@ export function initNavigation(options = {}) {
         if (!category) return;
 
         button.addEventListener("click", () => {
-            if (mode === "game") {
+            if (isSubPage) {
                 closeMenu();
                 window.location.href = `index.html?category=${encodeURIComponent(category)}`;
             } else {

@@ -64,9 +64,9 @@
     </script>
 
     <link rel="stylesheet" href="assets/css/main.css?v=8">
-    <link rel="stylesheet" href="assets/css/components.css?v=8">
+    <link rel="stylesheet" href="assets/css/components.css?v=11">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
-    <link rel="stylesheet" href="assets/css/home.css?v=7">
+    <link rel="stylesheet" href="assets/css/home.css?v=10">
     <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
     <!-- Google Tag Manager -->
     <script>
@@ -142,18 +142,25 @@
     </div>
 
     <div class="side-menu-body">
+        <a
+            id="check-compatibility-link"
+            href="compatibility.html"
+            class="platform-button"
+        >
+            Check Compatibility
+        </a>
+
+        <h2>Categories</h2>
         <button id="all-games-button" type="button" class="platform-button platform-button-primary">
             All Games
         </button>
-
-    <h2>Categories</h2>
-    <button
-        type="button"
-        class="platform-button"
-        data-category="multi-game-apps"
-    >
-        Multi-Game Apps
-    </button>
+        <button
+            type="button"
+            class="platform-button"
+            data-category="multi-game-apps"
+        >
+            Multi-Game Apps
+        </button>
     <button
         type="button"
         class="platform-button"
@@ -182,6 +189,61 @@
     <div class="home-hero">
         <h2 class="home-hero-title">Native Android Port List</h2>
         <p class="home-hero-subtitle">Discover, compare, and track native game ports for Android.</p>
+    </div>
+
+    <div id="home-banners" class="home-banners">
+        <aside id="home-feature-banner" class="home-feature-banner" aria-label="New compatibility feature announcement">
+            <div class="home-feature-copy">
+                <span class="home-feature-eyebrow">NEW FEATURE</span>
+                <h3 class="home-feature-title">Check Device &amp; SoC Compatibility</h3>
+                <p class="home-feature-text">
+                    Search your Android phone, tablet, handheld, or chipset to see community-tested compatibility reports.
+                </p>
+            </div>
+            <div class="home-feature-actions">
+                <a
+                    href="compatibility.html"
+                    class="home-feature-cta"
+                >
+                    Check Compatibility <span aria-hidden="true">↗</span>
+                </a>
+                <button
+                    type="button"
+                    id="home-feature-dismiss"
+                    class="home-feature-dismiss"
+                    aria-label="Dismiss compatibility announcement"
+                >
+                    ×
+                </button>
+            </div>
+        </aside>
+
+        <aside id="home-rate-banner" class="home-feature-banner is-rating" aria-label="Port rating feature announcement">
+            <div class="home-feature-copy">
+                <span class="home-feature-eyebrow is-gold">COMMUNITY RATINGS</span>
+                <h3 class="home-feature-title">Help Us Identify the Best Ports</h3>
+                <p class="home-feature-text">
+                    Played a port recently? Open any game page and leave a rating so everyone knows which ports are worth playing.
+                </p>
+            </div>
+            <div class="home-feature-actions">
+                <button
+                    type="button"
+                    id="home-rate-cta"
+                    class="home-feature-cta is-gold"
+                >
+                    Browse &amp; Rate <span aria-hidden="true">★</span>
+                </button>
+                <button
+                    type="button"
+                    id="home-rate-dismiss"
+                    class="home-feature-dismiss"
+                    aria-label="Dismiss rating announcement"
+                >
+                    ×
+                </button>
+            </div>
+        </aside>
     </div>
 
     <nav id="home-tabs" class="home-tabs" aria-label="Home sections">

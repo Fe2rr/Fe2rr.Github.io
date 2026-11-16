@@ -9,7 +9,10 @@ import { createSlug } from "../core/helpers.js";
 import { loadCatalog } from "../core/data.js";
 import { registerGameVisit } from "../services/visits.js";
 import { loadPortRatings, createRatingActions } from "../services/ratings.js";
-import { createCompatibilityActions } from "../services/compatibility.js";
+import {
+    loadGameCompatibility,
+    createCompatibilityActions,
+} from "../services/compatibility.js";
 import { initNavigation } from "../components/navigation.js";
 import { initSearch } from "../components/search.js";
 import { initThemeToggle } from "../components/theme.js";
@@ -25,6 +28,7 @@ const navController = initNavigation({
 
 async function loadSelectedGame() {
     const gameHeader = document.getElementById("game-header");
+    const portsHeader = document.getElementById("ports-header");
     const portList = document.getElementById("port-list");
     const status = document.getElementById("status");
 
@@ -38,6 +42,7 @@ async function loadSelectedGame() {
 
     if (requestedSlug) {
         status.textContent = "";
+        if (portsHeader) portsHeader.hidden = true;
         renderGameDetailSkeletons(gameHeader, portList, 2);
     }
 
@@ -47,6 +52,7 @@ async function loadSelectedGame() {
         navController.renderPlatforms(catalog.platformOrder, catalog.games);
 
         if (!requestedSlug) {
+            if (portsHeader) portsHeader.hidden = true;
             gameHeader.textContent = "No game selected.";
             status.textContent = "Return to the list and select a game.";
             portList.replaceChildren();
@@ -57,6 +63,7 @@ async function loadSelectedGame() {
         const game = catalog.games.find((item) => item.slug === targetSlug);
 
         if (!game) {
+            if (portsHeader) portsHeader.hidden = true;
             gameHeader.textContent = "Game not found.";
             status.textContent =
                 "This game could not be found in the spreadsheet.";
@@ -67,18 +74,30 @@ async function loadSelectedGame() {
         document.title = `${game.name} — NAPL`;
         registerGameVisit(game.name);
 
-        const ratings = await loadPortRatings();
+        const portIds = Array.from(
+            new Set(
+                (game.ports || [])
+                    .map((port) => String(port?.portId || "").trim())
+                    .filter(Boolean)
+            )
+        );
+
+        const [ratings, compatibility] = await Promise.all([
+            loadPortRatings(),
+            loadGameCompatibility(portIds),
+        ]);
 
         displayGame(
             game,
             catalog.allRows,
             ratings,
             createRatingActions(),
-            {},
+            compatibility,
             createCompatibilityActions()
         );
     } catch (error) {
         console.error("NAPL: could not load selected game.", error);
+        if (portsHeader) portsHeader.hidden = true;
         navController.setPlatformError(
             "Could not load platforms. Please try again later."
         );

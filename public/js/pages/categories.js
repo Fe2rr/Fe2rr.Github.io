@@ -26,6 +26,7 @@ export function createCategoryController(state) {
     const categorySortOptions = document.querySelectorAll(".category-sort-option");
     const categorySortDirection = document.getElementById("category-sort-direction");
     const homeTabsNav = document.getElementById("home-tabs");
+    const homeBannersContainer = document.getElementById("home-banners");
 
     function updateCategorySortDirection() {
         if (!categorySortDirection) return;
@@ -35,6 +36,12 @@ export function createCategoryController(state) {
     function showHomeSections(activeHomeSectionFn) {
         if (categoryControls) categoryControls.hidden = true;
         if (homeTabsNav) homeTabsNav.hidden = false;
+        if (homeBannersContainer) {
+            const hasVisibleBanner = Array.from(
+                homeBannersContainer.querySelectorAll(".home-feature-banner")
+            ).some((el) => el.dataset.dismissed !== "true");
+            homeBannersContainer.hidden = !hasVisibleBanner;
+        }
         activeHomeSectionFn?.();
     }
 
@@ -44,6 +51,7 @@ export function createCategoryController(state) {
         });
         if (categoryControls) categoryControls.hidden = false;
         if (homeTabsNav) homeTabsNav.hidden = true;
+        if (homeBannersContainer) homeBannersContainer.hidden = true;
     }
 
     function resetCategoryControls() {
@@ -166,26 +174,57 @@ export function createCategoryController(state) {
 
         const fragment = document.createDocumentFragment();
         for (const app of apps) {
-            const element = document.createElement("div");
-            element.className = "game";
+            const element = document.createElement("article");
+            element.className = "game multi-game-app-card";
+
+            const header = document.createElement("div");
+            header.className = "multi-game-app-header";
 
             const name = document.createElement("h2");
             name.className = "game-name";
             name.textContent = app.name;
 
-            const info = document.createElement("div");
-            info.className = "game-info";
-
             const count = document.createElement("span");
+            count.className = "multi-game-app-badge";
             count.textContent = `${app.gameCount} game${
                 app.gameCount !== 1 ? "s" : ""
             }`;
-            info.appendChild(count);
 
-            element.append(
-                name,
-                info,
-                createGamesUsingAppSection("You can also play:", app.games)
+            header.append(name, count);
+            element.appendChild(header);
+
+            const hasValidDate =
+                app.latestUpdate instanceof Date &&
+                !Number.isNaN(app.latestUpdate.getTime());
+
+            if (hasValidDate) {
+                const meta = document.createElement("div");
+                meta.className = "multi-game-app-meta";
+                meta.textContent = `Updated ${app.latestUpdate.toLocaleDateString(
+                    "en-US",
+                    { month: "short", day: "numeric", year: "numeric" }
+                )}`;
+                element.appendChild(meta);
+            }
+
+            if (Array.isArray(app.games) && app.games.length > 0) {
+                const preview = document.createElement("p");
+                preview.className = "multi-game-app-preview";
+                const sample = app.games.slice(0, 3).map((g) => g.name);
+                const remaining = app.games.length - sample.length;
+                preview.textContent =
+                    remaining > 0
+                        ? `${sample.join(" · ")} +${remaining} more`
+                        : sample.join(" · ");
+                element.appendChild(preview);
+            }
+
+            element.appendChild(
+                createGamesUsingAppSection("Playable Games", app.games, {
+                    icon: "gamepad",
+                    showCount: false,
+                    searchable: true,
+                })
             );
             fragment.appendChild(element);
         }

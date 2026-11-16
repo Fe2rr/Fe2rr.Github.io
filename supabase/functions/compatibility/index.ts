@@ -81,7 +81,9 @@ Deno.serve(async (request: Request) => {
     const url = new URL(request.url);
 
     if (request.method === "GET") {
-      if (url.searchParams.get("action") === "devices") {
+      const action = url.searchParams.get("action") || "";
+
+      if (action === "devices") {
         const rawDevices = await rpc("get_compatibility_devices", {});
         const devices = Array.isArray(rawDevices)
           ? rawDevices.map((device) => ({
@@ -97,6 +99,31 @@ Deno.serve(async (request: Request) => {
           { success: true, devices },
           200,
           { "Cache-Control": "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800" },
+        );
+      }
+
+      if (action === "search") {
+        const deviceId = String(url.searchParams.get("device_id") || "").trim().slice(0, 200);
+        const soc = String(url.searchParams.get("soc") || "").trim().slice(0, 120);
+        const query = String(url.searchParams.get("q") || "").trim().slice(0, 120);
+        const rawLimit = Number(url.searchParams.get("limit") || 500);
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 1000) : 500;
+
+        if (!deviceId && !soc && !query) {
+          return json({ success: true, reports: [] }, 200);
+        }
+
+        const reports = await rpc("get_compatibility_by_hardware", {
+          p_device_id: deviceId || null,
+          p_soc: soc || null,
+          p_query: query || null,
+          p_limit: limit,
+        });
+
+        return json(
+          { success: true, reports: Array.isArray(reports) ? reports : [] },
+          200,
+          { "Cache-Control": "public, max-age=20, s-maxage=40" },
         );
       }
 
@@ -128,28 +155,40 @@ Deno.serve(async (request: Request) => {
         return json({ success: false, error: "Invalid JSON body." }, 400);
       }
 
+      const VALID_STATUSES = new Set(["crash", "low_fps", "playable_30", "playable_60"]);
       const portId = String(body.port_id || "").trim();
       const deviceId = String(body.device_id || "").trim();
       const token = String(body.token || "").trim();
-      const works = typeof body.works === "boolean"
+      const rawStatus = String(body.status || "").trim();
+      const worksInput = typeof body.works === "boolean"
         ? body.works
         : body.works === 1 ? true : body.works === 0 ? false : null;
 
+      const resolvedStatus = VALID_STATUSES.has(rawStatus)
+        ? rawStatus
+        : worksInput === true
+        ? "playable_30"
+        : worksInput === false
+        ? "crash"
+        : "";
+
       if (!portId || portId.length > 120 || !deviceId || deviceId.length > 200 ||
-          !token || token.length > 512 || works === null) {
+          !token || token.length > 512 || !resolvedStatus) {
         return json({
           success: false,
-          error: "port_id, device_id, token, and works (boolean) are required.",
+          error: "port_id, device_id, token, and a valid status are required.",
         }, 400);
       }
 
+      const works = resolvedStatus === "playable_30" || resolvedStatus === "playable_60";
       const tokenHash = await hashToken(token);
       const saved = await rpc("upsert_compatibility_report", {
         p_port_id: portId,
         p_token_hash: tokenHash,
         p_device_id: deviceId,
         p_works: works,
-      });
+        p_status: resolvedStatus,
+      }) as { report?: unknown; summary?: unknown } | null;
 
       return json({
         success: true,

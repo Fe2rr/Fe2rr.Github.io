@@ -11,17 +11,44 @@ const PORT = 3000;
 const HOST = '0.0.0.0';
 const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev';
 
-// Load strict Android device list for compatibility validation
+// Load strict Android device list for compatibility validation (supports sharded manifest or raw array)
 const deviceMap = new Map();
+const devicesCatalog = [];
 try {
   const devicesPath = path.join(__dirname, 'public', 'assets', 'data', 'devices.json');
   const rawDevices = fs.readFileSync(devicesPath, 'utf8');
   const parsedDevices = JSON.parse(rawDevices);
+
+  let rawDeviceList = [];
   if (Array.isArray(parsedDevices)) {
-    for (const d of parsedDevices) {
-      if (d && typeof d.id === 'string' && typeof d.name === 'string') {
-        deviceMap.set(d.id, d.name);
+    rawDeviceList = parsedDevices;
+  } else if (
+    parsedDevices?.format === 'napl-device-catalog-shards-v1' &&
+    Array.isArray(parsedDevices.chunks)
+  ) {
+    for (const chunk of parsedDevices.chunks) {
+      const filename = String(chunk?.file || '');
+      if (!/^devices-part-\d{3}\.json$/.test(filename)) continue;
+      const chunkPath = path.join(__dirname, 'public', 'assets', 'data', 'device-catalog', filename);
+      const chunkRecords = JSON.parse(fs.readFileSync(chunkPath, 'utf8'));
+      if (Array.isArray(chunkRecords)) {
+        rawDeviceList.push(...chunkRecords);
       }
+    }
+  }
+
+  for (const d of rawDeviceList) {
+    if (d && typeof d.id === 'string' && typeof d.name === 'string') {
+      const entry = {
+        id: d.id,
+        name: d.name,
+        manufacturer: String(d.manufacturer || ''),
+        model: String(d.model || d.name),
+        soc: String(d.soc || ''),
+        deviceType: String(d.device_type || d.deviceType || 'phone'),
+      };
+      deviceMap.set(d.id, entry);
+      devicesCatalog.push(entry);
     }
   }
 } catch (error) {
@@ -30,6 +57,39 @@ try {
 
 // In-memory compatibility reports for local preview
 const compatibilityReports = new Map();
+const VALID_COMPAT_STATUSES = new Set(['crash', 'low_fps', 'playable_30', 'playable_60']);
+
+function buildPortSummary(portId) {
+  const summary = {
+    yes: 0,
+    no: 0,
+    counts: { playable_60: 0, playable_30: 0, low_fps: 0, crash: 0 },
+    reports: [],
+  };
+  const sorted = Array.from(compatibilityReports.values())
+    .filter((r) => r.portId === portId)
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+
+  for (const r of sorted) {
+    if (r.works) summary.yes += 1;
+    else summary.no += 1;
+    if (summary.counts[r.status] !== undefined) {
+      summary.counts[r.status] += 1;
+    }
+    if (summary.reports.length < 30) {
+      summary.reports.push({
+        deviceId: r.deviceId,
+        deviceName: r.deviceName,
+        deviceSoc: r.deviceSoc || '',
+        deviceType: r.deviceType || 'phone',
+        status: r.status,
+        works: r.works,
+        updatedAt: r.updatedAt,
+      });
+    }
+  }
+  return summary;
+}
 
 app.use(express.json());
 
@@ -63,8 +123,55 @@ app.all('/api/ratings/*', async (req, res) => {
   }
 });
 
-// Compatibility reports API (preview backend matching Cloudflare Catalog Worker contract)
+// Compatibility reports API (preview backend matching Supabase Edge Function contract)
 app.get('/api/compatibility', (req, res) => {
+  const action = String(req.query.action || '');
+  if (action === 'devices') {
+    return res.json({ success: true, devices: devicesCatalog });
+  }
+
+  if (action === 'search') {
+    const deviceId = String(req.query.device_id || '').trim();
+    const soc = String(req.query.soc || '').trim().toLowerCase();
+    const query = String(req.query.q || '').trim().toLowerCase();
+    const limit = Math.min(Math.max(Number(req.query.limit) || 500, 1), 1000);
+
+    if (!deviceId && !soc && !query) {
+      return res.json({ success: true, reports: [] });
+    }
+
+    const sorted = Array.from(compatibilityReports.values()).sort((a, b) =>
+      b.updatedAt.localeCompare(a.updatedAt)
+    );
+    const matches = [];
+    for (const r of sorted) {
+      const matchDevice = deviceId && r.deviceId === deviceId;
+      const matchSoc = soc && String(r.deviceSoc || '').toLowerCase() === soc;
+      const matchQuery =
+        !deviceId &&
+        !soc &&
+        query &&
+        (String(r.deviceName || '').toLowerCase().includes(query) ||
+          String(r.deviceSoc || '').toLowerCase().includes(query));
+
+      if (matchDevice || matchSoc || matchQuery) {
+        matches.push({
+          portId: r.portId,
+          deviceId: r.deviceId,
+          deviceName: r.deviceName,
+          deviceSoc: r.deviceSoc || '',
+          deviceType: r.deviceType || 'phone',
+          status: r.status,
+          works: r.works,
+          updatedAt: r.updatedAt,
+        });
+        if (matches.length >= limit) break;
+      }
+    }
+
+    return res.json({ success: true, reports: matches });
+  }
+
   const portIdsParam = String(req.query.port_ids || '');
   const portIds = portIdsParam
     .split(',')
@@ -74,31 +181,10 @@ app.get('/api/compatibility', (req, res) => {
 
   const compatibility = {};
   for (const id of portIds) {
-    compatibility[id] = { yes: 0, no: 0, reports: [] };
+    compatibility[id] = buildPortSummary(id);
   }
 
-  const allReports = Array.from(compatibilityReports.values()).sort((a, b) =>
-    b.updatedAt.localeCompare(a.updatedAt)
-  );
-
-  for (const report of allReports) {
-    const entry = compatibility[report.portId];
-    if (!entry) continue;
-
-    if (report.works) entry.yes += 1;
-    else entry.no += 1;
-
-    if (entry.reports.length < 30) {
-      entry.reports.push({
-        deviceId: report.deviceId,
-        deviceName: report.deviceName,
-        works: report.works,
-        updatedAt: report.updatedAt,
-      });
-    }
-  }
-
-  res.json({ success: true, compatibility });
+  return res.json({ success: true, compatibility });
 });
 
 app.post('/api/compatibility', (req, res) => {
@@ -110,28 +196,38 @@ app.post('/api/compatibility', (req, res) => {
   const portId = String(body.port_id || '').trim();
   const deviceId = String(body.device_id || '').trim();
   const token = String(body.token || '').trim();
-  const works =
+  const rawStatus = String(body.status || '').trim();
+  const worksInput =
     body.works === true || body.works === 1
       ? true
       : body.works === false || body.works === 0
       ? false
       : null;
 
-  if (!portId || !deviceId || !token || works === null) {
+  const status = VALID_COMPAT_STATUSES.has(rawStatus)
+    ? rawStatus
+    : worksInput === true
+    ? 'playable_30'
+    : worksInput === false
+    ? 'crash'
+    : '';
+
+  if (!portId || !deviceId || !token || !status) {
     return res.status(400).json({
       success: false,
-      error: 'port_id, device_id, token, and works (boolean) are required.',
+      error: 'port_id, device_id, token, and a valid status are required.',
     });
   }
 
-  const deviceName = deviceMap.get(deviceId);
-  if (!deviceName) {
+  const device = deviceMap.get(deviceId);
+  if (!device) {
     return res.status(400).json({
       success: false,
       error: 'Invalid device_id. Please select a device from the list.',
     });
   }
 
+  const works = status === 'playable_30' || status === 'playable_60';
   const key = `${portId}:${token}:${deviceId}`;
   const updatedAt = new Date().toISOString();
 
@@ -139,7 +235,10 @@ app.post('/api/compatibility', (req, res) => {
     portId,
     token,
     deviceId,
-    deviceName,
+    deviceName: device.model || device.name,
+    deviceSoc: device.soc || '',
+    deviceType: device.deviceType || 'phone',
+    status,
     works,
     updatedAt,
   });
@@ -149,9 +248,13 @@ app.post('/api/compatibility', (req, res) => {
     report: {
       portId,
       deviceId,
-      deviceName,
+      deviceName: device.model || device.name,
+      deviceSoc: device.soc || '',
+      deviceType: device.deviceType || 'phone',
+      status,
       works,
     },
+    summary: buildPortSummary(portId),
   });
 });
 

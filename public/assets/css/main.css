@@ -385,7 +385,10 @@ header h1,
 
 .side-menu-body {
   flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
   padding: 16px 14px 32px;
   display: flex;
   flex-direction: column;

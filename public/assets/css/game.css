@@ -1,16 +1,34 @@
 /* =========================================================
-   NAPL — GAME DETAIL & RATINGS STYLES
+   NAPL — GAME DETAIL, SHOWCASE HERO & PORTS STYLES
    ========================================================= */
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.game-top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
 
 .back-button {
   display: inline-flex;
   align-items: center;
   gap: 6px;
   min-height: 40px;
-  margin-bottom: 20px;
-  padding: 6px 12px;
+  padding: 6px 14px;
   border-radius: var(--radius-sm);
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   color: var(--text-secondary);
   border: 1px solid var(--border-subtle);
@@ -27,53 +45,100 @@
   background: var(--surface-2);
 }
 
-.game-summary-card {
+/* Editorial Showcase Hero */
+.game-summary-card,
+.game-hero {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 24px;
-  margin-bottom: 32px;
-  background: var(--surface-1);
+  gap: 20px;
+  padding: 26px 28px;
+  margin-bottom: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(110, 231, 160, 0.12), transparent 56%),
+    var(--surface-1);
   border: 1px solid var(--border-medium);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
 }
 
+html[data-theme="light"] .game-summary-card,
+html[data-theme="light"] .game-hero {
+  background:
+    radial-gradient(circle at top right, rgba(15, 92, 82, 0.06), transparent 58%),
+    var(--surface-1);
+}
+
 .game-summary-top {
-  display: flex;
-  align-items: flex-start;
-  gap: 24px;
+  display: grid;
+  grid-template-columns: 164px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  grid-template-areas:
+    "cover header"
+    "cover body";
+  gap: 12px 28px;
+  align-items: start;
+}
+
+.game-hero-media {
+  grid-area: cover;
+  width: 164px;
 }
 
 .game-summary-cover {
   display: block;
-  flex: 0 0 auto;
-  width: 132px;
+  width: 100%;
   height: auto;
-  max-height: 220px;
+  max-height: 300px;
+  aspect-ratio: auto;
   object-fit: contain;
-  object-position: top center;
-  align-self: flex-start;
-  border-radius: var(--radius-sm);
+  object-position: center;
+  border-radius: var(--radius-md);
   border: 1px solid var(--border-medium);
   background: var(--surface-2);
+  box-shadow: var(--shadow-card);
+}
+
+.game-cover-fallback {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  padding: 14px;
+  text-align: center;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  background:
+    radial-gradient(circle at top, rgba(110, 231, 160, 0.14), transparent 70%),
+    var(--surface-2);
+  color: var(--accent);
+}
+
+.game-cover-fallback-title {
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text-secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .game-summary-info {
-  flex: 1 1 auto;
+  grid-area: header;
   min-width: 0;
 }
 
-.game-summary-eyebrow {
-  display: none;
-}
-
 .game-summary-title {
-  margin: 0 0 10px;
+  margin: 0 0 8px;
   font-family: var(--font-display);
-  font-size: clamp(1.5rem, 3vw, 2.25rem);
+  font-size: clamp(1.65rem, 3.2vw, 2.5rem);
   font-weight: 700;
-  line-height: 1.12;
+  line-height: 1.1;
   letter-spacing: -0.025em;
   color: var(--text-strong);
   text-wrap: balance;
@@ -81,9 +146,9 @@
 
 .game-summary-metadata {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 4px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
   font-family: var(--font-mono);
   font-size: 12px;
   font-weight: 600;
@@ -91,9 +156,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+.game-summary-meta-sep {
+  color: var(--text-muted);
+}
+
+.game-hero-body {
+  grid-area: body;
+  min-width: 0;
+}
+
 .game-summary-description-container {
-  padding-top: 14px;
-  border-top: 1px solid var(--border-subtle);
+  max-width: 68ch;
 }
 
 .game-summary-description {
@@ -104,36 +177,73 @@
   white-space: pre-line;
 }
 
+.game-summary-description.is-muted {
+  color: var(--text-secondary);
+}
+
 .game-description-toggle {
-  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  margin-top: 6px;
+  padding: 2px 0;
   font-family: var(--font-mono);
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--accent);
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.game-description-toggle:hover {
+  color: var(--accent-hover);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+
+/* Ports Section Header */
+.ports-section-bar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.ports-section-bar[hidden] {
+  display: none;
+}
+
+.ports-section-heading {
+  min-width: 0;
 }
 
 .ports-section-title {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   font-family: var(--font-display);
-  font-size: 20px;
+  font-size: 21px;
   font-weight: 700;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   color: var(--text-strong);
 }
 
 .ports-section-description {
-  margin: 0 0 12px;
-  font-size: 14px;
+  margin: 0;
+  font-size: 13.5px;
   color: var(--text-secondary);
 }
 
+/* Ports Grid & Spotlight Card */
 #port-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(360px, 100%), 1fr));
-  gap: 16px;
-  margin-top: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
   width: 100%;
   min-width: 0;
+}
+
+#port-list .games-using-app-full {
+  grid-column: 1 / -1;
 }
 
 .port-card {
@@ -147,21 +257,66 @@
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
+}
+
+.port-card:hover {
+  border-color: var(--border-strong);
+}
+
+.port-card.is-spotlight {
+  border-color: var(--border-strong);
+  background:
+    radial-gradient(circle at top right, rgba(245, 196, 81, 0.08), transparent 52%),
+    var(--surface-1);
+}
+
+html[data-theme="light"] .port-card.is-spotlight {
+  background:
+    radial-gradient(circle at top right, rgba(180, 83, 9, 0.06), transparent 52%),
+    var(--surface-1);
+}
+
+@media (min-width: 780px) {
+  #port-list.has-spotlight-full > .port-card:first-child {
+    grid-column: 1 / -1;
+  }
 }
 
 .port-top {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 6px;
-  margin: -14px -16px 0;
-  padding: 12px 16px 10px;
-  background: var(--surface-2);
-  border-bottom: 1px solid var(--border-medium);
-  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  gap: 4px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.port-top-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.port-spotlight-kicker {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.port-spotlight-kicker.is-gold {
+  color: var(--gold);
 }
 
 .port-title {
+  flex: 1 1 auto;
   margin: 0;
   min-width: 0;
   max-width: 100%;
@@ -169,6 +324,7 @@
   font-family: var(--font-display);
   font-size: 17px;
   font-weight: 700;
+  line-height: 1.25;
   letter-spacing: -0.01em;
   color: var(--text-strong);
 }
@@ -176,13 +332,13 @@
 .port-details {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px 12px;
+  gap: 7px 14px;
 }
 
 .port-detail {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
   min-width: 0;
 }
 
@@ -211,13 +367,33 @@ a.port-detail-value {
   text-underline-offset: 3px;
 }
 
+.port-inputs-icons {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 19px;
+}
+
+.port-input-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-strong);
+  transition: color 0.16s ease;
+}
+
+.port-input-icon:hover {
+  color: var(--accent);
+}
+
 .port-notes {
-  padding-top: 8px;
+  padding-top: 10px;
   border-top: 1px solid var(--border-subtle);
 }
 
 .port-notes-label {
-  margin-bottom: 2px;
+  margin-bottom: 4px;
+  font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -228,12 +404,13 @@ a.port-detail-value {
   margin: 0;
   font-size: 13.5px;
   color: var(--text-main);
-  line-height: 1.45;
+  line-height: 1.5;
   white-space: pre-line;
 }
 
 .port-link-row {
   margin-top: auto;
+  padding-top: 4px;
   display: flex;
   align-items: stretch;
   gap: 8px;
@@ -248,7 +425,7 @@ a.port-detail-value {
   min-height: 44px;
   padding: 10px 18px;
   background: var(--cta-bg);
-  color: #fff;
+  color: #ffffff;
   border-radius: var(--radius-sm);
   font-family: var(--font-display);
   font-size: 14px;
@@ -258,6 +435,7 @@ a.port-detail-value {
 
 .port-link:hover {
   background: var(--cta-hover);
+  color: #ffffff;
 }
 
 .port-report-link-trigger {
@@ -290,13 +468,25 @@ a.port-detail-value {
   color: #fde68a;
 }
 
+html[data-theme="light"] .port-report-link-button {
+  background: rgba(202, 138, 4, 0.12);
+  border-color: rgba(161, 98, 7, 0.45);
+  color: #854d0e;
+}
+
+html[data-theme="light"] .port-report-link-button:hover {
+  background: rgba(202, 138, 4, 0.22);
+  border-color: #a16207;
+  color: #713f12;
+}
+
 .port-report-link-popover {
   position: absolute;
   z-index: 26;
   bottom: calc(100% + 10px);
   right: 0;
   width: 260px;
-  max-width: min(260px, calc(100vw - 40px));
+  max-width: min(260px, calc(100vw - 44px));
   padding: 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
@@ -305,6 +495,7 @@ a.port-detail-value {
 }
 
 .port-empty {
+  grid-column: 1 / -1;
   color: var(--text-secondary);
 }
 
@@ -312,16 +503,24 @@ a.port-detail-value {
 .port-rating {
   position: relative;
   display: flex;
+  flex-direction: row;
   align-items: center;
-  gap: 7px;
-  width: 100%;
-  flex-shrink: 0;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.port-rating-summary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-height: 22px;
 }
 
 .port-rating-stars {
   display: inline-flex;
   color: var(--gold);
-  font-size: 17px;
+  font-size: 16px;
   white-space: nowrap;
 }
 
@@ -343,7 +542,7 @@ a.port-detail-value {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-strong);
   white-space: nowrap;
 }
@@ -360,7 +559,6 @@ a.port-detail-value {
   position: relative;
   display: inline-flex;
   flex: 0 0 auto;
-  margin-left: auto;
 }
 
 .port-rating-trigger.is-open::after {
@@ -378,6 +576,7 @@ a.port-detail-value {
 }
 
 .port-rating-button {
+  min-height: 36px;
   border: 1px solid #4ade80;
   background: #16a34a;
   color: #ffffff;
@@ -404,7 +603,7 @@ a.port-detail-value {
   top: calc(100% + 10px);
   right: 0;
   width: 260px;
-  max-width: min(260px, calc(100vw - 40px));
+  max-width: min(260px, calc(100vw - 44px));
   padding: 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
@@ -431,8 +630,9 @@ a.port-detail-value {
   justify-content: space-between;
   align-items: center;
   width: 100%;
+  min-height: 38px;
   margin-top: 6px;
-  padding: 9px 10px;
+  padding: 8px 10px;
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: var(--surface-1);
@@ -464,12 +664,13 @@ a.port-detail-value {
 .port-rating-submit {
   display: block;
   width: 100%;
+  min-height: 40px;
   margin-top: 11px;
   padding: 9px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: var(--cta-bg);
-  color: #fff;
+  color: #ffffff;
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
@@ -498,10 +699,17 @@ a.port-detail-value {
   color: var(--accent);
 }
 
-/* Port Device Compatibility (Works? Yes/No + Strict Phone Model) */
+/* Integrated Port Compatibility Telemetry Sub-Panel */
+.port-compat-separator {
+  margin: 14px 0 12px;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
 .port-compat {
-  padding-top: 8px;
-  border-top: 1px solid var(--border-subtle);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .port-compat-bar {
@@ -509,18 +717,21 @@ a.port-detail-value {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
+  gap: 8px 12px;
 }
 
 .port-compat-summary-group {
-  display: inline-flex;
+  display: flex;
+  flex: 1 1 160px;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 8px;
+  gap: 2px 8px;
   min-width: 0;
 }
 
 .port-compat-title {
-  font-size: 11px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
   font-weight: 700;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -544,8 +755,8 @@ a.port-detail-value {
 .port-compat-meter {
   display: flex;
   width: 100%;
-  height: 7px;
-  margin-top: 8px;
+  height: 8px;
+  margin-top: 9px;
   border-radius: 999px;
   overflow: hidden;
   background: var(--surface-3);
@@ -553,32 +764,75 @@ a.port-detail-value {
 }
 
 .port-compat-meter.is-empty {
-  opacity: 0.72;
+  position: relative;
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    rgba(255, 255, 255, 0.05) 6px 12px
+  );
+  border: 1px dashed var(--border-medium);
 }
 
-.port-compat-meter-yes {
-  height: 100%;
-  width: 50%;
-  background: var(--accent);
-  transition: width 320ms var(--ease-out);
+
+html[data-theme="light"] .port-compat-meter.is-empty {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 6px,
+    rgba(17, 34, 27, 0.06) 6px 12px
+  );
 }
 
-.port-compat-meter-no {
+
+
+.port-compat-meter-segment {
   height: 100%;
-  width: 50%;
-  background: #f87171;
-  transition: width 320ms var(--ease-out);
+  width: 0%;
+}
+
+.port-compat-meter-segment.is-playable-60 {
+  background: #16a34a;
+}
+
+.port-compat-meter-segment.is-playable-30 {
+  background: #86efac;
+}
+
+.port-compat-meter-segment.is-low-fps {
+  background: #facc15;
+}
+
+.port-compat-meter-segment.is-crash {
+  background: #ef4444;
+}
+
+html[data-theme="light"] .port-compat-meter-segment.is-playable-60 {
+  background: #15803d;
+}
+
+html[data-theme="light"] .port-compat-meter-segment.is-playable-30 {
+  background: #4ade80;
+}
+
+html[data-theme="light"] .port-compat-meter-segment.is-low-fps {
+  background: #eab308;
+}
+
+html[data-theme="light"] .port-compat-meter-segment.is-crash {
+  background: #dc2626;
 }
 
 .port-compat-actions {
   display: inline-flex;
+  flex: 0 0 auto;
   align-items: center;
   gap: 6px;
+  margin-left: auto;
 }
 
 .port-compat-toggle {
+  min-height: 34px;
   border: 1px solid var(--border-medium);
-  background: transparent;
+  background: var(--surface-1);
   color: var(--text-secondary);
   border-radius: 7px;
   padding: 5px 10px;
@@ -598,6 +852,7 @@ a.port-detail-value {
 }
 
 .port-compat-button {
+  min-height: 34px;
   border: 1px solid #4ade80;
   background: #16a34a;
   color: #ffffff;
@@ -628,50 +883,90 @@ a.port-detail-value {
   z-index: 25;
   top: calc(100% + 10px);
   right: 0;
-  width: 290px;
-  max-width: min(290px, calc(100vw - 40px));
+  width: 316px;
+  max-width: min(316px, calc(100vw - 44px));
   padding: 14px;
   background: var(--surface-2);
   border: 1px solid var(--border-strong);
   border-radius: 10px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  box-shadow: var(--shadow-popover);
 }
 
-.port-compat-binary {
+.port-compat-tiers {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
 
 .port-compat-choice {
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 8px 8px;
   border: 1px solid var(--border-subtle);
   border-radius: 7px;
   background: var(--surface-1);
   color: var(--text-strong);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
   cursor: pointer;
   transition:
     border-color var(--duration-fast) var(--ease-out),
-    background-color var(--duration-fast) var(--ease-out);
+    background-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out);
 }
 
 .port-compat-choice:hover {
   background: var(--surface-3);
 }
 
-.port-compat-choice.selected.is-yes {
-  border-color: var(--accent);
-  background: rgba(16, 185, 129, 0.14);
-  color: var(--accent);
+.port-compat-choice.selected.is-playable-60 {
+  border-color: #16a34a;
+  background: rgba(22, 163, 74, 0.2);
+  color: #4ade80;
 }
 
-.port-compat-choice.selected.is-no {
-  border-color: var(--error-text);
-  background: rgba(248, 113, 113, 0.14);
-  color: var(--error-text);
+html[data-theme="light"] .port-compat-choice.selected.is-playable-60 {
+  border-color: #15803d;
+  background: rgba(21, 128, 61, 0.14);
+  color: #15803d;
+}
+
+.port-compat-choice.selected.is-playable-30 {
+  border-color: #86efac;
+  background: rgba(134, 239, 172, 0.14);
+  color: #86efac;
+}
+
+html[data-theme="light"] .port-compat-choice.selected.is-playable-30 {
+  border-color: #4ade80;
+  background: rgba(74, 222, 128, 0.18);
+  color: #16a34a;
+}
+
+.port-compat-choice.selected.is-low-fps {
+  border-color: #facc15;
+  background: rgba(250, 204, 21, 0.16);
+  color: #facc15;
+}
+
+html[data-theme="light"] .port-compat-choice.selected.is-low-fps {
+  border-color: #eab308;
+  background: rgba(234, 179, 8, 0.16);
+  color: #a16207;
+}
+
+.port-compat-choice.selected.is-crash {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.16);
+  color: #f87171;
+}
+
+html[data-theme="light"] .port-compat-choice.selected.is-crash {
+  border-color: #dc2626;
+  background: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
 }
 
 .port-device-field {
@@ -689,6 +984,7 @@ a.port-detail-value {
 
 .port-device-input {
   width: 100%;
+  min-height: 38px;
   padding: 8px 10px;
   border: 1px solid var(--border-medium);
   border-radius: 7px;
@@ -768,7 +1064,7 @@ a.port-detail-value {
   flex-direction: column;
   gap: 6px;
   padding: 10px 12px;
-  background: var(--surface-2);
+  background: var(--surface-1);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
 }
@@ -801,43 +1097,91 @@ a.port-detail-value {
   font-family: var(--font-mono);
   font-size: 11px;
   font-weight: 600;
+  white-space: nowrap;
 }
 
-.port-compat-status.is-yes {
-  color: var(--accent);
+.port-compat-status.is-playable-60 {
+  color: #22c55e;
 }
 
-.port-compat-status.is-no {
-  color: var(--error-text);
+html[data-theme="light"] .port-compat-status.is-playable-60 {
+  color: #15803d;
 }
 
-@media (max-width: 720px) {
+.port-compat-status.is-playable-30 {
+  color: #86efac;
+}
+
+html[data-theme="light"] .port-compat-status.is-playable-30 {
+  color: #16a34a;
+}
+
+.port-compat-status.is-low-fps {
+  color: #facc15;
+}
+
+html[data-theme="light"] .port-compat-status.is-low-fps {
+  color: #a16207;
+}
+
+.port-compat-status.is-crash {
+  color: #f87171;
+}
+
+html[data-theme="light"] .port-compat-status.is-crash {
+  color: #dc2626;
+}
+
+@media (max-width: 780px) {
   #port-list {
     grid-template-columns: 1fr;
   }
+}
 
-  .game-summary-card {
-    gap: 14px;
-    padding: 16px;
+@media (max-width: 720px) {
+  .game-summary-card,
+  .game-hero {
+    gap: 16px;
+    padding: 18px;
+    margin-bottom: 22px;
   }
 
   .game-summary-top {
-    gap: 16px;
+    grid-template-columns: 96px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "cover header"
+      "body body";
+    gap: 14px 16px;
   }
 
-  .game-summary-cover {
+  .game-hero-media {
     width: 96px;
-    max-height: 180px;
   }
 
+  .game-summary-title {
+    margin-bottom: 6px;
+  }
+
+  .port-card {
+    padding: 14px;
+  }
+}
+
+@media (max-width: 560px) {
   .port-details {
-    grid-template-columns: 1fr;
+    gap: 7px 10px;
   }
 }
 
 @media (max-width: 480px) {
+
   .port-rating {
     gap: 5px;
+  }
+
+  .port-rating-summary {
+    gap: 4px;
   }
 
   .port-rating-stars {
@@ -852,8 +1196,14 @@ a.port-detail-value {
     font-size: 10px;
   }
 
+  .port-rating-button,
+  .port-compat-button,
+  .port-compat-toggle {
+    min-height: 40px;
+  }
+
   .port-rating-button {
-    padding: 5px 8px;
+    padding: 6px 10px;
   }
 
   .port-rating-popover {

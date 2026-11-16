@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Adcash AutoTag -->
+    <!-- Google AdSense -->
+    <script async
+        src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-6826586907052847"
+        crossorigin="anonymous">
+    </script>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#11221b">
+
+    <meta
+        name="description"
+        content="Search Android devices or SoCs to explore community-submitted compatibility reports across native Android game ports."
+    >
+
+    <title>Check Compatibility — NAPL</title>
+    <link rel="canonical" href="https://fe2rr.github.io/Napl-prueba/compatibility.html">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Outfit:wght@600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
+        rel="stylesheet"
+    >
+
+    <script>
+        (function () {
+            try {
+                var saved = localStorage.getItem("napl_theme_v1");
+                document.documentElement.setAttribute(
+                    "data-theme",
+                    saved === "light" ? "light" : "dark"
+                );
+            } catch (e) {
+                document.documentElement.setAttribute("data-theme", "dark");
+            }
+        })();
+    </script>
+
+    <link rel="stylesheet" href="assets/css/main.css?v=8">
+    <link rel="stylesheet" href="assets/css/components.css?v=11">
+    <link rel="stylesheet" href="assets/css/loading.css?v=7">
+    <link rel="stylesheet" href="assets/css/compatibility.css?v=6">
+    <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
+    <!-- Google Tag Manager -->
+    <script>
+        (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
+        new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],
+        j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src=
+        'https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);
+        })(window,document,'script','dataLayer','GTM-NZQ3K53L');
+    </script>
+    <!-- End Google Tag Manager -->
+</head>
+
+<body class="compatibility-page">
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-NZQ3K53L"
+    height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+<header>
+    <button
+        id="menu-button"
+        type="button"
+        aria-label="Open menu"
+        aria-controls="side-menu"
+        aria-expanded="false"
+    >
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <line x1="4" y1="7" x2="20" y2="7"/>
+            <line x1="4" y1="12" x2="20" y2="12"/>
+            <line x1="4" y1="17" x2="20" y2="17"/>
+        </svg>
+    </button>
+
+    <h1 id="home-button" role="button" tabindex="0">NAPL</h1>
+
+    <div class="header-actions">
+        <button
+            id="theme-toggle"
+            type="button"
+            aria-label="Cambiar a modo oscuro"
+            aria-pressed="true"
+        ></button>
+        <button
+            id="search-button"
+            type="button"
+            aria-label="Open search"
+            aria-controls="search-container"
+            aria-expanded="false"
+        >
+            <svg xmlns="http://www.w3.org/2000/svg" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <circle cx="11" cy="11" r="8"/>
+                <path d="m21 21-4.3-4.3"/>
+            </svg>
+        </button>
+    </div>
+</header>
+
+<div id="menu-overlay"></div>
+
+<nav id="side-menu" aria-label="Menu">
+    <div class="side-menu-header">
+        <div class="side-menu-brand">
+            <span class="side-menu-title">NAPL</span>
+            <span class="side-menu-subtitle">Android Port Index</span>
+        </div>
+        <button id="menu-close" type="button" aria-label="Close menu">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                <path d="M18 6 6 18"/>
+                <path d="m6 6 12 12"/>
+            </svg>
+        </button>
+    </div>
+
+    <div class="side-menu-body">
+        <button id="all-games-button" type="button" class="platform-button platform-button-primary">
+            All Games
+        </button>
+        <a
+            id="check-compatibility-link"
+            href="compatibility.html"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="platform-button"
+        >
+            Check Compatibility
+        </a>
+
+        <h2>Categories</h2>
+        <button
+            type="button"
+            class="platform-button"
+            data-category="multi-game-apps"
+        >
+            Multi-Game Apps
+        </button>
+        <button
+            type="button"
+            class="platform-button"
+            data-category="dual-screen"
+        >
+            Dual Screen
+        </button>
+
+        <h2>Platforms</h2>
+        <div id="platform-list"></div>
+    </div>
+</nav>
+
+<main>
+    <div id="search-container" class="search-container" hidden>
+        <input
+            type="search"
+            id="search"
+            placeholder="Search games, ports or developers..."
+            aria-label="Search games"
+            autocomplete="off"
+        >
+        <div id="search-results" class="search-results" hidden></div>
+    </div>
+
+    <div class="compat-top-bar">
+        <button id="back-button" type="button" class="back-button">
+            ← Back to Catalog
+        </button>
+    </div>
+
+    <section class="compat-hero">
+        <h2 class="compat-hero-title">Check Device &amp; SoC Compatibility</h2>
+        <p class="compat-hero-subtitle">
+            Search your Android phone, tablet, handheld, or chipset to inspect which game ports people have tested.
+        </p>
+
+        <div class="compat-advisory" role="note">
+            <p class="compat-advisory-title">Community-submitted reports</p>
+            <p class="compat-advisory-text">
+                Compatibility statuses are submitted by NAPL community members and reflect their tested device, port version, GPU drivers, and Android build. Use them as a practical reference rather than a guarantee.
+            </p>
+        </div>
+    </section>
+
+    <section class="compat-hardware-panel" aria-label="Device or SoC search">
+        <label for="hardware-search-input" class="compat-panel-label">
+            Search by Android device model or commercial SoC
+        </label>
+
+        <form id="hardware-search-form" class="compat-hardware-form" autocomplete="off">
+            <div class="compat-hardware-input-wrap">
+                <input
+                    type="search"
+                    id="hardware-search-input"
+                    class="compat-hardware-input"
+                    placeholder="Type device or SoC (e.g. Poco F5, Odin 2, Snapdragon 8 Gen 2, Helio G99)"
+                    aria-label="Search device model or SoC"
+                    autocomplete="off"
+                >
+                <div
+                    id="hardware-suggestions"
+                    class="compat-hardware-suggestions"
+                    hidden
+                ></div>
+            </div>
+            <button type="submit" id="hardware-search-submit" class="compat-hardware-submit">
+                Search
+            </button>
+        </form>
+
+        <div id="hardware-active-bar" class="compat-active-bar" hidden>
+            <div class="compat-active-info">
+                <span id="hardware-active-label" class="compat-active-label"></span>
+                <span id="hardware-active-meta" class="compat-active-meta"></span>
+            </div>
+            <div class="compat-active-actions">
+                <button
+                    type="button"
+                    id="hardware-clear-button"
+                    class="compat-clear-button"
+                >
+                    Clear
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <section id="results-toolbar" class="compat-results-toolbar" hidden>
+        <div class="compat-filter-row">
+            <input
+                type="search"
+                id="results-filter-input"
+                class="compat-filter-input"
+                placeholder="Filter tested games, port projects, developers, or platforms..."
+                aria-label="Filter compatibility results"
+                autocomplete="off"
+            >
+            <div class="compat-sort-controls">
+                <div class="compat-sort-group" role="group" aria-label="Sort results">
+                    <button type="button" class="compat-sort-option active" data-sort="best">
+                        Best Playability
+                    </button>
+                    <button type="button" class="compat-sort-option" data-sort="reports">
+                        Most Reports
+                    </button>
+                    <button type="button" class="compat-sort-option" data-sort="recent">
+                        Recently Tested
+                    </button>
+                    <button type="button" class="compat-sort-option" data-sort="name">
+                        A–Z
+                    </button>
+                </div>
+                <button
+                    type="button"
+                    id="compat-sort-direction"
+                    class="compat-sort-direction"
+                    aria-label="Toggle sort direction"
+                >
+                    ↓
+                </button>
+            </div>
+        </div>
+
+        <div class="compat-status-filters" role="group" aria-label="Filter by performance status">
+            <button type="button" class="compat-status-filter active" data-status="all">
+                All tiers
+            </button>
+            <button type="button" class="compat-status-filter" data-status="playable_60">
+                Playable (60fps)
+            </button>
+            <button type="button" class="compat-status-filter" data-status="playable_30">
+                Playable (30fps)
+            </button>
+            <button type="button" class="compat-status-filter" data-status="low_fps">
+                Boots (low FPS)
+            </button>
+            <button type="button" class="compat-status-filter" data-status="crash">
+                Doesn't boot / Crash
+            </button>
+        </div>
+    </section>
+
+    <div id="compat-status" class="compat-status-line" role="status" aria-live="polite"></div>
+
+    <section id="compat-empty-prompt" class="compat-empty-prompt">
+        <p class="compat-empty-title">Select a chipset or device to start</p>
+        <p class="compat-empty-description">
+            Jump in with a common processor or handheld below, or type any Android phone, tablet, or SoC above.
+        </p>
+        <div id="compat-quick-presets" class="compat-quick-presets"></div>
+    </section>
+
+    <div id="compat-results" class="compat-results" hidden></div>
+</main>
+
+<footer>
+    <p>Native Android Port List</p>
+</footer>
+
+<script type="module" src="js/pages/compatibility.js"></script>
+</body>
+</html>
