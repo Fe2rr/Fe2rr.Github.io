@@ -223,7 +223,10 @@ export function initNavigation(options = {}) {
                         const target = new URL(returnPath, window.location.href);
                         if (
                             target.origin === window.location.origin &&
-                            target.pathname.endsWith("/index.html")
+                            (
+                                target.pathname.endsWith("/index.html") ||
+                                target.pathname.endsWith("/compatibility.html")
+                            )
                         ) {
                             window.location.href = target.href;
                             return;
