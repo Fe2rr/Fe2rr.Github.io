@@ -5,7 +5,11 @@
  * All rating styles live in assets/css/game.css (no CSS injected in JS).
  */
 
-import { restoreDescriptionLineBreaks } from "../core/helpers.js";
+import {
+    restoreDescriptionLineBreaks,
+    normalizeDeveloperName,
+    getDeveloperGameCounts,
+} from "../core/helpers.js";
 import {
     isMultiGameApp,
     isMultiGameAppPort,
@@ -968,7 +972,7 @@ function createSupportedInputsValue(rawValue) {
     return wrapper;
 }
 
-function createPortDetail(label, value, url = "") {
+function createPortDetail(label, value, url = "", linkOptions = null) {
     const detail = document.createElement("div");
     detail.className = "port-detail";
 
@@ -982,20 +986,32 @@ function createPortDetail(label, value, url = "") {
     }
 
     const textValue = String(value ?? "").trim() || "-";
-    const hasUrl =
-        textValue !== "-" &&
-        /^https?:\/\/\S+$/i.test(String(url || "").trim());
+    const trimmedUrl = String(url || "").trim();
+    const isExternalUrl = /^https?:\/\/\S+$/i.test(trimmedUrl);
+    const isInternalHref = Boolean(linkOptions?.internal && trimmedUrl);
+    const hasUrl = textValue !== "-" && (isExternalUrl || isInternalHref);
     const valueElement = hasUrl
         ? document.createElement("a")
         : document.createElement("div");
 
     valueElement.className = "port-detail-value";
+    if (linkOptions?.className && hasUrl) {
+        valueElement.classList.add(linkOptions.className);
+    }
     valueElement.textContent = textValue;
 
     if (hasUrl) {
-        valueElement.href = url;
-        valueElement.target = "_blank";
-        valueElement.rel = "noopener noreferrer";
+        valueElement.href = trimmedUrl;
+        if (isExternalUrl && !linkOptions?.internal) {
+            valueElement.target = "_blank";
+            valueElement.rel = "noopener noreferrer";
+        }
+        if (linkOptions?.title) {
+            valueElement.title = linkOptions.title;
+        }
+        if (linkOptions?.ariaLabel) {
+            valueElement.setAttribute("aria-label", linkOptions.ariaLabel);
+        }
     }
 
     detail.append(labelElement, valueElement);
@@ -1597,6 +1613,7 @@ function displayPortCard(
         spotlightLabel = "",
         onRatingUpdated = null,
         onCompatibilityUpdated = null,
+        developerCounts = null,
     } = options;
 
     const card = document.createElement("article");
@@ -1641,17 +1658,35 @@ function displayPortCard(
 
     const lastUpdateDisplay = formatShortDateDisplay(port.lastUpdate);
     const supportedInputsValue = createSupportedInputsValue(port.controller);
+    const devDisplay = String(port.developer || "").trim();
+    const devKey = normalizeDeveloperName(devDisplay);
+    const devGameCount =
+        devKey && developerCounts ? developerCounts.get(devKey) || 0 : 0;
+    const devUrl =
+        devGameCount > 1
+            ? `index.html?dev=${encodeURIComponent(devDisplay)}`
+            : "";
+    const devLinkOptions =
+        devGameCount > 1
+            ? {
+                  internal: true,
+                  className: "port-detail-dev-link",
+                  title: `View all ${devGameCount} games by ${devDisplay}`,
+                  ariaLabel: `View all ${devGameCount} games by ${devDisplay}`,
+              }
+            : null;
+
     const fields = [
-        ["Port type", port.platform, ""],
-        ["Developer", port.developer, ""],
-        ["Version", port.version, ""],
-        ["Last update", lastUpdateDisplay, ""],
-        ["Supported inputs", supportedInputsValue, ""],
-        ["Need game files?", port.files, port.dataUrl],
+        ["Port type", port.platform, "", null],
+        ["Developer", port.developer, devUrl, devLinkOptions],
+        ["Version", port.version, "", null],
+        ["Last update", lastUpdateDisplay, "", null],
+        ["Supported inputs", supportedInputsValue, "", null],
+        ["Need game files?", port.files, port.dataUrl, null],
     ];
 
-    for (const [label, value, url] of fields) {
-        const detail = createPortDetail(label, value, url);
+    for (const [label, value, url, linkOptions] of fields) {
+        const detail = createPortDetail(label, value, url, linkOptions);
         if (detail) details.appendChild(detail);
     }
 
@@ -1945,6 +1980,8 @@ export function displayGame(
             sortedPorts.length === 1 || sortedPorts.length >= 3
         );
 
+        const developerCounts = getDeveloperGameCounts(allRows);
+
         sortedPorts.forEach(({ port, rating }, index) => {
             const isTopPort = index === 0 && sortedPorts.length > 1;
             const hasRating = (Number(rating?.votes) || 0) > 0;
@@ -1966,6 +2003,7 @@ export function displayGame(
                     {
                         isSpotlight: isTopPort,
                         spotlightLabel,
+                        developerCounts,
                     }
                 )
             );

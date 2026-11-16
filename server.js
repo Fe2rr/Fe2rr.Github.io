@@ -372,9 +372,14 @@ app.post('/api/visit', async (req, res) => {
 
 app.use(
   express.static(path.join(__dirname, 'public'), {
+    etag: false,
+    lastModified: false,
     setHeaders(res, filePath) {
       if (/\.(html|css|js)$/i.test(filePath)) {
-        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+        res.setHeader('Surrogate-Control', 'no-store');
       }
     },
   })

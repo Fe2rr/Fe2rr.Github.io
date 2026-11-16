@@ -11,9 +11,8 @@ import { createSlug } from "../core/helpers.js";
 const POPULAR_URL =
     "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
 
-const allTimePopular = new Map();
-let allTimePopularLoaded = false;
-let allTimePopularPromise = null;
+const popularByPeriod = new Map();
+const popularPromises = new Map();
 let callbackSequence = 0;
 
 /**
@@ -83,40 +82,56 @@ export async function fetchPopularPeriod(period = "week") {
     return requestPopular(period);
 }
 
-export async function ensureAllTimePopular() {
-    if (allTimePopularLoaded) {
-        return allTimePopular;
+export async function ensurePopularPeriod(period = "alltime") {
+    const normalizedPeriod = String(period || "alltime").trim().toLowerCase();
+    if (popularByPeriod.has(normalizedPeriod)) {
+        return popularByPeriod.get(normalizedPeriod);
     }
 
-    if (allTimePopularPromise) {
-        return allTimePopularPromise;
+    if (popularPromises.has(normalizedPeriod)) {
+        return popularPromises.get(normalizedPeriod);
     }
 
-    allTimePopularPromise = fetchPopularPeriod("alltime")
+    const promise = fetchPopularPeriod(normalizedPeriod)
         .then((items) => {
-            allTimePopular.clear();
+            const periodMap = new Map();
 
             for (const item of items) {
-                const key = createSlug(item.game || item.slug || "");
-                if (!key) continue;
-
-                allTimePopular.set(key, Number(item.visits) || 0);
+                const visits = Number(item.visits) || 0;
+                const apiSlug = createSlug(item.slug || "");
+                const gameSlug = createSlug(item.game || "");
+                if (apiSlug) {
+                    periodMap.set(apiSlug, Math.max(periodMap.get(apiSlug) || 0, visits));
+                }
+                if (gameSlug) {
+                    periodMap.set(gameSlug, Math.max(periodMap.get(gameSlug) || 0, visits));
+                }
             }
 
-            allTimePopularLoaded = true;
-            return allTimePopular;
+            popularByPeriod.set(normalizedPeriod, periodMap);
+            return periodMap;
         })
         .catch((error) => {
-            console.warn("Could not load All Time popularity:", error);
-            return allTimePopular;
+            console.warn(`Could not load ${normalizedPeriod} popularity:`, error);
+            return new Map();
         })
         .finally(() => {
-            allTimePopularPromise = null;
+            popularPromises.delete(normalizedPeriod);
         });
 
-    return allTimePopularPromise;
+    popularPromises.set(normalizedPeriod, promise);
+    return promise;
+}
+
+export function getPopularVisits(slug, period = "alltime") {
+    const normalizedPeriod = String(period || "alltime").trim().toLowerCase();
+    return popularByPeriod.get(normalizedPeriod)?.get(slug) || 0;
+}
+
+export async function ensureAllTimePopular() {
+    return ensurePopularPeriod("alltime");
 }
 
 export function getAllTimeVisits(slug) {
-    return allTimePopular.get(slug) || 0;
+    return getPopularVisits(slug, "alltime");
 }

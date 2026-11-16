@@ -13,7 +13,7 @@ import {
     loadGameCompatibility,
     createCompatibilityActions,
 } from "../services/compatibility.js";
-import { initNavigation } from "../components/navigation.js";
+import { initNavigation } from "../components/navigation.js?v=17";
 import { initSearch } from "../components/search.js";
 import { initThemeToggle } from "../components/theme.js";
 import { renderGameDetailSkeletons } from "../components/loading.js";

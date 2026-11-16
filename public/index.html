@@ -63,10 +63,10 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="assets/css/main.css?v=8">
+    <link rel="stylesheet" href="assets/css/main.css?v=11">
     <link rel="stylesheet" href="assets/css/components.css?v=13">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
-    <link rel="stylesheet" href="assets/css/home.css?v=10">
+    <link rel="stylesheet" href="assets/css/home.css?v=15">
     <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
     <!-- Google Tag Manager -->
     <script>
@@ -246,42 +246,110 @@
         </aside>
     </div>
 
-    <nav id="home-tabs" class="home-tabs" aria-label="Home sections">
-        <button
-            type="button"
-            class="home-tab active"
-            data-section="last-added"
-            aria-selected="true"
+    <div id="category-controls" class="category-controls">
+        <input
+            type="search"
+            id="category-search"
+            placeholder="Search..."
+            aria-label="Search games in catalog"
+            autocomplete="off"
         >
-            Last Added
-        </button>
-        <button
-            type="button"
-            class="home-tab"
-            data-section="popular"
-            aria-selected="false"
-        >
-            Popular
-        </button>
-        <button
-            type="button"
-            class="home-tab"
-            data-section="last-updated"
-            aria-selected="false"
-        >
-            Last Updated
-        </button>
-    </nav>
 
-    <section id="last-added-section" class="home-section">
-        <div id="last-added-list" class="home-list"></div>
-        <button id="last-added-more" type="button" class="view-more-button" hidden>
-            View more
-        </button>
-    </section>
+        <div id="category-filters" class="category-filters">
+            <label class="category-filter-field" for="filter-platform">
+                <span class="category-filter-label">Platform</span>
+                <span class="category-filter-select-wrap">
+                    <select id="filter-platform" class="category-filter-select" aria-label="Filter by platform">
+                        <option value="">All Platforms</option>
+                    </select>
+                    <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </span>
+            </label>
 
-    <section id="popular-section" class="home-section" hidden>
-        <div class="home-section-header">
+            <label class="category-filter-field" for="filter-genre">
+                <span class="category-filter-label">Genre</span>
+                <span class="category-filter-select-wrap">
+                    <select id="filter-genre" class="category-filter-select" aria-label="Filter by genre">
+                        <option value="">All Genres</option>
+                    </select>
+                    <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </span>
+            </label>
+
+            <label class="category-filter-field" for="filter-developer">
+                <span class="category-filter-label">Developer</span>
+                <span class="category-filter-select-wrap">
+                    <select id="filter-developer" class="category-filter-select" aria-label="Filter by developer">
+                        <option value="">All Developers</option>
+                    </select>
+                    <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </span>
+            </label>
+
+            <button
+                type="button"
+                id="active-filter-clear"
+                class="category-filters-clear"
+                aria-label="Clear active filters"
+                hidden
+            >
+                Clear filters
+            </button>
+        </div>
+
+        <div class="category-sort-row">
+            <div class="category-sort" role="group" aria-label="Sort games">
+                <button
+                    type="button"
+                    class="category-sort-option active"
+                    data-sort="added"
+                    aria-label="Sort by last added"
+                >
+                    Added
+                </button>
+                <button
+                    type="button"
+                    class="category-sort-option"
+                    data-sort="updated"
+                    aria-label="Sort by last updated"
+                >
+                    Updated
+                </button>
+                <button
+                    type="button"
+                    class="category-sort-option"
+                    data-sort="popular"
+                    aria-label="Sort by popular"
+                >
+                    Popular
+                </button>
+                <button
+                    type="button"
+                    class="category-sort-option"
+                    data-sort="name"
+                    aria-label="Sort alphabetically"
+                >
+                    A–Z
+                </button>
+            </div>
+
+            <button
+                type="button"
+                id="category-sort-direction"
+                class="category-sort-direction"
+                aria-label="Toggle sort direction"
+            >
+                ↓
+            </button>
+        </div>
+
+        <div id="popular-period-row" class="popular-period-row" hidden>
             <div class="popular-tabs" role="group" aria-label="Popular period">
                 <button
                     type="button"
@@ -309,66 +377,15 @@
                 </button>
             </div>
         </div>
-        <div id="popular-list" class="home-list"></div>
-        <button id="popular-more" type="button" class="view-more-button" hidden>
-            View more
-        </button>
-    </section>
-
-    <section id="last-updated-section" class="home-section" hidden>
-        <div id="last-updated-list" class="home-list"></div>
-        <button id="last-updated-more" type="button" class="view-more-button" hidden>
-            View more
-        </button>
-    </section>
-
-    <div id="category-controls" class="category-controls" hidden>
-        <input
-            type="search"
-            id="category-search"
-            placeholder="Filter this list..."
-            aria-label="Filter games in category"
-            autocomplete="off"
-        >
-
-        <div class="category-sort-row">
-            <div class="category-sort" role="group" aria-label="Sort games">
-                <button
-                    type="button"
-                    class="category-sort-option active"
-                    data-sort="updated"
-                >
-                    Updated
-                </button>
-                <button
-                    type="button"
-                    class="category-sort-option"
-                    data-sort="name"
-                >
-                    A–Z
-                </button>
-                <button
-                    type="button"
-                    class="category-sort-option"
-                    data-sort="popular"
-                >
-                    Popular
-                </button>
-            </div>
-
-            <button
-                type="button"
-                id="category-sort-direction"
-                class="category-sort-direction"
-                aria-label="Toggle sort direction"
-            >
-                ↓
-            </button>
-        </div>
     </div>
 
     <div id="status" role="status" aria-live="polite"></div>
-    <div id="game-list" class="game-list" hidden></div>
+    <div id="game-list" class="game-list"></div>
+    <div id="show-more-container" class="show-more-container" hidden>
+        <button type="button" id="show-more-button" class="view-more-button">
+            Show more
+        </button>
+    </div>
 
 
 </main>
@@ -377,6 +394,6 @@
     <p>Native Android Port List</p>
 </footer>
 
-<script type="module" src="js/pages/home.js"></script>
+<script type="module" src="js/pages/home.js?v=19"></script>
 </body>
 </html>

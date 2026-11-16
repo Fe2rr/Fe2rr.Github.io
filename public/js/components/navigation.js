@@ -13,8 +13,13 @@ export function getPlatformGroup(platform) {
         return "Others";
     }
 
-    if (normalized.includes("playstation")) {
-        return "PlayStation";
+    if (
+        normalized.includes("playstation") ||
+        normalized.includes("sony") ||
+        /\bps[1-5p]\b/.test(normalized) ||
+        normalized.includes("vita")
+    ) {
+        return "Sony";
     }
 
     if (normalized.startsWith("xbox")) {
@@ -80,6 +85,8 @@ export function initNavigation(options = {}) {
     const homeButton = document.getElementById("home-button");
     const backButton = document.getElementById("back-button");
 
+    let openGroups = new Set();
+
     checkCompatibilityLink?.addEventListener("click", closeMenu);
 
     function openMenu() {
@@ -100,37 +107,26 @@ export function initNavigation(options = {}) {
         menuButton?.setAttribute("aria-expanded", "false");
     }
 
-    function addMenuSeparator(title) {
-        if (!platformList) return;
-        const separator = document.createElement("div");
-        separator.className = "menu-separator";
-        separator.textContent = `── ${title} ──`;
-        platformList.appendChild(separator);
-    }
-
-    function addMenuItem(label, href, onClick) {
-        if (!platformList) return;
-
+    function createPlatformMenuItem(label, href, onClick) {
         if (isSubPage) {
             const link = document.createElement("a");
-            link.className = "platform-button";
+            link.className = "platform-button platform-sub-button";
             link.href = href;
             link.textContent = label;
             link.addEventListener("click", closeMenu);
-            platformList.appendChild(link);
-            return;
+            return link;
         }
 
         const button = document.createElement("button");
         button.type = "button";
-        button.className = "platform-button";
+        button.className = "platform-button platform-sub-button";
         button.textContent = label;
         button.addEventListener("click", () => {
             onActionResetSearch?.();
             onClick?.();
             closeMenu();
         });
-        platformList.appendChild(button);
+        return button;
     }
 
     function renderPlatforms(platformOrder, loadedGames) {
@@ -139,7 +135,7 @@ export function initNavigation(options = {}) {
         platformList.replaceChildren();
 
         const platforms = getUniquePlatforms(platformOrder, loadedGames);
-        const groupOrder = ["Nintendo", "PlayStation", "Xbox", "Others"];
+        const groupOrder = ["Nintendo", "Sony", "Xbox", "Others"];
         const grouped = new Map(groupOrder.map((group) => [group, []]));
 
         for (const platform of platforms) {
@@ -151,27 +147,88 @@ export function initNavigation(options = {}) {
             grouped.get(group).push(platform);
         }
 
-        for (const group of groupOrder) {
-            const entries = grouped.get(group);
-            if (!entries || entries.length === 0) continue;
+        const populatedGroups = groupOrder.filter(
+            (group) => (grouped.get(group) || []).length > 0
+        );
 
-            addMenuSeparator(group);
-
-            for (const platform of entries) {
-                addMenuItem(
-                    platform,
-                    `index.html?platform=${encodeURIComponent(platform)}`,
-                    () => onSelectPlatform?.(platform)
-                );
-            }
-        }
-
-        if (platforms.length === 0) {
+        if (populatedGroups.length === 0) {
             const msg = document.createElement("div");
             msg.className = "menu-separator";
             msg.textContent = "No platforms available";
             platformList.appendChild(msg);
+            return;
         }
+
+        // If the page loaded with ?platform=..., open its group automatically.
+        const urlPlatform = new URLSearchParams(window.location.search).get("platform");
+        if (urlPlatform) {
+            const urlGroup = getPlatformGroup(normalizePlatformLabel(urlPlatform));
+            if (populatedGroups.includes(urlGroup)) {
+                openGroups.add(urlGroup);
+            }
+        }
+
+        const fragment = document.createDocumentFragment();
+
+        for (const group of populatedGroups) {
+            const entries = grouped.get(group) || [];
+            const slug = group.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+            const panelId = `platform-group-panel-${slug}`;
+            const isOpen = openGroups.has(group);
+
+            const groupEl = document.createElement("div");
+            groupEl.className = `platform-group${isOpen ? " is-open" : ""}`;
+
+            const toggle = document.createElement("button");
+            toggle.type = "button";
+            toggle.className = "platform-group-toggle";
+            toggle.setAttribute("aria-expanded", String(isOpen));
+            toggle.setAttribute("aria-controls", panelId);
+
+            const labelSpan = document.createElement("span");
+            labelSpan.className = "platform-group-label";
+            labelSpan.textContent = group;
+
+            const arrowSpan = document.createElement("span");
+            arrowSpan.className = "platform-group-arrow";
+            arrowSpan.setAttribute("aria-hidden", "true");
+            arrowSpan.innerHTML =
+                '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>';
+
+            toggle.append(labelSpan, arrowSpan);
+
+            const panel = document.createElement("div");
+            panel.id = panelId;
+            panel.className = "platform-group-panel";
+            panel.hidden = !isOpen;
+
+            for (const platform of entries) {
+                panel.appendChild(
+                    createPlatformMenuItem(
+                        platform,
+                        `index.html?platform=${encodeURIComponent(platform)}`,
+                        () => onSelectPlatform?.(platform)
+                    )
+                );
+            }
+
+            toggle.addEventListener("click", () => {
+                const nextOpen = panel.hidden;
+                if (nextOpen) {
+                    openGroups.add(group);
+                } else {
+                    openGroups.delete(group);
+                }
+                groupEl.classList.toggle("is-open", nextOpen);
+                toggle.setAttribute("aria-expanded", String(nextOpen));
+                panel.hidden = !nextOpen;
+            });
+
+            groupEl.append(toggle, panel);
+            fragment.appendChild(groupEl);
+        }
+
+        platformList.appendChild(fragment);
     }
 
     menuButton?.addEventListener("click", () => {
@@ -242,7 +299,7 @@ export function initNavigation(options = {}) {
                     return;
                 }
 
-                window.location.href = "index.html?view=all-games";
+                window.location.href = "index.html";
             }
         });
     }
@@ -256,7 +313,7 @@ export function initNavigation(options = {}) {
     } else if (allGamesButton && isSubPage) {
         allGamesButton.addEventListener("click", () => {
             closeMenu();
-            window.location.href = "index.html?view=all-games";
+            window.location.href = "index.html";
         });
     }
 
