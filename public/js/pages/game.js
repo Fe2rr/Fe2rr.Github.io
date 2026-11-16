@@ -28,6 +28,7 @@ const navController = initNavigation({
 
 async function loadSelectedGame() {
     const gameHeader = document.getElementById("game-header");
+    const portsHeader = document.getElementById("ports-header");
     const portList = document.getElementById("port-list");
     const status = document.getElementById("status");
 
@@ -41,6 +42,7 @@ async function loadSelectedGame() {
 
     if (requestedSlug) {
         status.textContent = "";
+        if (portsHeader) portsHeader.hidden = true;
         renderGameDetailSkeletons(gameHeader, portList, 2);
     }
 
@@ -50,6 +52,7 @@ async function loadSelectedGame() {
         navController.renderPlatforms(catalog.platformOrder, catalog.games);
 
         if (!requestedSlug) {
+            if (portsHeader) portsHeader.hidden = true;
             gameHeader.textContent = "No game selected.";
             status.textContent = "Return to the list and select a game.";
             portList.replaceChildren();
@@ -60,6 +63,7 @@ async function loadSelectedGame() {
         const game = catalog.games.find((item) => item.slug === targetSlug);
 
         if (!game) {
+            if (portsHeader) portsHeader.hidden = true;
             gameHeader.textContent = "Game not found.";
             status.textContent =
                 "This game could not be found in the spreadsheet.";
@@ -93,6 +97,7 @@ async function loadSelectedGame() {
         );
     } catch (error) {
         console.error("NAPL: could not load selected game.", error);
+        if (portsHeader) portsHeader.hidden = true;
         navController.setPlatformError(
             "Could not load platforms. Please try again later."
         );
