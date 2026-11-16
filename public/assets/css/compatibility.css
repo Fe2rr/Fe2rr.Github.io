@@ -857,10 +857,6 @@ html[data-theme="light"] .compat-report-status.is-crash {
 }
 
 @media (max-width: 720px) {
-  .compat-hardware-form {
-    flex-direction: column;
-  }
-
   .compat-game-header {
     flex-direction: column;
     align-items: flex-start;
