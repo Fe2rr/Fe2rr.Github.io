@@ -78,6 +78,17 @@ function closeReportLinkPopover(container) {
     container.classList.remove("is-open");
 }
 
+function closeSharePopover(container) {
+    if (!container) return;
+
+    const popover = container.querySelector(".game-share-popover");
+    const button = container.querySelector(".game-share-button");
+
+    if (popover) popover.hidden = true;
+    if (button) button.setAttribute("aria-expanded", "false");
+    container.classList.remove("is-open");
+}
+
 function initializeRatingPopoverEvents() {
     if (ratingPopoverEventsInitialized) return;
     ratingPopoverEventsInitialized = true;
@@ -107,6 +118,13 @@ function initializeRatingPopoverEvents() {
                     closeReportLinkPopover(container);
                 }
             });
+
+        const clickedShare = event.target.closest(".game-share-trigger");
+        document.querySelectorAll(".game-share-trigger").forEach((container) => {
+            if (container !== clickedShare) {
+                closeSharePopover(container);
+            }
+        });
     });
 
     document.addEventListener("keydown", (event) => {
@@ -122,6 +140,9 @@ function initializeRatingPopoverEvents() {
             .forEach((container) => {
                 closeReportLinkPopover(container);
             });
+        document.querySelectorAll(".game-share-trigger").forEach((container) => {
+            closeSharePopover(container);
+        });
     });
 }
 
@@ -425,6 +446,9 @@ function createPortCompatibility(
 
     const bar = document.createElement("div");
     bar.className = "port-compat-bar";
+
+    const mainGroup = document.createElement("div");
+    mainGroup.className = "port-compat-main";
 
     const summaryGroup = document.createElement("div");
     summaryGroup.className = "port-compat-summary-group";
@@ -851,9 +875,10 @@ function createPortCompatibility(
         await ensureDevicesLoaded();
     });
 
+    mainGroup.append(summaryGroup, meter);
     actionsGroup.append(toggleListButton, trigger);
-    bar.append(summaryGroup, actionsGroup);
-    container.append(bar, meter, listElement);
+    bar.append(mainGroup, actionsGroup);
+    container.append(bar, listElement);
 
     renderCompatibilitySummary(summary);
     return container;
@@ -1055,6 +1080,422 @@ function createCoverFallback(gameName) {
     return fallback;
 }
 
+function createShareSvg(kind) {
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", "0 0 24 24");
+    svg.setAttribute("aria-hidden", "true");
+
+    if (kind === "share") {
+        svg.setAttribute("width", "16");
+        svg.setAttribute("height", "16");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "2");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+
+        const circles = [
+            { cx: "18", cy: "5", r: "3" },
+            { cx: "6", cy: "12", r: "3" },
+            { cx: "18", cy: "19", r: "3" },
+        ];
+        for (const attrs of circles) {
+            const circle = document.createElementNS(svgNS, "circle");
+            for (const [k, v] of Object.entries(attrs)) circle.setAttribute(k, v);
+            svg.appendChild(circle);
+        }
+
+        const lines = [
+            { x1: "8.59", y1: "13.51", x2: "15.42", y2: "17.49" },
+            { x1: "15.41", y1: "6.51", x2: "8.59", y2: "10.49" },
+        ];
+        for (const attrs of lines) {
+            const line = document.createElementNS(svgNS, "line");
+            for (const [k, v] of Object.entries(attrs)) line.setAttribute(k, v);
+            svg.appendChild(line);
+        }
+        return svg;
+    }
+
+    if (kind === "close") {
+        svg.setAttribute("width", "14");
+        svg.setAttribute("height", "14");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "2.2");
+        svg.setAttribute("stroke-linecap", "round");
+        const lines = [
+            { x1: "18", y1: "6", x2: "6", y2: "18" },
+            { x1: "6", y1: "6", x2: "18", y2: "18" },
+        ];
+        for (const attrs of lines) {
+            const line = document.createElementNS(svgNS, "line");
+            for (const [k, v] of Object.entries(attrs)) line.setAttribute(k, v);
+            svg.appendChild(line);
+        }
+        return svg;
+    }
+
+    if (kind === "check") {
+        svg.setAttribute("width", "14");
+        svg.setAttribute("height", "14");
+        svg.setAttribute("fill", "none");
+        svg.setAttribute("stroke", "currentColor");
+        svg.setAttribute("stroke-width", "2.4");
+        svg.setAttribute("stroke-linecap", "round");
+        svg.setAttribute("stroke-linejoin", "round");
+
+        const polyline = document.createElementNS(svgNS, "polyline");
+        polyline.setAttribute("points", "20 6 9 17 4 12");
+        svg.appendChild(polyline);
+        return svg;
+    }
+
+    if (kind === "whatsapp") {
+        svg.setAttribute("width", "24");
+        svg.setAttribute("height", "24");
+        svg.setAttribute("fill", "currentColor");
+        const path = document.createElementNS(svgNS, "path");
+        path.setAttribute("fill-rule", "evenodd");
+        path.setAttribute("clip-rule", "evenodd");
+        path.setAttribute(
+            "d",
+            "M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413Z"
+        );
+        svg.appendChild(path);
+        return svg;
+    }
+
+    if (kind === "reddit") {
+        svg.setAttribute("width", "28");
+        svg.setAttribute("height", "28");
+
+        const stem = document.createElementNS(svgNS, "path");
+        stem.setAttribute("d", "M12 9.2L13.4 4.3L16.7 5.0");
+        stem.setAttribute("fill", "none");
+        stem.setAttribute("stroke", "#ffffff");
+        stem.setAttribute("stroke-width", "1.6");
+        stem.setAttribute("stroke-linecap", "round");
+        stem.setAttribute("stroke-linejoin", "round");
+
+        const tip = document.createElementNS(svgNS, "circle");
+        tip.setAttribute("cx", "18.2");
+        tip.setAttribute("cy", "5.2");
+        tip.setAttribute("r", "1.7");
+        tip.setAttribute("fill", "#ffffff");
+
+        const leftEar = document.createElementNS(svgNS, "circle");
+        leftEar.setAttribute("cx", "4.8");
+        leftEar.setAttribute("cy", "12.6");
+        leftEar.setAttribute("r", "2.1");
+        leftEar.setAttribute("fill", "#ffffff");
+
+        const rightEar = document.createElementNS(svgNS, "circle");
+        rightEar.setAttribute("cx", "19.2");
+        rightEar.setAttribute("cy", "12.6");
+        rightEar.setAttribute("r", "2.1");
+        rightEar.setAttribute("fill", "#ffffff");
+
+        const head = document.createElementNS(svgNS, "ellipse");
+        head.setAttribute("cx", "12");
+        head.setAttribute("cy", "14.2");
+        head.setAttribute("rx", "7.6");
+        head.setAttribute("ry", "5.6");
+        head.setAttribute("fill", "#ffffff");
+
+        const leftEye = document.createElementNS(svgNS, "circle");
+        leftEye.setAttribute("cx", "9.1");
+        leftEye.setAttribute("cy", "13.5");
+        leftEye.setAttribute("r", "1.25");
+        leftEye.setAttribute("fill", "#ff4500");
+
+        const rightEye = document.createElementNS(svgNS, "circle");
+        rightEye.setAttribute("cx", "14.9");
+        rightEye.setAttribute("cy", "13.5");
+        rightEye.setAttribute("r", "1.25");
+        rightEye.setAttribute("fill", "#ff4500");
+
+        const smile = document.createElementNS(svgNS, "path");
+        smile.setAttribute("d", "M8.8 16.3c1.4 1.3 5.0 1.3 6.4 0");
+        smile.setAttribute("fill", "none");
+        smile.setAttribute("stroke", "#ff4500");
+        smile.setAttribute("stroke-width", "1.35");
+        smile.setAttribute("stroke-linecap", "round");
+
+        svg.append(stem, tip, leftEar, rightEar, head, leftEye, rightEye, smile);
+        return svg;
+    }
+
+    if (kind === "x") {
+        svg.setAttribute("width", "20");
+        svg.setAttribute("height", "20");
+        svg.setAttribute("fill", "currentColor");
+        const path = document.createElementNS(svgNS, "path");
+        path.setAttribute(
+            "d",
+            "M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"
+        );
+        svg.appendChild(path);
+        return svg;
+    }
+
+    // Facebook official flush-bottom white 'f' mark inside #1877F2 circle
+    svg.setAttribute("width", "44");
+    svg.setAttribute("height", "44");
+    svg.setAttribute("fill", "currentColor");
+    const path = document.createElementNS(svgNS, "path");
+    path.setAttribute(
+        "d",
+        "M13.5 24v-9.4h3.15l.47-3.65H13.5V8.62c0-1.06.29-1.78 1.81-1.78h1.93V3.57c-.33-.04-1.48-.14-2.81-.14-2.78 0-4.68 1.7-4.68 4.81v2.71H6.6v3.65h3.15V24h3.75z"
+    );
+    svg.appendChild(path);
+    return svg;
+}
+
+async function copyTextToClipboard(text) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch {
+            // Fall through to execCommand fallback
+        }
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    textarea.style.pointerEvents = "none";
+    document.body.appendChild(textarea);
+    textarea.select();
+
+    let copied = false;
+    try {
+        copied = document.execCommand("copy");
+    } catch {
+        copied = false;
+    } finally {
+        textarea.remove();
+    }
+    return copied;
+}
+
+let activeShareToastTimer = null;
+let activeShareToastRemoveTimer = null;
+
+function showShareToast(message) {
+    let toast = document.getElementById("napl-share-toast");
+    if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "napl-share-toast";
+        toast.className = "game-share-toast";
+        toast.setAttribute("role", "status");
+        toast.setAttribute("aria-live", "polite");
+        document.body.appendChild(toast);
+    }
+
+    if (activeShareToastTimer) clearTimeout(activeShareToastTimer);
+    if (activeShareToastRemoveTimer) clearTimeout(activeShareToastRemoveTimer);
+
+    toast.replaceChildren(createShareSvg("check"));
+    const label = document.createElement("span");
+    label.textContent = message;
+    toast.appendChild(label);
+
+    toast.classList.remove("is-visible");
+    void toast.offsetWidth;
+    toast.classList.add("is-visible");
+
+    activeShareToastTimer = setTimeout(() => {
+        toast.classList.remove("is-visible");
+        activeShareToastTimer = null;
+        activeShareToastRemoveTimer = setTimeout(() => {
+            toast.remove();
+            activeShareToastRemoveTimer = null;
+        }, 220);
+    }, 2200);
+}
+
+function createGameShareControl(game) {
+    initializeRatingPopoverEvents();
+
+    const shareUrl = new URL("game.html", window.location.href);
+    if (game?.slug) {
+        shareUrl.searchParams.set("game", game.slug);
+    } else {
+        const currentSlug = new URLSearchParams(window.location.search).get("game");
+        if (currentSlug) shareUrl.searchParams.set("game", currentSlug);
+    }
+
+    const canonicalUrl = shareUrl.href;
+    const shareTitle = `${game.name} — NAPL`;
+    const shareText = `Check out ${game.name} native Android ports on NAPL`;
+
+    const trigger = document.createElement("div");
+    trigger.className = "game-share-trigger";
+
+    const shareButton = document.createElement("button");
+    shareButton.type = "button";
+    shareButton.className = "game-share-button";
+    shareButton.title = "Share";
+    shareButton.setAttribute("aria-label", `Share ${game.name}`);
+    shareButton.setAttribute("aria-expanded", "false");
+    shareButton.setAttribute("aria-haspopup", "dialog");
+    shareButton.appendChild(createShareSvg("share"));
+
+    const popover = document.createElement("div");
+    popover.className = "game-share-popover";
+    popover.hidden = true;
+    popover.setAttribute("role", "dialog");
+    popover.setAttribute("aria-label", `Share ${game.name}`);
+
+    const popHead = document.createElement("div");
+    popHead.className = "game-share-popover-head";
+
+    const popTitle = document.createElement("h4");
+    popTitle.className = "game-share-popover-title";
+    popTitle.textContent = "Share";
+
+    const closeButton = document.createElement("button");
+    closeButton.type = "button";
+    closeButton.className = "game-share-close";
+    closeButton.setAttribute("aria-label", "Close share menu");
+    closeButton.appendChild(createShareSvg("close"));
+    closeButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        closeSharePopover(trigger);
+        shareButton.focus();
+    });
+
+    popHead.append(popTitle, closeButton);
+
+    const platformsGrid = document.createElement("div");
+    platformsGrid.className = "game-share-platforms";
+
+    const platforms = [
+        {
+            id: "whatsapp",
+            label: "WhatsApp",
+            href: `https://api.whatsapp.com/send?text=${encodeURIComponent(`${shareText} ${canonicalUrl}`)}`,
+        },
+        {
+            id: "reddit",
+            label: "Reddit",
+            href: `https://www.reddit.com/submit?url=${encodeURIComponent(canonicalUrl)}&title=${encodeURIComponent(shareTitle)}`,
+        },
+        {
+            id: "x",
+            label: "X",
+            href: `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(canonicalUrl)}`,
+        },
+        {
+            id: "facebook",
+            label: "Facebook",
+            href: `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(canonicalUrl)}`,
+        },
+    ];
+
+    for (const platform of platforms) {
+        const anchor = document.createElement("a");
+        anchor.className = `game-share-platform is-${platform.id}`;
+        anchor.href = platform.href;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        anchor.setAttribute("aria-label", `Share on ${platform.label}`);
+
+        const iconBox = document.createElement("span");
+        iconBox.className = "game-share-platform-icon";
+        iconBox.appendChild(createShareSvg(platform.id));
+
+        const label = document.createElement("span");
+        label.className = "game-share-platform-label";
+        label.textContent = platform.label;
+
+        anchor.append(iconBox, label);
+        platformsGrid.appendChild(anchor);
+    }
+
+    const copyBox = document.createElement("div");
+    copyBox.className = "game-share-copy-box";
+
+    const urlInput = document.createElement("input");
+    urlInput.type = "text";
+    urlInput.readOnly = true;
+    urlInput.className = "game-share-url-input";
+    urlInput.value = canonicalUrl;
+    urlInput.setAttribute("aria-label", "Direct game link");
+    urlInput.addEventListener("click", () => {
+        urlInput.select();
+    });
+
+    const copyButton = document.createElement("button");
+    copyButton.type = "button";
+    copyButton.className = "game-share-copy-btn";
+    copyButton.textContent = "Copy Link";
+
+    let resetTimer = null;
+    copyButton.addEventListener("click", async () => {
+        const copied = await copyTextToClipboard(canonicalUrl);
+        if (!copied) {
+            urlInput.select();
+            return;
+        }
+
+        if (resetTimer) clearTimeout(resetTimer);
+        copyBox.classList.add("is-copied");
+        copyButton.classList.add("is-copied");
+        const copiedLabel = document.createElement("span");
+        copiedLabel.textContent = "Copied!";
+        copyButton.replaceChildren(createShareSvg("check"), copiedLabel);
+        showShareToast("Link Copied!");
+
+        resetTimer = setTimeout(() => {
+            copyBox.classList.remove("is-copied");
+            copyButton.classList.remove("is-copied");
+            copyButton.textContent = "Copy Link";
+            resetTimer = null;
+        }, 1800);
+    });
+
+    copyBox.append(urlInput, copyButton);
+    popover.append(popHead, platformsGrid, copyBox);
+    trigger.append(shareButton, popover);
+
+    shareButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+
+        if (!popover.hidden) {
+            closeSharePopover(trigger);
+            return;
+        }
+
+        document.querySelectorAll(".port-rating").forEach((other) => {
+            closeRatingPopover(other);
+        });
+        document.querySelectorAll(".port-compat").forEach((other) => {
+            closeCompatibilityPopover(other);
+        });
+        document
+            .querySelectorAll(".port-report-link-trigger")
+            .forEach((other) => {
+                closeReportLinkPopover(other);
+            });
+
+        popover.hidden = false;
+        trigger.classList.add("is-open");
+        shareButton.setAttribute("aria-expanded", "true");
+    });
+
+    popover.addEventListener("click", (event) => {
+        event.stopPropagation();
+    });
+
+    return trigger;
+}
+
 function displayGameSummary(game, parentElement) {
     parentElement.replaceChildren();
     parentElement.className = "game-header game-summary-card game-hero";
@@ -1089,11 +1530,16 @@ function displayGameSummary(game, parentElement) {
     const headerInfo = document.createElement("div");
     headerInfo.className = "game-summary-info";
 
+    const headerTop = document.createElement("div");
+    headerTop.className = "game-summary-head";
+
     const title = document.createElement("h1");
     title.id = "game-title";
     title.className = "game-summary-title";
     title.textContent = game.name;
-    headerInfo.appendChild(title);
+
+    headerTop.append(title, createGameShareControl(game));
+    headerInfo.appendChild(headerTop);
 
     const metadata = document.createElement("div");
     metadata.className = "game-summary-metadata";
