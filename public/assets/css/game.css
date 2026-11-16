@@ -700,6 +700,11 @@ html[data-theme="light"] .port-report-link-button:hover {
 }
 
 /* Integrated Port Compatibility Telemetry Sub-Panel */
+.port-compat-separator {
+  margin: 14px 0 12px;
+  border-top: 1px solid rgba(128, 128, 128, 0.25);
+}
+
 .port-compat {
   padding: 0;
   background: transparent;
