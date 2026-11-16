@@ -64,7 +64,7 @@ const state = {
     selection: null, // { type: 'soc'|'device'|'query', device?: object, soc?: string, query?: string }
     rawReports: [],
     filterQuery: "",
-    statusFilter: "all",
+    statusFilters: new Set(COMPAT_STATUSES.map((status) => status.id)),
     sortBy: "best",
     sortDescending: false,
     loadingReports: false,
@@ -255,7 +255,7 @@ function renderLoadingSkeletons() {
 
 function computeGroupedGames() {
     const query = normalizeText(state.filterQuery);
-    const statusFilter = state.statusFilter;
+    const statusFilters = state.statusFilters;
 
     // Group reports by portId first, filtering by statusFilter if active
     const portGroupsMap = new Map();
@@ -279,7 +279,7 @@ function computeGroupedGames() {
             developer: "",
         };
 
-        if (statusFilter !== "all" && report.status !== statusFilter) {
+        if (!statusFilters.has(report.status)) {
             continue;
         }
 
@@ -911,16 +911,37 @@ sortDirectionBtn?.addEventListener("click", () => {
     renderGroupedResults();
 });
 
+function updateStatusFilterUI() {
+    const allSelected =
+        state.statusFilters.size === COMPAT_STATUSES.length;
+
+    statusFilterBtns.forEach((btn) => {
+        const status = btn.dataset.status || "all";
+        const selected =
+            status === "all"
+                ? allSelected
+                : state.statusFilters.has(status);
+
+        btn.classList.toggle("active", selected);
+        btn.setAttribute("aria-pressed", selected ? "true" : "false");
+    });
+}
+
 statusFilterBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
         const nextStatus = btn.dataset.status || "all";
-        state.statusFilter = nextStatus;
-        statusFilterBtns.forEach((other) => {
-            other.classList.toggle(
-                "active",
-                (other.dataset.status || "all") === nextStatus
+
+        if (nextStatus === "all") {
+            state.statusFilters = new Set(
+                COMPAT_STATUSES.map((status) => status.id)
             );
-        });
+        } else if (state.statusFilters.has(nextStatus)) {
+            state.statusFilters.delete(nextStatus);
+        } else {
+            state.statusFilters.add(nextStatus);
+        }
+
+        updateStatusFilterUI();
         renderGroupedResults();
     });
 });
