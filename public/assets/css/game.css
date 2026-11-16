@@ -701,10 +701,10 @@ html[data-theme="light"] .port-report-link-button:hover {
 
 /* Integrated Port Compatibility Telemetry Sub-Panel */
 .port-compat {
-  padding: 10px 12px;
-  background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
 }
 
 .port-compat-bar {
@@ -768,19 +768,6 @@ html[data-theme="light"] .port-report-link-button:hover {
   border: 1px dashed var(--border-medium);
 }
 
-.port-compat-meter.is-empty::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.12) 50%,
-    transparent 100%
-  );
-  transform: translateX(-100%);
-  animation: port-compat-empty-sweep 2.8s ease-in-out infinite;
-}
 
 html[data-theme="light"] .port-compat-meter.is-empty {
   background: repeating-linear-gradient(
@@ -790,35 +777,11 @@ html[data-theme="light"] .port-compat-meter.is-empty {
   );
 }
 
-html[data-theme="light"] .port-compat-meter.is-empty::after {
-  background: linear-gradient(
-    90deg,
-    transparent 0%,
-    rgba(17, 34, 27, 0.09) 50%,
-    transparent 100%
-  );
-}
 
-@keyframes port-compat-empty-sweep {
-  0% {
-    transform: translateX(-100%);
-  }
-  65%,
-  100% {
-    transform: translateX(100%);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .port-compat-meter.is-empty::after {
-    animation: none;
-  }
-}
 
 .port-compat-meter-segment {
   height: 100%;
   width: 0%;
-  transition: width 320ms var(--ease-out);
 }
 
 .port-compat-meter-segment.is-playable-60 {
