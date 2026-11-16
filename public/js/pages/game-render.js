@@ -1213,16 +1213,6 @@ function displayPortCard(
         card.appendChild(details);
     }
 
-    const compatSection = createPortCompatibility(
-        port,
-        compatibility,
-        compatibilityActions,
-        onCompatibilityUpdated
-    );
-    if (compatSection) {
-        card.appendChild(compatSection);
-    }
-
     if (port.notes) {
         const notes = document.createElement("div");
         notes.className = "port-notes";
@@ -1237,6 +1227,16 @@ function displayPortCard(
 
         notes.append(label, text);
         card.appendChild(notes);
+    }
+
+    const compatSection = createPortCompatibility(
+        port,
+        compatibility,
+        compatibilityActions,
+        onCompatibilityUpdated
+    );
+    if (compatSection) {
+        card.appendChild(compatSection);
     }
 
     const portUrl = String(port.url || "").trim();
