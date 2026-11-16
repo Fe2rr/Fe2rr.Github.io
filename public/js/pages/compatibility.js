@@ -390,9 +390,6 @@ function computeGroupedGames() {
             case "reports":
                 diff = b.totalReports - a.totalReports;
                 break;
-            case "recent":
-                diff = b.latestTimestamp - a.latestTimestamp;
-                break;
             case "name":
                 diff = a.game.name.localeCompare(b.game.name, "en", {
                     sensitivity: "base",
