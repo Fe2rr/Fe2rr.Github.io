@@ -20,13 +20,11 @@ The project uses a combination of:
 - React and Vite for the supporting application/tooling.
 - Supabase for backend services and data storage.
 - Lucide for iconography where used.
-- Google Fonts: JetBrains Mono, Outfit, and Plus Jakarta Sans.
 
 ## Credits & acknowledgements
 
 - **Project creator and maintainer:** [Fe2rr](https://github.com/Fe2rr).
 - **Community contributors:** Thanks to everyone who submits port information, ratings, corrections, and device compatibility reports. Community-submitted reports are attributed to their contributors where displayed.
-- **Typography:** [JetBrains Mono](https://fonts.google.com/specimen/JetBrains+Mono), [Outfit](https://fonts.google.com/specimen/Outfit), and [Plus Jakarta Sans](https://fonts.google.com/specimen/Plus+Jakarta+Sans), served through Google Fonts.
 - **Icons:** [Lucide](https://lucide.dev/).
 - **Backend platform:** [Supabase](https://supabase.com/).
 - **Build tooling:** [Vite](https://vite.dev/) and [React](https://react.dev/).
@@ -40,10 +38,6 @@ Game titles, trademarks, logos, and other third-party materials belong to their 
 Compatibility information and performance ratings are submitted by community members and reflect individual configurations and testing conditions. They are provided for reference only and do not guarantee that a game port will work the same way on every device.
 
 If you are a rights holder and have a concern about content displayed on NAPL, please contact the project maintainer through the [GitHub repository](https://github.com/Fe2rr/Fe2rr.github.io).
-
-## Contributing
-
-Contributions that improve port information, compatibility data, ratings, and documentation are welcome. Please use the repository's issue and pull request features to report corrections or propose changes.
 
 ---
 
