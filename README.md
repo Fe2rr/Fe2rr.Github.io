@@ -21,16 +21,6 @@ The project uses a combination of:
 - Supabase for backend services and data storage.
 - Lucide for iconography where used.
 
-## Credits & acknowledgements
-
-- **Project creator and maintainer:** [Fe2rr](https://github.com/Fe2rr).
-- **Community contributors:** Thanks to everyone who submits port information, ratings, corrections, and device compatibility reports. Community-submitted reports are attributed to their contributors where displayed.
-- **Icons:** [Lucide](https://lucide.dev/).
-- **Backend platform:** [Supabase](https://supabase.com/).
-- **Build tooling:** [Vite](https://vite.dev/) and [React](https://react.dev/).
-
-Third-party libraries and services remain the property of their respective authors and are subject to their own terms and licenses. Please refer to their official project pages for details.
-
 ## Content, trademarks, and disclaimer
 
 Game titles, trademarks, logos, and other third-party materials belong to their respective owners. NAPL is an independent community project and is not affiliated with, endorsed by, or sponsored by the game publishers, developers, or platform manufacturers mentioned on the site.
