@@ -10,7 +10,7 @@ import {
     renderErrorBox,
     renderListSkeletons,
 } from "../components/loading.js?v=14";
-import { createCategoryController } from "./categories.js?v=19";
+import { createCategoryController } from "./categories.js?v=20";
 
 initThemeToggle();
 

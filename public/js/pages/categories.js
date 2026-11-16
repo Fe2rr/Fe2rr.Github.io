@@ -53,6 +53,9 @@ export function createCategoryController(state, options = {}) {
     let currentList = [];
     let currentMode = "games";
     let renderedCount = 0;
+    let catalogPlatformOrder = [];
+    let catalogGames = [];
+    let multiGameDevKeys = new Set();
 
     function setSelectToMatchedValue(selectEl, targetValue, normalizer) {
         if (!selectEl) return;
@@ -80,7 +83,73 @@ export function createCategoryController(state, options = {}) {
         selectEl.classList.add("is-active");
     }
 
-    function populateFilterOptions(platformOrder, games) {
+    function gameMatchesFilters(
+        game,
+        {
+            category = state.selectedCategory,
+            platform = "",
+            genre = "",
+            developer = "",
+            query = "",
+        } = {}
+    ) {
+        if (category === "dual-screen" && !isDualScreen(game)) {
+            return false;
+        }
+
+        const devKey = normalizeDeveloperName(developer);
+        const genreKey = normalizeText(genre);
+        const platformKey = normalizePlatformForFilter(platform);
+
+        if (developer && !devKey) return false;
+
+        if (devKey && platformKey) {
+            const hasMatchingPort = (game.ports || []).some(
+                (port) =>
+                    normalizeDeveloperName(port?.developer) === devKey &&
+                    normalizePlatformForFilter(port?.platform) === platformKey
+            );
+            if (!hasMatchingPort) return false;
+        } else if (devKey) {
+            const hasDeveloperPort = (game.ports || []).some(
+                (port) => normalizeDeveloperName(port?.developer) === devKey
+            );
+            if (!hasDeveloperPort) return false;
+        } else if (platformKey) {
+            const hasPlatform =
+                (game.platforms || []).some(
+                    (p) => normalizePlatformForFilter(p) === platformKey
+                ) ||
+                (game.ports || []).some(
+                    (port) =>
+                        normalizePlatformForFilter(port?.platform) === platformKey
+                );
+            if (!hasPlatform) return false;
+        }
+
+        if (genreKey) {
+            const gameGenres = extractGameGenres(game.genre);
+            const hasGenre = gameGenres.some(
+                (g) => normalizeText(g) === genreKey
+            );
+            if (!hasGenre) return false;
+        }
+
+        if (query && !normalizeText(game.name).includes(query)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    function rebuildDynamicFilterOptions() {
+        const games = Array.isArray(catalogGames) ? catalogGames : [];
+        const query = normalizeText(categorySearchInput?.value || "");
+        const selectedDevKey = normalizeDeveloperName(state.selectedDeveloper);
+        const selectedPlatformKey = normalizePlatformForFilter(
+            state.selectedPlatform
+        );
+
         if (platformFilterSelect) {
             platformFilterSelect.replaceChildren();
             const defaultOpt = document.createElement("option");
@@ -88,19 +157,43 @@ export function createCategoryController(state, options = {}) {
             defaultOpt.textContent = "All Platforms";
             platformFilterSelect.appendChild(defaultOpt);
 
+            const gamesForPlatforms = games.filter((game) =>
+                gameMatchesFilters(game, {
+                    category: state.selectedCategory,
+                    genre: state.selectedGenre,
+                    developer: state.selectedDeveloper,
+                    query,
+                })
+            );
+
             const availablePlatforms = new Set();
-            for (const game of games || []) {
-                for (const raw of game?.platforms || []) {
-                    const key = normalizeText(normalizePlatformLabel(raw));
-                    if (key) availablePlatforms.add(key);
+            for (const game of gamesForPlatforms) {
+                if (selectedDevKey) {
+                    for (const port of game?.ports || []) {
+                        if (
+                            normalizeDeveloperName(port?.developer) !==
+                            selectedDevKey
+                        ) {
+                            continue;
+                        }
+                        const key = normalizePlatformForFilter(port?.platform);
+                        if (key) availablePlatforms.add(key);
+                    }
+                } else {
+                    for (const raw of game?.platforms || []) {
+                        const key = normalizePlatformForFilter(raw);
+                        if (key) availablePlatforms.add(key);
+                    }
                 }
             }
 
             const seenPlatforms = new Set();
             const orderedPlatforms = [];
             const sources = [
-                ...(Array.isArray(platformOrder) ? platformOrder : []),
-                ...(games || []).flatMap((g) => g?.platforms || []),
+                ...(Array.isArray(catalogPlatformOrder)
+                    ? catalogPlatformOrder
+                    : []),
+                ...gamesForPlatforms.flatMap((g) => g?.platforms || []),
             ];
 
             for (const raw of sources) {
@@ -134,8 +227,17 @@ export function createCategoryController(state, options = {}) {
             defaultOpt.textContent = "All Genres";
             genreFilterSelect.appendChild(defaultOpt);
 
+            const gamesForGenres = games.filter((game) =>
+                gameMatchesFilters(game, {
+                    category: state.selectedCategory,
+                    platform: state.selectedPlatform,
+                    developer: state.selectedDeveloper,
+                    query,
+                })
+            );
+
             const genreMap = new Map();
-            for (const game of games || []) {
+            for (const game of gamesForGenres) {
                 for (const genre of extractGameGenres(game?.genre)) {
                     const key = normalizeText(genre);
                     if (!key) continue;
@@ -167,15 +269,33 @@ export function createCategoryController(state, options = {}) {
             defaultOpt.textContent = "All Developers";
             developerFilterSelect.appendChild(defaultOpt);
 
+            const gamesForDevs = games.filter((game) =>
+                gameMatchesFilters(game, {
+                    category: state.selectedCategory,
+                    platform: state.selectedPlatform,
+                    genre: state.selectedGenre,
+                    query,
+                })
+            );
+
             const devMap = new Map();
-            for (const game of games || []) {
+            for (const game of gamesForDevs) {
                 const seenInGame = new Set();
                 for (const port of game?.ports || []) {
+                    if (
+                        selectedPlatformKey &&
+                        normalizePlatformForFilter(port?.platform) !==
+                            selectedPlatformKey
+                    ) {
+                        continue;
+                    }
                     const display = String(port?.developer || "")
                         .trim()
                         .replace(/\s+/g, " ");
                     const key = normalizeDeveloperName(display);
-                    if (!key || seenInGame.has(key)) continue;
+                    if (!key || !multiGameDevKeys.has(key) || seenInGame.has(key)) {
+                        continue;
+                    }
                     seenInGame.add(key);
 
                     const entry = devMap.get(key);
@@ -187,11 +307,9 @@ export function createCategoryController(state, options = {}) {
                 }
             }
 
-            const sortedDevs = Array.from(devMap.values())
-                .filter((entry) => entry.count > 1)
-                .sort((a, b) =>
-                    a.label.localeCompare(b.label, "en", { sensitivity: "base" })
-                );
+            const sortedDevs = Array.from(devMap.values()).sort((a, b) =>
+                a.label.localeCompare(b.label, "en", { sensitivity: "base" })
+            );
 
             for (const entry of sortedDevs) {
                 const option = document.createElement("option");
@@ -200,6 +318,28 @@ export function createCategoryController(state, options = {}) {
                 developerFilterSelect.appendChild(option);
             }
         }
+    }
+
+    function populateFilterOptions(platformOrder, games) {
+        catalogPlatformOrder = Array.isArray(platformOrder) ? platformOrder : [];
+        catalogGames = Array.isArray(games) ? games : [];
+
+        const globalDevCounts = new Map();
+        for (const game of catalogGames) {
+            const seenInGame = new Set();
+            for (const port of game?.ports || []) {
+                const key = normalizeDeveloperName(port?.developer);
+                if (!key || seenInGame.has(key)) continue;
+                seenInGame.add(key);
+                globalDevCounts.set(key, (globalDevCounts.get(key) || 0) + 1);
+            }
+        }
+
+        multiGameDevKeys = new Set(
+            Array.from(globalDevCounts.entries())
+                .filter(([, count]) => count > 1)
+                .map(([key]) => key)
+        );
 
         syncFilterControls();
     }
@@ -244,6 +384,10 @@ export function createCategoryController(state, options = {}) {
 
         if (categoryFiltersContainer) {
             categoryFiltersContainer.hidden = isMultiGameAppsView;
+        }
+
+        if (!isMultiGameAppsView && catalogGames.length > 0) {
+            rebuildDynamicFilterOptions();
         }
 
         setSelectToMatchedValue(
@@ -642,44 +786,15 @@ export function createCategoryController(state, options = {}) {
             return;
         }
 
-        const devKey = normalizeDeveloperName(state.selectedDeveloper);
-        const genreKey = normalizeText(state.selectedGenre);
-        const platformKey = normalizePlatformForFilter(state.selectedPlatform);
-
-        const filtered = state.games.filter((game) => {
-            if (state.selectedCategory === "dual-screen" && !isDualScreen(game)) {
-                return false;
-            }
-
-            if (state.selectedDeveloper) {
-                if (!devKey) return false;
-                const hasDeveloperPort = (game.ports || []).some(
-                    (port) => normalizeDeveloperName(port?.developer) === devKey
-                );
-                if (!hasDeveloperPort) return false;
-            }
-
-            if (state.selectedGenre) {
-                const gameGenres = extractGameGenres(game.genre);
-                const hasGenre = gameGenres.some(
-                    (g) => normalizeText(g) === genreKey
-                );
-                if (!hasGenre) return false;
-            }
-
-            if (
-                state.selectedPlatform &&
-                !(game.platforms || []).some(
-                    (platform) =>
-                        normalizePlatformForFilter(platform) === platformKey
-                )
-            ) {
-                return false;
-            }
-
-            if (!query) return true;
-            return normalizeText(game.name).includes(query);
-        });
+        const filtered = state.games.filter((game) =>
+            gameMatchesFilters(game, {
+                category: state.selectedCategory,
+                platform: state.selectedPlatform,
+                genre: state.selectedGenre,
+                developer: state.selectedDeveloper,
+                query,
+            })
+        );
 
         const sortedByQuery = query
             ? filterAndSortByQuery(filtered, (g) => g.name, query)
