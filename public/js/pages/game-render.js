@@ -1236,6 +1236,10 @@ function displayPortCard(
         onCompatibilityUpdated
     );
     if (compatSection) {
+        const separator = document.createElement("div");
+        separator.className = "port-compat-separator";
+        separator.setAttribute("aria-hidden", "true");
+        card.appendChild(separator);
         card.appendChild(compatSection);
     }
 
