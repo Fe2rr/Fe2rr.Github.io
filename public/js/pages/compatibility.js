@@ -15,7 +15,7 @@ import {
     searchHardwareCatalog,
     searchCompatibilityByHardware,
     groupIdenticalCompatReports,
-} from "../services/compatibility.js";
+} from "../services/compatibility.js?v=18";
 import { initNavigation } from "../components/navigation.js?v=17";
 import { initSearch } from "../components/search.js";
 import { initThemeToggle } from "../components/theme.js";
