@@ -249,22 +249,75 @@ export async function loadDevices() {
 
     if (!devicesPromise) {
         devicesPromise = (async () => {
-            const response = await fetch(
-                `${COMPATIBILITY_API_URL}?action=devices&catalog_version=2`,
-                { cache: "no-store" }
-            );
-            if (!response.ok) {
+            // The device catalog is static data. Keep it off Supabase to avoid
+            // invoking the retired action=devices endpoint (HTTP 410).
+            const manifestUrl = new URL("../../assets/data/devices.json", import.meta.url);
+            const manifestResponse = await fetch(manifestUrl, { cache: "default" });
+
+            if (!manifestResponse.ok) {
                 throw new Error(
-                    `Could not load device database (HTTP ${response.status}).`
+                    `Could not load device catalog manifest (HTTP ${manifestResponse.status}).`
                 );
             }
 
-            const payload = await response.json();
-            if (!payload?.success || !Array.isArray(payload.devices)) {
-                throw new Error("Device database returned an invalid format.");
+            const manifest = await manifestResponse.json();
+            if (
+                manifest?.format !== "napl-device-catalog-shards-v1" ||
+                !Number.isInteger(manifest.total) ||
+                !Array.isArray(manifest.chunks) ||
+                manifest.chunks.length === 0
+            ) {
+                throw new Error("Device catalog manifest has an invalid format.");
             }
 
-            devicesCache = payload.devices.map(normalizeDeviceRecord);
+            const chunkNames = new Set();
+            const chunks = await Promise.all(
+                manifest.chunks.map(async (chunk) => {
+                    if (
+                        typeof chunk?.file !== "string" ||
+                        !/^devices-part-\d{3}\.json$/.test(chunk.file) ||
+                        chunkNames.has(chunk.file) ||
+                        !Number.isInteger(chunk.records) ||
+                        chunk.records < 0
+                    ) {
+                        throw new Error("Device catalog manifest contains an invalid shard.");
+                    }
+                    chunkNames.add(chunk.file);
+
+                    const shardUrl = new URL(
+                        `device-catalog/${chunk.file}`,
+                        manifestUrl
+                    );
+                    const response = await fetch(shardUrl, { cache: "default" });
+                    if (!response.ok) {
+                        throw new Error(
+                            `Could not load device catalog shard ${chunk.file} (HTTP ${response.status}).`
+                        );
+                    }
+
+                    const records = await response.json();
+                    if (!Array.isArray(records) || records.length !== chunk.records) {
+                        throw new Error(
+                            `Device catalog shard ${chunk.file} has an invalid record count.`
+                        );
+                    }
+                    return records;
+                })
+            );
+
+            const records = chunks.flat();
+            if (records.length !== manifest.total) {
+                throw new Error(
+                    `Device catalog record count mismatch (expected ${manifest.total}, received ${records.length}).`
+                );
+            }
+
+            const devices = records.map(normalizeDeviceRecord);
+            if (devices.some((device) => !device.id || !device.name)) {
+                throw new Error("Device catalog contains records without an ID or name.");
+            }
+
+            devicesCache = devices;
             return devicesCache;
         })();
     }
