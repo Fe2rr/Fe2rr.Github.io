@@ -280,7 +280,7 @@ export async function loadDevices() {
             const chunks = await Promise.all(
                 manifest.chunks.map(async (chunk) => {
                     const filename = String(chunk?.file || "");
-                    if (!/^devices-part-\\d{3}\\.json$/.test(filename)) {
+                    if (!/^devices-part-\d{3}\.json$/.test(filename)) {
                         throw new Error(
                             `Invalid device catalog filename: ${filename || "(empty)"}.`
                         );
