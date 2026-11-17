@@ -12,7 +12,6 @@ import {
 } from "../core/helpers.js";
 import {
     isMultiGameApp,
-    isMultiGameAppPort,
     findGamesUsingApp,
     createGamesUsingAppSection,
 } from "../components/multi-game-apps.js";
@@ -1864,16 +1863,14 @@ function displayPortCard(
         card.appendChild(linkRow);
     }
 
-    if (isMultiGameAppPort(port, allRows)) {
-        const gamesList = findGamesUsingApp(port.project, allRows);
-        if (gamesList.length > 0) {
-            card.appendChild(
-                createGamesUsingAppSection(
-                    "With this port you can also play:",
-                    gamesList
-                )
-            );
-        }
+    const gamesList = findGamesUsingApp(port.project, allRows);
+    if (gamesList.length > 0) {
+        card.appendChild(
+            createGamesUsingAppSection(
+                "With this port you can also play:",
+                gamesList
+            )
+        );
     }
 
     return card;
