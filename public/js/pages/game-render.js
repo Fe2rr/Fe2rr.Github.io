@@ -7,6 +7,7 @@
 
 import {
     restoreDescriptionLineBreaks,
+    normalizeText,
     normalizeDeveloperName,
     getDeveloperGameCounts,
 } from "../core/helpers.js";
