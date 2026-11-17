@@ -107,7 +107,9 @@ export function getMultiGameApps(games) {
 
             if (
                 normalizedProject === "unofficial port" ||
-                normalizedProject === "android port"
+                normalizedProject === "unofficial ports" ||
+                normalizedProject === "android port" ||
+                normalizedProject === "android ports"
             ) {
                 continue;
             }
