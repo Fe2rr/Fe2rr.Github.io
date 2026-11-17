@@ -1,8 +1,9 @@
 /*
  * NAPL — COMPATIBILITY SERVICE
  *
- * Manages Works? Yes/No reports paired with strict Android device selection
- * from the Supabase devices catalog and compatibility_reports tables.
+ * Manages compatibility reports and Android device selection.
+ * The device catalog is loaded from static, versioned JSON files; Supabase
+ * is used only for compatibility reports, never for device catalog reads.
  */
 
 import {
@@ -249,22 +250,88 @@ export async function loadDevices() {
 
     if (!devicesPromise) {
         devicesPromise = (async () => {
-            const response = await fetch(
-                `${COMPATIBILITY_API_URL}?action=devices&catalog_version=2`,
-                { cache: "no-store" }
+            // Resolve relative to this module so the catalog also works when
+            // V4 is hosted from a GitHub Pages project subpath.
+            const manifestUrl = new URL(
+                "../../assets/data/devices.json",
+                import.meta.url
             );
-            if (!response.ok) {
+            const manifestResponse = await fetch(manifestUrl, {
+                cache: "default",
+            });
+
+            if (!manifestResponse.ok) {
                 throw new Error(
-                    `Could not load device database (HTTP ${response.status}).`
+                    `Could not load device catalog manifest (HTTP ${manifestResponse.status}).`
                 );
             }
 
-            const payload = await response.json();
-            if (!payload?.success || !Array.isArray(payload.devices)) {
-                throw new Error("Device database returned an invalid format.");
+            const manifest = await manifestResponse.json();
+            if (
+                manifest?.format !== "napl-device-catalog-shards-v1" ||
+                !Array.isArray(manifest.chunks) ||
+                manifest.chunks.length === 0
+            ) {
+                throw new Error("Device catalog manifest has an invalid format.");
             }
 
-            devicesCache = payload.devices.map(normalizeDeviceRecord);
+            // Fetch the static JSON shards directly from GitHub Pages.
+            // This path does not call Supabase or consume database egress.
+            const chunks = await Promise.all(
+                manifest.chunks.map(async (chunk) => {
+                    const filename = String(chunk?.file || "");
+                    if (!/^devices-part-\\d{3}\\.json$/.test(filename)) {
+                        throw new Error(
+                            `Invalid device catalog filename: ${filename || "(empty)"}.`
+                        );
+                    }
+
+                    const chunkUrl = new URL(
+                        `../../assets/data/device-catalog/${filename}`,
+                        import.meta.url
+                    );
+                    const response = await fetch(chunkUrl, {
+                        cache: "default",
+                    });
+
+                    if (!response.ok) {
+                        throw new Error(
+                            `Could not load device catalog part ${filename} (HTTP ${response.status}).`
+                        );
+                    }
+
+                    const records = await response.json();
+                    if (
+                        !Array.isArray(records) ||
+                        records.length !== Number(chunk.records)
+                    ) {
+                        throw new Error(
+                            `Device catalog part ${filename} has an invalid record count.`
+                        );
+                    }
+
+                    return records;
+                })
+            );
+
+            const rawDevices = chunks.flat();
+            if (
+                Number.isFinite(Number(manifest.total)) &&
+                rawDevices.length !== Number(manifest.total)
+            ) {
+                throw new Error(
+                    `Device catalog is incomplete (${rawDevices.length}/${manifest.total}).`
+                );
+            }
+
+            devicesCache = rawDevices
+                .map(normalizeDeviceRecord)
+                .filter((device) => device.id && device.name);
+
+            if (devicesCache.length !== rawDevices.length) {
+                throw new Error("Device catalog contains invalid device records.");
+            }
+
             return devicesCache;
         })();
     }
