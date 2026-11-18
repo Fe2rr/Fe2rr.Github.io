@@ -144,6 +144,74 @@ html[data-theme="light"] body {
     #ffffff;
 }
 
+/* Smooth Theme & Cross-Document View Transitions */
+@view-transition {
+  navigation: auto;
+}
+
+::view-transition-old(root) {
+  animation: napl-page-out 170ms var(--ease-out) both;
+}
+
+::view-transition-new(root) {
+  animation: napl-page-in 220ms var(--ease-out) both;
+}
+
+::view-transition-group(napl-hero-cover),
+::view-transition-group(napl-hero-title) {
+  animation-duration: 240ms;
+  animation-timing-function: var(--ease-out);
+}
+
+html.is-radial-theme-transition::view-transition-old(root),
+html.is-radial-theme-transition::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+html.is-radial-theme-transition::view-transition-old(root) {
+  z-index: 1;
+}
+
+html.is-radial-theme-transition::view-transition-new(root) {
+  z-index: 9999;
+}
+
+@keyframes napl-page-out {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes napl-page-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+html.is-theme-transitioning,
+html.is-theme-transitioning *,
+html.is-theme-transitioning *::before,
+html.is-theme-transitioning *::after {
+  transition:
+    background-color 320ms var(--ease-out),
+    border-color 320ms var(--ease-out),
+    color 260ms var(--ease-out),
+    box-shadow 320ms var(--ease-out),
+    fill 260ms var(--ease-out),
+    stroke 260ms var(--ease-out) !important;
+}
+
 button,
 input,
 select,
@@ -233,11 +301,17 @@ header h1,
   cursor: pointer;
   white-space: nowrap;
   user-select: none;
-  transition: color var(--duration-fast) var(--ease-out);
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 #home-button:hover {
   color: var(--accent);
+}
+
+#home-button:active {
+  transform: scale(0.97);
 }
 
 #menu-button,
@@ -254,7 +328,8 @@ header h1,
   transition:
     background-color var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 #menu-button,
@@ -272,12 +347,71 @@ header h1,
   text-transform: uppercase;
 }
 
+#theme-toggle:active {
+  transform: scale(0.95);
+}
+
+#theme-toggle .theme-toggle-icon {
+  display: inline-block;
+  transform-origin: center center;
+  will-change: transform;
+}
+
+#theme-toggle.is-switching .theme-toggle-icon {
+  animation: napl-theme-icon-spin 380ms cubic-bezier(0.22, 1.35, 0.36, 1) both;
+}
+
+#theme-toggle.is-switching .theme-toggle-label {
+  animation: napl-theme-label-fade 240ms var(--ease-out) both;
+}
+
+@keyframes napl-theme-icon-spin {
+  0% {
+    transform: scale(0.65) rotate(-60deg);
+    opacity: 0.4;
+  }
+  55% {
+    transform: scale(1.16) rotate(12deg);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes napl-theme-label-fade {
+  0% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+#menu-button svg,
+#search-button svg {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
 #menu-button:hover,
 #search-button:hover,
 #theme-toggle:hover {
   background: var(--surface-2);
   border-color: var(--border-strong);
   color: var(--accent);
+}
+
+#menu-button:hover svg,
+#search-button:hover svg {
+  transform: scale(1.08);
+}
+
+#menu-button:active,
+#search-button:active {
+  transform: scale(0.94);
 }
 
 @media (max-width: 520px) {
@@ -374,13 +508,18 @@ header h1,
   transition:
     background-color var(--duration-fast) var(--ease-out),
     border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 #menu-close:hover {
   background: var(--surface-3);
   border-color: var(--border-strong);
   color: var(--text-strong);
+}
+
+#menu-close:active {
+  transform: scale(0.93);
 }
 
 .side-menu-body {
@@ -478,8 +617,23 @@ header h1,
   padding: 2px 0 4px 12px;
 }
 
+.platform-group-panel:not([hidden]) {
+  animation: napl-menu-panel-in 170ms var(--ease-out) backwards;
+}
+
 .platform-group-panel[hidden] {
   display: none;
+}
+
+@keyframes napl-menu-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .platform-sub-button {
@@ -510,13 +664,18 @@ header h1,
   transition:
     background-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out),
-    padding-left var(--duration-fast) var(--ease-out);
+    padding-left var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
 }
 
 .platform-button:hover {
   background: var(--surface-2);
   color: var(--accent);
   padding-left: 16px;
+}
+
+.platform-button:active {
+  transform: scale(0.985);
 }
 
 .platform-button-primary {
@@ -572,6 +731,21 @@ footer p {
     transition-duration: 0.01ms !important;
     animation-duration: 0.01ms !important;
     scroll-behavior: auto !important;
+  }
+
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation-duration: 0.01ms !important;
+  }
+
+  #theme-toggle:active,
+  #menu-button:active,
+  #search-button:active,
+  #menu-close:active,
+  #home-button:active,
+  .platform-button:active {
+    transform: none;
   }
 }
 
