@@ -50,10 +50,30 @@ export function isMultiGameAppPort(port, allRows) {
     });
 }
 
-export function findGamesUsingApp(appName, allRows) {
-    const appNameNormalized = normalizeText(appName);
+const NON_UNIQUE_PROJECT_NAMES = new Set([
+    "unofficial port",
+    "unofficial ports",
+    "android port",
+    "android ports",
+]);
 
-    if (!appNameNormalized || !Array.isArray(allRows)) {
+function normalizeProjectKey(projectName) {
+    return normalizeText(projectName).replace(/\s+/g, " ");
+}
+
+export function isNonUniqueProjectName(projectName) {
+    const normalized = normalizeProjectKey(projectName);
+    return NON_UNIQUE_PROJECT_NAMES.has(normalized);
+}
+
+export function findGamesUsingApp(appName, allRows) {
+    const appNameNormalized = normalizeProjectKey(appName);
+
+    if (
+        !appNameNormalized ||
+        isNonUniqueProjectName(appNameNormalized) ||
+        !Array.isArray(allRows)
+    ) {
         return [];
     }
 
@@ -65,7 +85,7 @@ export function findGamesUsingApp(appName, allRows) {
         }
 
         const gameName = String(row.game).trim();
-        const projectName = normalizeText(row.project);
+        const projectName = normalizeProjectKey(row.project);
         const normalizedGameName = normalizeText(gameName);
 
         if (normalizedGameName === appNameNormalized) continue;
@@ -98,19 +118,13 @@ export function getMultiGameApps(games) {
             if (!port) continue;
 
             const projectName = String(port.project ?? "").trim();
-            const normalizedProject = normalizeText(projectName);
 
             const isMarkedAsApp = [
                 "multi-game apps",
                 "multi game apps",
             ].includes(normalizeText(port.platform));
 
-            if (
-                normalizedProject === "unofficial port" ||
-                normalizedProject === "unofficial ports" ||
-                normalizedProject === "android port" ||
-                normalizedProject === "android ports"
-            ) {
+            if (isNonUniqueProjectName(projectName)) {
                 continue;
             }
 
