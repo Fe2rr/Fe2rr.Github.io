@@ -628,7 +628,7 @@ export function createCompatibilityActions() {
             };
         },
 
-        async reportBrokenLink({ portId, reason, url }) {
+        async reportBrokenLink({ portId, reason = "", note = "", url }) {
             const storageKey = "napl_link_report_client_v1";
             let clientId = "";
 
@@ -642,28 +642,60 @@ export function createCompatibilityActions() {
                 clientId = crypto.randomUUID();
             }
 
-            const response = await fetch(REPORT_LINK_API_URL, {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
+            const baseReason = String(reason || "").trim();
+            const cleanNote = String(note || "")
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, 80);
+
+            const combinedReason = cleanNote
+                ? (baseReason
+                      ? `${baseReason} — ${cleanNote}`.slice(0, 120)
+                      : cleanNote.slice(0, 120))
+                : baseReason.slice(0, 120);
+
+            const sendRequest = async (payloadReason) => {
+                const payload = {
                     client_id: clientId,
                     port_id: portId,
-                    reason,
+                    reason: payloadReason,
                     url,
-                }),
-                cache: "no-store",
-            });
+                };
+                if (cleanNote) {
+                    payload.note = cleanNote;
+                }
 
-            const raw = await response.text();
-            let data = {};
-            try {
-                data = raw ? JSON.parse(raw) : {};
-            } catch {
-                throw new Error(
-                    "The report server returned an invalid response."
-                );
+                const response = await fetch(REPORT_LINK_API_URL, {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify(payload),
+                    cache: "no-store",
+                });
+
+                const raw = await response.text();
+                let data = {};
+                try {
+                    data = raw ? JSON.parse(raw) : {};
+                } catch {
+                    throw new Error(
+                        "The report server returned an invalid response."
+                    );
+                }
+
+                return { response, data };
+            };
+
+            let { response, data } = await sendRequest(combinedReason);
+
+            if (
+                (!response.ok || !data.success) &&
+                response.status === 400 &&
+                baseReason &&
+                combinedReason !== baseReason
+            ) {
+                ({ response, data } = await sendRequest(baseReason));
             }
 
             if (!response.ok || !data.success) {
