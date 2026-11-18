@@ -10,6 +10,10 @@
   margin: 0 auto 24px;
 }
 
+.search-container:not([hidden]) {
+  animation: napl-search-reveal 180ms var(--ease-out) backwards;
+}
+
 #search,
 #category-search {
   width: 100%;
@@ -48,6 +52,11 @@
   border-radius: var(--radius-md);
   overflow: hidden;
   box-shadow: var(--shadow-popover);
+  transform-origin: top center;
+}
+
+.search-results:not([hidden]) {
+  animation: napl-search-dropdown-in 160ms var(--ease-out) backwards;
 }
 
 .search-result {
@@ -61,7 +70,13 @@
   border-bottom: 1px solid var(--border-subtle);
   transition:
     background-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
+    color var(--duration-fast) var(--ease-out),
+    padding-left var(--duration-fast) var(--ease-out);
+}
+
+.search-result.is-entering {
+  animation: napl-card-enter 160ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--enter-index, 0), 5) * 16ms);
 }
 
 .search-result:last-child {
@@ -71,6 +86,7 @@
 .search-result:hover {
   background: var(--surface-3);
   color: var(--accent);
+  padding-left: 20px;
 }
 
 /* Game Card — Detailed List */
@@ -94,6 +110,12 @@
     box-shadow var(--duration-fast) var(--ease-out);
 }
 
+.home-game.is-entering,
+.multi-game-app-card.is-entering {
+  animation: napl-card-enter 210ms var(--ease-out) backwards;
+  animation-delay: calc(min(var(--enter-index, 0), 10) * 18ms);
+}
+
 .home-game:hover {
   transform: translateY(-1px);
   background: var(--surface-2);
@@ -101,11 +123,15 @@
   box-shadow: var(--shadow-card-hover);
 }
 
+.home-game:active {
+  transform: scale(0.99);
+}
+
 .home-game-cover-container {
   flex: 0 0 64px;
   width: 64px;
   height: fit-content;
-  min-height: 0;
+  min-height: 88px;
   align-self: center;
   border-radius: var(--radius-sm);
   overflow: hidden;
@@ -114,6 +140,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.home-game-cover-container.is-loaded {
+  min-height: 0;
 }
 
 .home-game-cover-container.cover-unavailable::after {
@@ -133,6 +163,62 @@
   max-height: none;
   aspect-ratio: auto;
   object-fit: contain;
+  transform-origin: center center;
+  transition: transform 220ms var(--ease-out);
+}
+
+.home-game:hover .home-game-cover,
+.home-game:focus-visible .home-game-cover {
+  transform: scale(1.06);
+}
+
+@keyframes napl-card-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes napl-search-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes napl-search-dropdown-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .search-container:not([hidden]),
+  .search-results:not([hidden]),
+  .search-result.is-entering,
+  .home-game.is-entering,
+  .multi-game-app-card.is-entering {
+    animation: none !important;
+  }
+
+  .home-game:hover .home-game-cover,
+  .home-game:focus-visible .home-game-cover,
+  .home-game:active {
+    transform: none;
+  }
 }
 
 .home-game-content {
