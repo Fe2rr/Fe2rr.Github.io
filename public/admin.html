@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="theme-color" content="#102a26">
+  <title>NAPL · Administración</title>
+  <link rel="stylesheet" href="assets/css/admin.css">
+  <script type="module" src="js/admin.js"></script>
+</head>
+<body>
+  <section id="login-view" class="login-shell">
+    <form id="login-form" class="login-card">
+      <div class="brand-mark">NAPL <span>ADMIN</span></div>
+      <h1>Administración del catálogo</h1>
+      <p>Ingresá con la contraseña de administrador.</p>
+      <label for="admin-password">Contraseña</label>
+      <input id="admin-password" type="password" autocomplete="current-password" required>
+      <button class="button primary full" type="submit">Ingresar</button>
+      <p id="login-message" class="message" role="status"></p>
+    </form>
+  </section>
+
+  <main id="admin-view" class="admin-shell" hidden>
+    <header class="topbar">
+      <div class="brand-mark">NAPL <span>ADMIN</span></div>
+      <div class="topbar-state"><span id="state-dot" class="state-dot"></span><span id="save-state">Cargando catálogo…</span></div>
+      <div class="topbar-actions">
+        <button id="import-button" class="button secondary" type="button">Importar CSV</button>
+        <button id="download-button" class="button secondary" type="button">Descargar JSON</button>
+        <button id="publish-button" class="button primary" type="button" disabled>Publicar en GitHub</button>
+        <button id="logout-button" class="button quiet" type="button">Salir</button>
+      </div>
+    </header>
+
+    <div id="notice" class="notice" role="status" hidden></div>
+
+    <div class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-heading">
+          <div><h2>Catálogo</h2><span id="catalog-count">0 juegos</span></div>
+          <button id="new-game-button" class="button primary small" type="button">+ Juego</button>
+        </div>
+        <input id="game-search" class="search-input" type="search" placeholder="Buscar juego o port…" autocomplete="off">
+        <div id="platform-list" class="platform-list"></div>
+      </aside>
+
+      <section class="editor" id="editor">
+        <div id="empty-editor" class="empty-state">
+          <div class="empty-icon">⌘</div>
+          <h2>Seleccioná un juego</h2>
+          <p>Elegí un juego de la lista o creá uno nuevo para empezar a editar.</p>
+        </div>
+        <div id="game-editor" hidden></div>
+      </section>
+    </div>
+  </main>
+</body>
+</html>
