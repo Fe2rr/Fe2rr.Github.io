@@ -6,16 +6,21 @@
  */
 
 import {
+    createSlug,
     restoreDescriptionLineBreaks,
     normalizeText,
     normalizeDeveloperName,
+    normalizeYearValue,
+    extractGameGenres,
     getDeveloperGameCounts,
-} from "../core/helpers.js";
+} from "../core/helpers.js?v=15";
+import { loadCoverImage } from "../core/cover-fallback.js?v=2";
 import {
     isMultiGameApp,
+    isNonUniqueProjectName,
     findGamesUsingApp,
     createGamesUsingAppSection,
-} from "../components/multi-game-apps.js";
+} from "../components/multi-game-apps.js?v=15";
 import {
     COMPAT_STATUSES,
     getCompatStatusMeta,
@@ -26,7 +31,7 @@ import {
     setStoredUserDevice,
     parseDeviceDisplayParts,
     groupIdenticalCompatReports,
-} from "../services/compatibility.js";
+} from "../services/compatibility.js?v=19";
 
 
 let ratingPopoverEventsInitialized = false;
@@ -150,7 +155,14 @@ function initializeRatingPopoverEvents() {
     });
 }
 
-function createRatingStars(average) {
+function triggerStarBurst(element) {
+    if (!element) return;
+    element.classList.remove("is-animating");
+    void element.offsetWidth;
+    element.classList.add("is-animating");
+}
+
+function createRatingStars(average, animate = false) {
     const stars = document.createElement("span");
     stars.className = "port-rating-stars";
     stars.setAttribute("aria-label", `${average.toFixed(1)} out of 5`);
@@ -158,6 +170,7 @@ function createRatingStars(average) {
     for (let i = 1; i <= 5; i++) {
         const star = document.createElement("span");
         star.className = "port-rating-star";
+        star.style.setProperty("--star-index", String(i - 1));
         star.textContent = "★";
 
         const fill = document.createElement("span");
@@ -174,6 +187,10 @@ function createRatingStars(average) {
         stars.appendChild(star);
     }
 
+    if (animate) {
+        triggerStarBurst(stars);
+    }
+
     return stars;
 }
 
@@ -185,6 +202,10 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
 
     const summaryElement = document.createElement("div");
     summaryElement.className = "port-rating-summary";
+    summaryElement.setAttribute("role", "button");
+    summaryElement.tabIndex = 0;
+    summaryElement.title = "Rate this port";
+    summaryElement.setAttribute("aria-label", "Open port rating");
 
     let currentRating = ratings?.[port.portId] || {};
     let starsElement = createRatingStars(Number(currentRating.avg) || 0);
@@ -196,12 +217,12 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
     const countElement = document.createElement("span");
     countElement.className = "port-rating-count";
 
-    function updateRatingDisplay(rating) {
+    function updateRatingDisplay(rating, animate = false) {
         currentRating = rating || {};
         const average = Number(currentRating.avg) || 0;
         const votes = Number(currentRating.votes) || 0;
 
-        const newStars = createRatingStars(votes > 0 ? average : 0);
+        const newStars = createRatingStars(votes > 0 ? average : 0, animate);
         starsElement.replaceWith(newStars);
         starsElement = newStars;
 
@@ -270,10 +291,16 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
             previousRating > 0 ? "Update vote" : "Submit vote";
     }
 
-    function selectRating(score) {
+    function selectRating(score, animate = true) {
         selectedRating = score;
         optionButtons.forEach((button, idx) => {
-            button.classList.toggle("selected", idx + 1 === score);
+            const isMatch = idx + 1 === score;
+            button.classList.toggle("selected", isMatch);
+            if (!isMatch) {
+                button.classList.remove("is-animating");
+            } else if (animate) {
+                triggerStarBurst(button);
+            }
         });
         updateSubmitButton();
         setFeedback(`Selected: ${options[score - 1]}`);
@@ -290,12 +317,19 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
 
         const optionStars = document.createElement("span");
         optionStars.className = "port-rating-option-stars";
-        optionStars.textContent = "★".repeat(score);
+        optionStars.setAttribute("aria-hidden", "true");
+        for (let s = 0; s < score; s++) {
+            const starSpan = document.createElement("span");
+            starSpan.className = "port-rating-option-star";
+            starSpan.style.setProperty("--star-index", String(s));
+            starSpan.textContent = "★";
+            optionStars.appendChild(starSpan);
+        }
 
         option.append(optionLabel, optionStars);
         option.addEventListener("click", () => {
             if (loadingVote || submitting) return;
-            selectRating(score);
+            selectRating(score, true);
         });
 
         optionButtons.push(option);
@@ -378,7 +412,7 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
             previousRating = selectedRating;
 
             if (result?.rating) {
-                updateRatingDisplay(result.rating);
+                updateRatingDisplay(result.rating, true);
                 onRatingUpdated?.(port.portId, result.rating);
             }
 
@@ -411,7 +445,7 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
     trigger.className = "port-rating-trigger";
     trigger.append(rateButton, popover);
 
-    rateButton.addEventListener("click", async (event) => {
+    async function toggleRatingPopover(event) {
         event.stopPropagation();
 
         if (!popover.hidden) {
@@ -429,7 +463,21 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
         trigger.classList.add("is-open");
         rateButton.setAttribute("aria-expanded", "true");
         await loadPreviousVote();
+    }
+
+    summaryElement.addEventListener("click", (event) => {
+        triggerStarBurst(starsElement);
+        toggleRatingPopover(event);
     });
+
+    summaryElement.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        triggerStarBurst(starsElement);
+        toggleRatingPopover(event);
+    });
+
+    rateButton.addEventListener("click", toggleRatingPopover);
 
     container.appendChild(trigger);
     return container;
@@ -1526,19 +1574,14 @@ function displayGameSummary(game, parentElement) {
     if (/^https?:\/\/\S+$/i.test(coverUrl)) {
         const cover = document.createElement("img");
         cover.className = "game-summary-cover";
-        cover.src = coverUrl;
         cover.alt = `${game.name} cover`;
         cover.loading = "eager";
         cover.decoding = "async";
         cover.referrerPolicy = "no-referrer";
-        cover.addEventListener(
-            "error",
-            () => {
-                cover.replaceWith(createCoverFallback(game.name));
-            },
-            { once: true }
-        );
         media.appendChild(cover);
+        loadCoverImage(cover, coverUrl, () => {
+            cover.replaceWith(createCoverFallback(game.name));
+        });
     } else {
         media.appendChild(createCoverFallback(game.name));
     }
@@ -1560,11 +1603,60 @@ function displayGameSummary(game, parentElement) {
     const metadata = document.createElement("div");
     metadata.className = "game-summary-metadata";
 
-    const metaParts = [];
-    if (game.year) metaParts.push({ className: "game-summary-year", text: String(game.year) });
-    if (game.genre) metaParts.push({ className: "game-summary-genre", text: String(game.genre) });
+    const metaNodes = [];
 
-    metaParts.forEach((part, idx) => {
+    if (game.year) {
+        const cleanYear = normalizeYearValue(game.year);
+        if (cleanYear) {
+            const yearLink = document.createElement("a");
+            yearLink.className = "game-summary-year game-summary-meta-link";
+            yearLink.href = `index.html?year=${encodeURIComponent(cleanYear)}`;
+            yearLink.textContent = cleanYear;
+            yearLink.title = `View all games from ${cleanYear}`;
+            yearLink.setAttribute(
+                "aria-label",
+                `Filter games released in ${cleanYear}`
+            );
+            metaNodes.push(yearLink);
+        } else {
+            const yearSpan = document.createElement("span");
+            yearSpan.className = "game-summary-year";
+            yearSpan.textContent = String(game.year);
+            metaNodes.push(yearSpan);
+        }
+    }
+
+    if (game.genre) {
+        const genres = extractGameGenres(game.genre);
+        const genreWrap = document.createElement("span");
+        genreWrap.className = "game-summary-genre";
+
+        if (genres.length > 0) {
+            genres.forEach((genreLabel, idx) => {
+                if (idx > 0) {
+                    genreWrap.appendChild(document.createTextNode(", "));
+                }
+                const genreLink = document.createElement("a");
+                genreLink.className = "game-summary-meta-link";
+                genreLink.href = `index.html?genre=${encodeURIComponent(
+                    genreLabel
+                )}`;
+                genreLink.textContent = genreLabel;
+                genreLink.title = `View all ${genreLabel} games`;
+                genreLink.setAttribute(
+                    "aria-label",
+                    `Filter games by genre ${genreLabel}`
+                );
+                genreWrap.appendChild(genreLink);
+            });
+        } else {
+            genreWrap.textContent = String(game.genre);
+        }
+
+        metaNodes.push(genreWrap);
+    }
+
+    metaNodes.forEach((node, idx) => {
         if (idx > 0) {
             const sep = document.createElement("span");
             sep.className = "game-summary-meta-sep";
@@ -1572,10 +1664,7 @@ function displayGameSummary(game, parentElement) {
             sep.textContent = "·";
             metadata.appendChild(sep);
         }
-        const span = document.createElement("span");
-        span.className = part.className;
-        span.textContent = part.text;
-        metadata.appendChild(span);
+        metadata.appendChild(node);
     });
 
     if (metadata.children.length > 0) {
@@ -1595,6 +1684,12 @@ function displayGameSummary(game, parentElement) {
     }
 
     heroGrid.append(media, headerInfo, heroBody);
+    parentElement.classList.add("is-entering");
+    parentElement.addEventListener(
+        "animationend",
+        () => parentElement.classList.remove("is-entering"),
+        { once: true }
+    );
     parentElement.appendChild(heroGrid);
 }
 
@@ -1771,9 +1866,43 @@ function displayPortCard(
             "Suspicious / broken file",
         ];
 
+        const MAX_REPORT_NOTE_LENGTH = 80;
         let selectedReason = "";
         let sendingReport = false;
         const reasonButtons = [];
+
+        const noteField = document.createElement("div");
+        noteField.className = "port-report-note-field";
+
+        const noteHeader = document.createElement("div");
+        noteHeader.className = "port-report-note-header";
+
+        const noteLabel = document.createElement("label");
+        noteLabel.className = "port-report-note-label";
+        const noteId = `port-report-note-${createSlug(
+            port.portId || port.project || port.game || "link"
+        )}-${Math.random().toString(36).slice(2, 7)}`;
+        noteLabel.htmlFor = noteId;
+        noteLabel.textContent = "Short note (optional)";
+
+        const noteCounter = document.createElement("span");
+        noteCounter.className = "port-report-note-count";
+        noteCounter.textContent = `0/${MAX_REPORT_NOTE_LENGTH}`;
+
+        noteHeader.append(noteLabel, noteCounter);
+
+        const noteInput = document.createElement("textarea");
+        noteInput.id = noteId;
+        noteInput.className = "port-report-note-input";
+        noteInput.rows = 2;
+        noteInput.maxLength = MAX_REPORT_NOTE_LENGTH;
+        noteInput.placeholder = "Brief detail, e.g. leads to v1.0 APK";
+        noteInput.setAttribute(
+            "aria-label",
+            `Short note (optional, max ${MAX_REPORT_NOTE_LENGTH} characters)`
+        );
+
+        noteField.append(noteHeader, noteInput);
 
         const submitReportBtn = document.createElement("button");
         submitReportBtn.type = "button";
@@ -1783,7 +1912,46 @@ function displayPortCard(
 
         const reportFeedback = document.createElement("p");
         reportFeedback.className = "port-rating-feedback";
-        reportFeedback.textContent = "Choose a reason above.";
+        reportFeedback.textContent = "Choose a reason or add a short note.";
+
+        const updateReportFormState = (preserveFeedback = false) => {
+            const rawLen = noteInput.value.length;
+            const trimmedNote = noteInput.value
+                .replace(/\s+/g, " ")
+                .trim();
+
+            noteCounter.textContent = `${rawLen}/${MAX_REPORT_NOTE_LENGTH}`;
+            noteCounter.classList.toggle(
+                "is-near-limit",
+                rawLen >= 65 && rawLen < MAX_REPORT_NOTE_LENGTH
+            );
+            noteCounter.classList.toggle(
+                "is-at-limit",
+                rawLen >= MAX_REPORT_NOTE_LENGTH
+            );
+
+            const canSubmit =
+                !sendingReport &&
+                (Boolean(selectedReason) || trimmedNote.length >= 3);
+            submitReportBtn.disabled = !canSubmit;
+
+            if (!preserveFeedback) {
+                reportFeedback.className = "port-rating-feedback";
+                if (selectedReason && trimmedNote) {
+                    reportFeedback.textContent = `Selected: ${selectedReason} + note`;
+                } else if (selectedReason) {
+                    reportFeedback.textContent = `Selected: ${selectedReason}`;
+                } else if (trimmedNote.length >= 3) {
+                    reportFeedback.textContent = "Ready to send your note.";
+                } else if (trimmedNote.length > 0) {
+                    reportFeedback.textContent =
+                        "Select a reason or write at least 3 chars.";
+                } else {
+                    reportFeedback.textContent =
+                        "Choose a reason or add a short note.";
+                }
+            }
+        };
 
         reportPopover.append(rTitle, rDesc);
 
@@ -1794,22 +1962,51 @@ function displayPortCard(
             opt.textContent = reason;
             opt.addEventListener("click", () => {
                 if (sendingReport) return;
-                selectedReason = reason;
+                selectedReason = selectedReason === reason ? "" : reason;
                 reasonButtons.forEach((b) =>
-                    b.classList.toggle("selected", b === opt)
+                    b.classList.toggle(
+                        "selected",
+                        Boolean(selectedReason) && b.textContent === selectedReason
+                    )
                 );
-                submitReportBtn.disabled = false;
-                reportFeedback.className = "port-rating-feedback";
-                reportFeedback.textContent = `Selected: ${reason}`;
+                updateReportFormState();
             });
             reasonButtons.push(opt);
             reportPopover.appendChild(opt);
         });
 
+        noteInput.addEventListener("input", () => {
+            if (/[\r\n]/.test(noteInput.value)) {
+                const start = noteInput.selectionStart;
+                noteInput.value = noteInput.value.replace(/[\r\n]+/g, " ");
+                if (typeof start === "number") {
+                    noteInput.setSelectionRange(start, start);
+                }
+            }
+            if (noteInput.value.length > MAX_REPORT_NOTE_LENGTH) {
+                noteInput.value = noteInput.value.slice(0, MAX_REPORT_NOTE_LENGTH);
+            }
+            updateReportFormState();
+        });
+
+        noteInput.addEventListener("keydown", (event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                if (!submitReportBtn.disabled) {
+                    submitReportBtn.click();
+                }
+            }
+        });
+
         submitReportBtn.addEventListener("click", async () => {
-            if (!selectedReason || sendingReport) return;
+            const noteText = noteInput.value
+                .replace(/\s+/g, " ")
+                .trim()
+                .slice(0, MAX_REPORT_NOTE_LENGTH);
+            if (sendingReport || (!selectedReason && noteText.length < 3)) return;
             sendingReport = true;
             submitReportBtn.disabled = true;
+            noteInput.disabled = true;
             reportFeedback.className = "port-rating-feedback";
             reportFeedback.textContent = "Sending report...";
 
@@ -1820,6 +2017,7 @@ function displayPortCard(
                 await compatibilityActions.reportBrokenLink({
                     portId: port.portId || port.project || port.game,
                     reason: selectedReason,
+                    note: noteText,
                     url: portUrl,
                 });
                 reportFeedback.className = "port-rating-feedback success";
@@ -1832,13 +2030,16 @@ function displayPortCard(
                 reportFeedback.className = "port-rating-feedback error";
                 reportFeedback.textContent =
                     err.message || "Could not send report.";
-                submitReportBtn.disabled = false;
-            } finally {
+                noteInput.disabled = false;
                 sendingReport = false;
+                updateReportFormState(true);
+                return;
             }
+            noteInput.disabled = false;
+            sendingReport = false;
         });
 
-        reportPopover.append(submitReportBtn, reportFeedback);
+        reportPopover.append(noteField, submitReportBtn, reportFeedback);
 
         reportBtn.addEventListener("click", (event) => {
             event.stopPropagation();
@@ -1865,10 +2066,12 @@ function displayPortCard(
         card.appendChild(linkRow);
     }
 
-    const gamesList = findGamesUsingApp(port.project, allRows).filter(
-        (game) =>
-            normalizeText(game.name) !== normalizeText(currentGameName)
-    );
+    const gamesList = !isNonUniqueProjectName(port.project)
+        ? findGamesUsingApp(port.project, allRows).filter(
+              (game) =>
+                  normalizeText(game.name) !== normalizeText(currentGameName)
+          )
+        : [];
     if (gamesList.length > 0) {
         card.appendChild(
             createGamesUsingAppSection(
@@ -1993,23 +2196,32 @@ export function displayGame(
                     : "Latest Port"
                 : "";
 
-            portList.appendChild(
-                displayPortCard(
-                    port,
-                    index,
-                    allRows,
-                    ratingsState,
-                    ratingActions,
-                    compatibilityState,
-                    compatibilityActions,
-                    {
-                        isSpotlight: isTopPort,
-                        spotlightLabel,
-                        developerCounts,
-                        currentGameName: game.name,
-                    }
-                )
+            const portCard = displayPortCard(
+                port,
+                index,
+                allRows,
+                ratingsState,
+                ratingActions,
+                compatibilityState,
+                compatibilityActions,
+                {
+                    isSpotlight: isTopPort,
+                    spotlightLabel,
+                    developerCounts,
+                    currentGameName: game.name,
+                }
             );
+            portCard.style.setProperty(
+                "--enter-index",
+                String(Math.min(index, 8))
+            );
+            portCard.classList.add("is-entering");
+            portCard.addEventListener(
+                "animationend",
+                () => portCard.classList.remove("is-entering"),
+                { once: true }
+            );
+            portList.appendChild(portCard);
         });
     }
 

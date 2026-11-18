@@ -2,6 +2,31 @@
  * NAPL — GAME CARD COMPONENT
  */
 
+import { loadCoverImage } from "../core/cover-fallback.js?v=2";
+
+let pageShowCleanupRegistered = false;
+
+function clearActiveCardTransitions() {
+    document
+        .querySelectorAll(
+            ".home-game-cover-container, .home-game-name, .search-result"
+        )
+        .forEach((el) => {
+            if (
+                el.style.viewTransitionName === "napl-hero-cover" ||
+                el.style.viewTransitionName === "napl-hero-title"
+            ) {
+                el.style.viewTransitionName = "";
+            }
+        });
+}
+
+function ensurePageShowCleanup() {
+    if (pageShowCleanupRegistered || typeof window === "undefined") return;
+    pageShowCleanupRegistered = true;
+    window.addEventListener("pageshow", clearActiveCardTransitions);
+}
+
 export function getRepresentativePort(game) {
     if (!game || !Array.isArray(game.ports)) {
         return null;
@@ -74,25 +99,32 @@ export function createHomeGameCard(game, port, options = {}) {
 
     const coverUrl = String(game.coverUrl || "").trim();
 
-    if (coverUrl) {
+    if (/^https?:\/\/\S+$/i.test(coverUrl)) {
         const cover = document.createElement("img");
         cover.className = "home-game-cover";
-        cover.src = coverUrl;
         cover.alt = `${game.name} cover`;
-        cover.loading = "lazy";
+        cover.loading = "eager";
         cover.decoding = "async";
         cover.referrerPolicy = "no-referrer";
-
         cover.addEventListener(
-            "error",
+            "load",
             () => {
-                cover.remove();
-                coverContainer.classList.add("cover-unavailable");
+                coverContainer.classList.add("is-loaded");
             },
             { once: true }
         );
 
         coverContainer.appendChild(cover);
+
+        loadCoverImage(cover, coverUrl, () => {
+            cover.remove();
+            coverContainer.classList.remove("is-loaded");
+            coverContainer.classList.add("cover-unavailable");
+        });
+
+        if (cover.complete && cover.naturalWidth > 0) {
+            coverContainer.classList.add("is-loaded");
+        }
     } else {
         coverContainer.classList.add("cover-unavailable");
     }
@@ -136,5 +168,22 @@ export function createHomeGameCard(game, port, options = {}) {
     }
 
     element.append(coverContainer, content);
+
+    ensurePageShowCleanup();
+    element.addEventListener("click", (event) => {
+        if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+        ) {
+            return;
+        }
+        clearActiveCardTransitions();
+        coverContainer.style.viewTransitionName = "napl-hero-cover";
+        name.style.viewTransitionName = "napl-hero-title";
+    });
+
     return element;
 }

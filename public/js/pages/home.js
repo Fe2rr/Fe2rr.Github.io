@@ -4,13 +4,13 @@
 
 import { loadCatalog } from "../core/data.js?v=14";
 import { initNavigation } from "../components/navigation.js?v=17";
-import { initSearch } from "../components/search.js?v=14";
-import { initThemeToggle } from "../components/theme.js?v=14";
+import { initSearch } from "../components/search.js?v=15";
+import { initThemeToggle } from "../components/theme.js?v=16";
 import {
     renderErrorBox,
     renderListSkeletons,
 } from "../components/loading.js?v=14";
-import { createCategoryController } from "./categories.js?v=20";
+import { createCategoryController } from "./categories.js?v=28";
 
 initThemeToggle();
 
@@ -21,6 +21,7 @@ const state = {
     selectedPlatform: "",
     selectedCategory: "all-games",
     selectedGenre: "",
+    selectedYear: "",
     selectedDeveloper: "",
     selectedCategorySort: "added",
     categorySortDescending: false,
@@ -67,6 +68,7 @@ function openCategory(category, defaultSort = "added") {
     state.selectedPlatform = "";
     state.selectedCategory = category;
     state.selectedGenre = "";
+    state.selectedYear = "";
     state.selectedDeveloper = "";
     categoryController.resetCategoryControls(defaultSort);
     categoryController.showCategoryView();
@@ -79,6 +81,7 @@ function openPlatform(platform) {
     state.selectedPlatform = platform;
     state.selectedCategory = "all-games";
     state.selectedGenre = "";
+    state.selectedYear = "";
     state.selectedDeveloper = "";
     categoryController.resetCategoryControls("added");
     categoryController.showCategoryView();
@@ -120,18 +123,19 @@ function applyInitialRouteFromUrl() {
     const platform = params.get("platform") || "";
     const category = params.get("category") || "";
     const genre = params.get("genre") || "";
+    const year = params.get("year") || "";
     const dev = params.get("dev") || "";
     const view = params.get("view") || "";
     const period = params.get("period") || "";
 
-    if (!platform && !category && !genre && !dev && !view) {
+    if (!platform && !category && !genre && !year && !dev && !view) {
         goHome();
         return;
     }
 
     searchController.resetSearchBar();
 
-    if (category === "multi-game-apps" && !platform && !genre && !dev) {
+    if (category === "multi-game-apps" && !platform && !genre && !year && !dev) {
         openCategory("multi-game-apps", "updated");
         return;
     }
@@ -155,7 +159,16 @@ function applyInitialRouteFromUrl() {
         category === "dual-screen" ? "dual-screen" : "all-games";
     state.selectedPlatform = platform.trim();
     state.selectedGenre = genre.trim();
+    state.selectedYear = year.trim();
     state.selectedDeveloper = dev.trim();
+    if (
+        state.selectedPlatform ||
+        state.selectedGenre ||
+        state.selectedYear ||
+        state.selectedDeveloper
+    ) {
+        categoryController.setFiltersOpen(true);
+    }
     categoryController.resetCategoryControls(initialSort);
     categoryController.showCategoryView();
     if (gameList) gameList.hidden = false;
@@ -168,7 +181,9 @@ async function initHomePage() {
     statusElement.textContent = "";
     gameList.hidden = false;
     if (showMoreContainer) showMoreContainer.hidden = true;
-    renderListSkeletons(gameList, 8);
+    if (!gameList.querySelector(".skeleton-card")) {
+        renderListSkeletons(gameList, 10);
+    }
 
     try {
         const catalog = await loadCatalog();
@@ -214,22 +229,41 @@ function syncHomeBannersContainer() {
         homeBannersContainer.querySelectorAll(".home-feature-banner")
     ).some((banner) => !banner.hidden);
     homeBannersContainer.hidden = !anyVisible;
+    if (anyVisible) {
+        document.documentElement.removeAttribute("data-all-banners");
+    } else {
+        document.documentElement.setAttribute("data-all-banners", "dismissed");
+    }
 }
 
-function setupDismissibleBanner(bannerEl, dismissBtn, storageKey) {
+function applyBannerDismissedState(bannerEl, storageKey, rootAttr) {
     if (!bannerEl) return;
+    let dismissed = false;
     try {
-        if (localStorage.getItem(storageKey) === "1") {
-            bannerEl.dataset.dismissed = "true";
-            bannerEl.hidden = true;
-        }
+        dismissed = localStorage.getItem(storageKey) === "1";
     } catch {
         // Ignore storage read errors
     }
 
+    if (dismissed) {
+        bannerEl.dataset.dismissed = "true";
+        bannerEl.hidden = true;
+        if (rootAttr) {
+            document.documentElement.setAttribute(rootAttr, "dismissed");
+        }
+    }
+}
+
+function setupDismissibleBanner(bannerEl, dismissBtn, storageKey, rootAttr) {
+    if (!bannerEl) return;
+    applyBannerDismissedState(bannerEl, storageKey, rootAttr);
+
     dismissBtn?.addEventListener("click", () => {
         bannerEl.dataset.dismissed = "true";
         bannerEl.hidden = true;
+        if (rootAttr) {
+            document.documentElement.setAttribute(rootAttr, "dismissed");
+        }
         syncHomeBannersContainer();
         try {
             localStorage.setItem(storageKey, "1");
@@ -239,18 +273,38 @@ function setupDismissibleBanner(bannerEl, dismissBtn, storageKey) {
     });
 }
 
+function syncAllFeatureBannersFromStorage() {
+    applyBannerDismissedState(
+        homeFeatureBanner,
+        COMPAT_BANNER_STORAGE_KEY,
+        "data-compat-banner"
+    );
+    applyBannerDismissedState(
+        homeRateBanner,
+        RATE_BANNER_STORAGE_KEY,
+        "data-rate-banner"
+    );
+    syncHomeBannersContainer();
+}
+
 function initFeatureBanners() {
     setupDismissibleBanner(
         homeFeatureBanner,
         homeFeatureDismiss,
-        COMPAT_BANNER_STORAGE_KEY
+        COMPAT_BANNER_STORAGE_KEY,
+        "data-compat-banner"
     );
     setupDismissibleBanner(
         homeRateBanner,
         homeRateDismiss,
-        RATE_BANNER_STORAGE_KEY
+        RATE_BANNER_STORAGE_KEY,
+        "data-rate-banner"
     );
     syncHomeBannersContainer();
+
+    window.addEventListener("pageshow", () => {
+        syncAllFeatureBannersFromStorage();
+    });
 
     homeRateCta?.addEventListener("click", () => {
         if (state.selectedCategory === "multi-game-apps") {
@@ -262,5 +316,46 @@ function initFeatureBanners() {
     });
 }
 
+function initScrollTopButton() {
+    const scrollTopButton = document.getElementById("scroll-top-button");
+    if (!scrollTopButton) return;
+
+    const SCROLL_TOP_THRESHOLD = 420;
+    let rafId = 0;
+
+    function updateVisibility() {
+        rafId = 0;
+        const isVisible = window.scrollY >= SCROLL_TOP_THRESHOLD;
+        scrollTopButton.classList.toggle("is-visible", isVisible);
+        scrollTopButton.setAttribute("aria-hidden", String(!isVisible));
+        if (isVisible) {
+            scrollTopButton.removeAttribute("tabindex");
+        } else {
+            scrollTopButton.setAttribute("tabindex", "-1");
+        }
+    }
+
+    function scheduleUpdate() {
+        if (rafId) return;
+        rafId = window.requestAnimationFrame(updateVisibility);
+    }
+
+    window.addEventListener("scroll", scheduleUpdate, { passive: true });
+    window.addEventListener("pageshow", updateVisibility);
+
+    scrollTopButton.addEventListener("click", () => {
+        const prefersReducedMotion = window.matchMedia?.(
+            "(prefers-reduced-motion: reduce)"
+        ).matches;
+        window.scrollTo({
+            top: 0,
+            behavior: prefersReducedMotion ? "auto" : "smooth",
+        });
+    });
+
+    updateVisibility();
+}
+
 initFeatureBanners();
+initScrollTopButton();
 initHomePage();

@@ -52,22 +52,40 @@
 
     <script>
         (function () {
+            var root = document.documentElement;
             try {
                 var saved = localStorage.getItem("napl_theme_v1");
-                document.documentElement.setAttribute(
+                root.setAttribute(
                     "data-theme",
                     saved === "light" ? "light" : "dark"
                 );
             } catch (e) {
-                document.documentElement.setAttribute("data-theme", "dark");
+                root.setAttribute("data-theme", "dark");
+            }
+            try {
+                var compatDismissed =
+                    localStorage.getItem("napl_compat_banner_dismissed_v2") === "1";
+                var rateDismissed =
+                    localStorage.getItem("napl_rate_banner_dismissed_v2") === "1";
+                if (compatDismissed) {
+                    root.setAttribute("data-compat-banner", "dismissed");
+                }
+                if (rateDismissed) {
+                    root.setAttribute("data-rate-banner", "dismissed");
+                }
+                if (compatDismissed && rateDismissed) {
+                    root.setAttribute("data-all-banners", "dismissed");
+                }
+            } catch (e) {
+                // Ignore storage errors before paint
             }
         })();
     </script>
 
-    <link rel="stylesheet" href="assets/css/main.css?v=11">
-    <link rel="stylesheet" href="assets/css/components.css?v=13">
+    <link rel="stylesheet" href="assets/css/main.css?v=13">
+    <link rel="stylesheet" href="assets/css/components.css?v=15">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
-    <link rel="stylesheet" href="assets/css/home.css?v=15">
+    <link rel="stylesheet" href="assets/css/home.css?v=21">
     <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
     <!-- Google Tag Manager -->
     <script>
@@ -256,52 +274,199 @@
             autocomplete="off"
         >
 
-        <div id="category-filters" class="category-filters">
-            <label class="category-filter-field" for="filter-platform">
-                <span class="category-filter-label">Platform</span>
-                <span class="category-filter-select-wrap">
-                    <select id="filter-platform" class="category-filter-select" aria-label="Filter by platform">
-                        <option value="">All Platforms</option>
-                    </select>
-                    <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </span>
-            </label>
-
-            <label class="category-filter-field" for="filter-genre">
-                <span class="category-filter-label">Genre</span>
-                <span class="category-filter-select-wrap">
-                    <select id="filter-genre" class="category-filter-select" aria-label="Filter by genre">
-                        <option value="">All Genres</option>
-                    </select>
-                    <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </span>
-            </label>
-
-            <label class="category-filter-field" for="filter-developer">
-                <span class="category-filter-label">Developer</span>
-                <span class="category-filter-select-wrap">
-                    <select id="filter-developer" class="category-filter-select" aria-label="Filter by developer">
-                        <option value="">All Developers</option>
-                    </select>
-                    <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                        <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                </span>
-            </label>
-
+        <div id="category-filters-accordion" class="category-filters-accordion">
             <button
                 type="button"
-                id="active-filter-clear"
-                class="category-filters-clear"
-                aria-label="Clear active filters"
-                hidden
+                id="category-filters-toggle"
+                class="category-filters-toggle"
+                aria-expanded="false"
+                aria-controls="category-filters-panel"
             >
-                Clear filters
+                <span class="category-filters-toggle-label">
+                    <svg class="category-filters-toggle-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <line x1="4" y1="6" x2="20" y2="6"/>
+                        <line x1="7" y1="12" x2="17" y2="12"/>
+                        <line x1="10" y1="18" x2="14" y2="18"/>
+                    </svg>
+                    <span>Filters</span>
+                </span>
+                <span class="category-filters-toggle-meta">
+                    <span
+                        id="category-filters-active-summary"
+                        class="category-filters-active-summary"
+                        hidden
+                    ></span>
+                    <svg class="category-filters-toggle-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                </span>
             </button>
+
+            <div id="category-filters-panel" class="category-filters-panel" hidden>
+                <div id="category-filters" class="category-filters">
+                    <div class="category-filter-slot">
+                        <button
+                            type="button"
+                            id="filter-platform-trigger"
+                            class="category-filter-trigger"
+                            data-filter-key="platform"
+                            aria-expanded="false"
+                            aria-controls="category-filter-tray"
+                        >
+                            <span class="category-filter-label">Platform</span>
+                            <span class="category-filter-trigger-value-row">
+                                <span id="filter-platform-value" class="category-filter-value">All Platforms</span>
+                                <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="category-filter-single-clear"
+                            data-clear-filter="platform"
+                            aria-label="Clear platform filter"
+                            hidden
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="category-filter-slot">
+                        <button
+                            type="button"
+                            id="filter-genre-trigger"
+                            class="category-filter-trigger"
+                            data-filter-key="genre"
+                            aria-expanded="false"
+                            aria-controls="category-filter-tray"
+                        >
+                            <span class="category-filter-label">Genre</span>
+                            <span class="category-filter-trigger-value-row">
+                                <span id="filter-genre-value" class="category-filter-value">All Genres</span>
+                                <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="category-filter-single-clear"
+                            data-clear-filter="genre"
+                            aria-label="Clear genre filter"
+                            hidden
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="category-filter-slot">
+                        <button
+                            type="button"
+                            id="filter-year-trigger"
+                            class="category-filter-trigger"
+                            data-filter-key="year"
+                            aria-expanded="false"
+                            aria-controls="category-filter-tray"
+                        >
+                            <span class="category-filter-label">Year</span>
+                            <span class="category-filter-trigger-value-row">
+                                <span id="filter-year-value" class="category-filter-value">All Years</span>
+                                <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="category-filter-single-clear"
+                            data-clear-filter="year"
+                            aria-label="Clear year filter"
+                            hidden
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <div class="category-filter-slot">
+                        <button
+                            type="button"
+                            id="filter-developer-trigger"
+                            class="category-filter-trigger"
+                            data-filter-key="developer"
+                            aria-expanded="false"
+                            aria-controls="category-filter-tray"
+                        >
+                            <span class="category-filter-label">Developer</span>
+                            <span class="category-filter-trigger-value-row">
+                                <span id="filter-developer-value" class="category-filter-value">All Developers</span>
+                                <svg class="category-filter-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </span>
+                        </button>
+                        <button
+                            type="button"
+                            class="category-filter-single-clear"
+                            data-clear-filter="developer"
+                            aria-label="Clear developer filter"
+                            hidden
+                        >
+                            ×
+                        </button>
+                    </div>
+
+                    <button
+                        type="button"
+                        id="active-filter-clear"
+                        class="category-filters-clear"
+                        aria-label="Clear active filters"
+                        hidden
+                    >
+                        Clear filters
+                    </button>
+                </div>
+
+                <div id="category-filter-tray" class="category-filter-tray" hidden>
+                    <div class="category-filter-tray-header">
+                        <div class="category-filter-tray-heading">
+                            <span id="category-filter-tray-title" class="category-filter-tray-title"></span>
+                            <span id="category-filter-tray-count" class="category-filter-tray-count"></span>
+                        </div>
+                        <div class="category-filter-tray-actions">
+                            <button
+                                type="button"
+                                id="category-filter-tray-reset"
+                                class="category-filter-tray-reset"
+                                hidden
+                            >
+                                Clear selection
+                            </button>
+                            <button
+                                type="button"
+                                id="category-filter-tray-close"
+                                class="category-filter-tray-close"
+                                aria-label="Close filter options"
+                            >
+                                Done
+                            </button>
+                        </div>
+                    </div>
+
+                    <div id="category-filter-tray-search-wrap" class="category-filter-tray-search-wrap" hidden>
+                        <input
+                            type="search"
+                            id="category-filter-tray-search"
+                            class="category-filter-tray-search"
+                            placeholder="Filter options..."
+                            aria-label="Filter options"
+                            autocomplete="off"
+                        >
+                    </div>
+
+                    <div id="category-filter-tray-grid" class="category-filter-tray-grid"></div>
+                </div>
+            </div>
         </div>
 
         <div class="category-sort-row">
@@ -381,7 +546,88 @@
     </div>
 
     <div id="status" role="status" aria-live="polite"></div>
-    <div id="game-list" class="game-list"></div>
+    <div id="game-list" class="game-list">
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+        <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton skeleton-cover"></div>
+            <div class="skeleton-content">
+                <div class="skeleton skeleton-title"></div>
+                <div class="skeleton skeleton-subtitle"></div>
+                <div class="skeleton skeleton-meta"></div>
+            </div>
+        </div>
+    </div>
     <div id="show-more-container" class="show-more-container" hidden>
         <button type="button" id="show-more-button" class="view-more-button">
             Show more
@@ -395,7 +641,22 @@
     <p>Native Android Port List</p>
 </footer>
 
-<script type="module" src="js/pages/home.js?v=20"></script>
+<button
+    id="scroll-top-button"
+    class="scroll-top-button"
+    type="button"
+    aria-label="Scroll to top"
+    title="Scroll to top"
+    aria-hidden="true"
+    tabindex="-1"
+>
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M12 19V5"/>
+        <path d="m5 12 7-7 7 7"/>
+    </svg>
+</button>
+
+<script type="module" src="js/pages/home.js?v=30"></script>
 
 
 </body>
