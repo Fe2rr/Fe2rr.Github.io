@@ -84,14 +84,44 @@ export function initSearch(options = {}) {
         }
 
         const fragment = document.createDocumentFragment();
-        for (const game of matches) {
+        matches.forEach((game, idx) => {
             const link = document.createElement("a");
-            link.className = "search-result";
+            link.className = "search-result is-entering";
+            link.style.setProperty("--enter-index", String(idx));
             link.setAttribute("role", "listitem");
             link.href = `game.html?game=${encodeURIComponent(game.slug)}`;
             link.textContent = game.name;
+            link.addEventListener(
+                "animationend",
+                () => link.classList.remove("is-entering"),
+                { once: true }
+            );
+            link.addEventListener("click", (event) => {
+                if (
+                    event.button !== 0 ||
+                    event.metaKey ||
+                    event.ctrlKey ||
+                    event.shiftKey ||
+                    event.altKey
+                ) {
+                    return;
+                }
+                document
+                    .querySelectorAll(
+                        ".home-game-cover-container, .home-game-name, .search-result"
+                    )
+                    .forEach((el) => {
+                        if (
+                            el.style.viewTransitionName === "napl-hero-cover" ||
+                            el.style.viewTransitionName === "napl-hero-title"
+                        ) {
+                            el.style.viewTransitionName = "";
+                        }
+                    });
+                link.style.viewTransitionName = "napl-hero-title";
+            });
             fragment.appendChild(link);
-        }
+        });
 
         searchResults.appendChild(fragment);
         searchResults.hidden = false;
