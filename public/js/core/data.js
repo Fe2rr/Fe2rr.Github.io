@@ -1,369 +1,187 @@
 /*
- * NAPL — CATALOG DATA LOADER & NORMALIZER
+ * NAPL — CATALOG DATA LOADER & CLIENT CACHE
  *
- * Single unified CSV loader, normalizer and game grouper
- * used by both index.html and game.html (no duplicate fetches).
+ * Loads the static JSON database (`assets/data/catalog.json`) with instant
+ * client-side CacheStorage / stale-while-revalidate caching and graceful
+ * Google Sheets CSV fallback.
  */
 
 import {
-    normalizeHeader,
-    normalizeText,
-    normalizePlatformLabel,
-    createSlug,
-} from "./helpers.js";
+    parseCSV,
+    getColumn,
+    extractPlatformOrder,
+    processRows,
+    groupGames,
+    hydrateCatalog,
+    csvToCatalogDocument,
+} from "./catalog-schema.js?v=1";
+
+export { parseCSV, getColumn, extractPlatformOrder, processRows, groupGames };
+
+const CATALOG_JSON_URL = "assets/data/catalog.json";
+const SHEET_CSV_URL =
+    "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
+const CATALOG_CACHE_NAME = "napl-catalog-v1";
+const CATALOG_META_STORAGE_KEY = "napl_catalog_cache_meta_v1";
+const CATALOG_SOFT_TTL_MS = 60 * 1000;
 
 let catalogPromise = null;
+let revalidationPromise = null;
 
-export function parseCSV(csv) {
-    const rows = [];
-    let row = [];
-    let field = "";
-    let insideQuotes = false;
-
-    for (let i = 0; i < csv.length; i++) {
-        const char = csv[i];
-
-        if (char === '"') {
-            if (insideQuotes && csv[i + 1] === '"') {
-                field += '"';
-                i++;
-            } else {
-                insideQuotes = !insideQuotes;
-            }
-            continue;
-        }
-
-        if (char === "," && !insideQuotes) {
-            row.push(field);
-            field = "";
-            continue;
-        }
-
-        if ((char === "\n" || char === "\r") && !insideQuotes) {
-            if (char === "\r" && csv[i + 1] === "\n") {
-                i++;
-            }
-
-            row.push(field);
-            field = "";
-
-            if (row.some((value) => value.trim() !== "")) {
-                rows.push(row);
-            }
-
-            row = [];
-            continue;
-        }
-
-        field += char;
+function readCachedMeta() {
+    try {
+        const raw = localStorage.getItem(CATALOG_META_STORAGE_KEY);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw);
+        return parsed && typeof parsed === "object" ? parsed : null;
+    } catch {
+        return null;
     }
-
-    if (field.length > 0 || row.length > 0) {
-        row.push(field);
-
-        if (row.some((value) => value.trim() !== "")) {
-            rows.push(row);
-        }
-    }
-
-    if (rows.length === 0) {
-        return [];
-    }
-
-    const headers = rows.shift().map(normalizeHeader);
-
-    return rows.map((values) => {
-        const rowObject = {};
-
-        headers.forEach((header, index) => {
-            if (header) {
-                rowObject[header] = String(values[index] || "").trim();
-            }
-        });
-
-        return rowObject;
-    });
 }
 
-export function getColumn(row, possibleNames) {
-    for (const name of possibleNames) {
-        const normalizedName = normalizeHeader(name);
-
-        if (Object.prototype.hasOwnProperty.call(row, normalizedName)) {
-            return String(row[normalizedName] || "").trim();
-        }
-    }
-
-    return "";
-}
-
-export function extractPlatformOrder(rows) {
-    const uniquePlatforms = new Map();
-
-    for (const row of rows) {
-        const platform = normalizePlatformLabel(
-            getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"])
+function writeCachedMeta(doc) {
+    try {
+        localStorage.setItem(
+            CATALOG_META_STORAGE_KEY,
+            JSON.stringify({
+                updatedAt: String(doc?.updatedAt || ""),
+                cachedAt: Date.now(),
+            })
         );
-
-        if (!platform) continue;
-
-        const key = normalizeText(platform);
-        if (key === "multi-game apps" || key === "multi game apps") {
-            continue;
-        }
-
-        if (!uniquePlatforms.has(key)) {
-            uniquePlatforms.set(key, platform);
-        }
+    } catch {
+        // Ignore storage errors
     }
-
-    return Array.from(uniquePlatforms.values());
 }
 
-export function processRows(rows) {
-    let currentGame = "";
-    let currentYear = "";
-    const result = [];
+async function readCachedCatalogDoc() {
+    if (typeof window === "undefined" || !("caches" in window)) {
+        return null;
+    }
+    try {
+        const cache = await window.caches.open(CATALOG_CACHE_NAME);
+        const match = await cache.match(CATALOG_JSON_URL);
+        if (!match) return null;
+        const doc = await match.json();
+        return doc && Array.isArray(doc.games) ? doc : null;
+    } catch {
+        return null;
+    }
+}
 
-    for (const row of rows) {
-        const gameValue = getColumn(row, ["GAME", "GAME NAME", "NAME", "JUEGO"]);
-        const yearValue = getColumn(row, ["YEAR", "ANO", "AÑO"]);
-        const platformValue = getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"]);
-        const projectValue = getColumn(row, ["PROJECT", "PROYECTO"]);
-
-        if (gameValue) currentGame = gameValue;
-        if (yearValue) currentYear = yearValue;
-
-        // Match the working V3 behavior: PLATFORM and PROJECT belong only
-        // to the current CSV row. Do not inherit values from previous rows.
-        const platform = platformValue;
-        const project = projectValue;
-        const rawPortId = getColumn(row, ["PORTS_ID", "PORT ID", "PORT_ID"]);
-        const portId =
-            /^unofficial-port(?:-\d+)?$/i.test(rawPortId) && currentGame
-                ? `${createSlug(currentGame)}-${rawPortId.toLowerCase()}`
-                : rawPortId;
-        const link = getColumn(row, ["LINK", "PROJECT LINK", "ENLACE"]);
-        const url = getColumn(row, ["URL", "PORT URL", "PORT LINK"]);
-        const dataUrl = getColumn(row, ["DATA URL", "DATA LINK", "GAME FILES URL"]);
-        const developer = getColumn(row, [
-            "DEVELOPER",
-            "DEVELOPER/PUBLISHER",
-            "DESARROLLADOR",
-        ]);
-        const version = getColumn(row, ["VERSION", "VERSIÓN"]);
-        const controller = getColumn(row, [
-            "CONTROLLER SUPPORT",
-            "CONTROLLER",
-            "GAMEPAD",
-            "MANDO",
-        ]);
-        const files = getColumn(row, [
-            "NEEDS GAME FILES?",
-            "NEEDS GAME FILES",
-            "GAME FILES",
-            "NECESITA ARCHIVOS",
-        ]);
-        const works = getColumn(row, ["WORKS?", "WORKS", "FUNCIONA"]);
-        const lastUpdate = getColumn(row, [
-            "LAST UPDATE",
-            "LAST UPDATED",
-            "ÚLTIMA ACTUALIZACIÓN",
-        ]);
-        const dateAdded = getColumn(row, ["DATE ADDED"]);
-        const notes = getColumn(row, ["NOTES", "NOTE", "NOTAS"]);
-        const coverUrl = getColumn(row, [
-            "COVER_URL",
-            "COVER URL",
-            "COVER",
-            "COVER IMAGE",
-            "IMAGE URL",
-            "PORTADA",
-        ]);
-        const genre = getColumn(row, ["GENRE", "GÉNERO", "GENERO"]);
-        const description = getColumn(row, [
-            "DESCRIPTION",
-            "DESCRIPCIÓN",
-            "DESCRIPCION",
-        ]);
-
-        const hasPortData = [
-            project,
-            link,
-            url,
-            dataUrl,
-            developer,
-            version,
-            controller,
-            files,
-            works,
-            lastUpdate,
-            dateAdded,
-            notes,
-        ].some((value) => String(value || "").trim() !== "");
-
-        if (!currentGame || !hasPortData) {
-            continue;
-        }
-
-        result.push({
-            game: currentGame,
-            year: currentYear,
-            platform,
-            project,
-            portId,
-            link,
-            url,
-            dataUrl,
-            developer,
-            version,
-            controller,
-            files,
-            works,
-            lastUpdate,
-            dateAdded,
-            notes,
-            coverUrl,
-            genre,
-            description,
+async function writeCachedCatalogDoc(doc) {
+    writeCachedMeta(doc);
+    if (typeof window === "undefined" || !("caches" in window)) {
+        return;
+    }
+    try {
+        const cache = await window.caches.open(CATALOG_CACHE_NAME);
+        const res = new Response(JSON.stringify(doc), {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json; charset=utf-8",
+            },
         });
+        await cache.put(CATALOG_JSON_URL, res);
+    } catch {
+        // Ignore CacheStorage write errors
     }
-
-    return result;
 }
 
-export function groupGames(rows) {
-    const grouped = new Map();
+async function fetchJsonCatalog(bypassBrowserCache = false) {
+    const url = bypassBrowserCache
+        ? `${CATALOG_JSON_URL}?t=${Date.now()}`
+        : CATALOG_JSON_URL;
+    const response = await fetch(url, {
+        method: "GET",
+        cache: bypassBrowserCache ? "no-store" : "default",
+    });
 
-    if (!Array.isArray(rows)) {
-        return [];
+    if (!response.ok) {
+        throw new Error(`Catalog JSON returned HTTP ${response.status}.`);
     }
 
-    for (const port of rows) {
-        if (!port || !port.game) continue;
-
-        // V3 groups by normalized game name, not by its URL slug.
-        const key = normalizeText(port.game);
-        if (!key) continue;
-
-        if (!grouped.has(key)) {
-            grouped.set(key, {
-                name: port.game,
-                year: port.year || "",
-                // Keep grouping by normalized name, but use URL-safe slugs for routes.
-                slug: createSlug(port.game),
-                coverUrl: port.coverUrl || "",
-                genre: port.genre || "",
-                description: port.description || "",
-                ports: [],
-                platforms: new Set(),
-            });
-        }
-
-        const game = grouped.get(key);
-
-        if (!game.year && port.year) game.year = port.year;
-        if (!game.coverUrl && port.coverUrl) game.coverUrl = port.coverUrl;
-        if (!game.genre && port.genre) game.genre = port.genre;
-        if (!game.description && port.description) {
-            game.description = port.description;
-        }
-
-        if (port.platform) {
-            game.platforms.add(port.platform);
-        }
-
-        game.ports.push(port);
+    const doc = await response.json();
+    if (!doc || !Array.isArray(doc.games) || !doc.games.length) {
+        throw new Error("Catalog JSON is empty or invalid.");
     }
 
-    return Array.from(grouped.values()).map((game) => ({
-        ...game,
-        platforms: Array.from(game.platforms),
-    }));
+    await writeCachedCatalogDoc(doc);
+    return doc;
 }
 
-export async function loadCatalog(force = false) {
+async function fetchFallbackSheetCatalog() {
+    const response = await fetch(SHEET_CSV_URL, {
+        method: "GET",
+        cache: "no-store",
+    });
+
+    if (!response.ok) {
+        throw new Error(`Google Sheets returned HTTP ${response.status}.`);
+    }
+
+    const csv = await response.text();
+    const doc = csvToCatalogDocument(csv);
+    await writeCachedCatalogDoc(doc);
+    return doc;
+}
+
+async function loadFreshCatalogDoc(force = false) {
+    try {
+        return await fetchJsonCatalog(force);
+    } catch {
+        return await fetchFallbackSheetCatalog();
+    }
+}
+
+function scheduleBackgroundRevalidation(cachedDoc, onBackgroundUpdate) {
+    if (revalidationPromise) return revalidationPromise;
+
+    revalidationPromise = (async () => {
+        try {
+            const freshDoc = await fetchJsonCatalog(true);
+            const prevStamp = String(cachedDoc?.updatedAt || "");
+            const nextStamp = String(freshDoc?.updatedAt || "");
+
+            if (nextStamp && nextStamp !== prevStamp) {
+                const hydrated = hydrateCatalog(freshDoc);
+                catalogPromise = Promise.resolve(hydrated);
+                if (typeof onBackgroundUpdate === "function") {
+                    onBackgroundUpdate(hydrated);
+                }
+            }
+        } catch {
+            // Silent background revalidation failure; cached catalog remains active
+        } finally {
+            revalidationPromise = null;
+        }
+    })();
+
+    return revalidationPromise;
+}
+
+export async function loadCatalog(force = false, options = {}) {
+    const { onBackgroundUpdate = null } = options || {};
+
     if (catalogPromise && !force) {
         return catalogPromise;
     }
 
     catalogPromise = (async () => {
-        const sheetUrl =
-            "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
-
-        const response = await fetch(sheetUrl, {
-            method: "GET",
-            cache: "no-store",
-        });
-
-        if (!response.ok) {
-            throw new Error(`Google Sheets returned HTTP ${response.status}.`);
-        }
-
-        const csv = await response.text();
-        const rows = parseCSV(csv);
-
-        if (!rows.length) {
-            throw new Error("Google Sheets returned an empty catalog.");
-        }
-
-        const allRows = processRows(rows);
-        if (!allRows.length) {
-            throw new Error(
-                "The Community Ports sheet was read, but no valid ports were found."
-            );
-        }
-
-        const games = groupGames(allRows);
-        const platformOrder = extractPlatformOrder(rows);
-
-        // Temporary diagnostics: inspect where catalog entries may be lost.
-        const countBy = (items, getValue) => {
-            const counts = new Map();
-            for (const item of items) {
-                const value = String(getValue(item) || "").trim();
-                if (!value) continue;
-                counts.set(value, (counts.get(value) || 0) + 1);
+        if (!force) {
+            const cachedDoc = await readCachedCatalogDoc();
+            if (cachedDoc) {
+                const meta = readCachedMeta();
+                const isStale =
+                    !meta?.cachedAt || Date.now() - meta.cachedAt > CATALOG_SOFT_TTL_MS;
+                if (isStale) {
+                    scheduleBackgroundRevalidation(cachedDoc, onBackgroundUpdate);
+                }
+                return hydrateCatalog(cachedDoc);
             }
-            return Object.fromEntries(
-                [...counts.entries()].sort((a, b) => a[0].localeCompare(b[0]))
-            );
-        };
-
-        const dualScreenPorts = allRows.filter((port) =>
-            normalizeText(port.project).includes("dual screen")
-        );
-
-        console.groupCollapsed("[NAPL] Catalog diagnostics");
-        console.log("CSV characters:", csv.length);
-        console.log("Parsed CSV rows:", rows.length);
-        console.log("Processed port rows:", allRows.length);
-        console.log("Grouped games:", games.length);
-        console.log("Rows discarded during processing:", rows.length - allRows.length);
-        console.log("Platforms in raw CSV:", countBy(rows, (row) =>
-            getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"])
-        ));
-        console.log("Platforms in processed ports:", countBy(allRows, (port) => port.platform));
-        console.log("Dual Screen ports:", dualScreenPorts.length);
-        console.log("Games with Dual Screen:", new Set(dualScreenPorts.map((port) =>
-            normalizeText(port.game)
-        )).size);
-        console.log("Dual Screen project examples:", dualScreenPorts.slice(0, 10).map((port) => ({
-            game: port.game,
-            platform: port.platform,
-            project: port.project
-        })));
-        console.groupEnd();
-
-        if (!games.length) {
-            throw new Error("The Community Ports sheet contains no games.");
         }
 
-        return {
-            games,
-            platformOrder,
-            allRows,
-        };
+        const doc = await loadFreshCatalogDoc(force);
+        return hydrateCatalog(doc);
     })().catch((err) => {
         catalogPromise = null;
         throw err;

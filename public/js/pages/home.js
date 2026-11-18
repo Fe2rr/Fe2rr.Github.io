@@ -2,7 +2,7 @@
  * NAPL — HOME PAGE CONTROLLER (ALL GAMES + BANNERS)
  */
 
-import { loadCatalog } from "../core/data.js?v=14";
+import { loadCatalog } from "../core/data.js?v=15";
 import { initNavigation } from "../components/navigation.js?v=17";
 import { initSearch } from "../components/search.js?v=15";
 import { initThemeToggle } from "../components/theme.js?v=16";
@@ -10,7 +10,7 @@ import {
     renderErrorBox,
     renderListSkeletons,
 } from "../components/loading.js?v=14";
-import { createCategoryController } from "./categories.js?v=28";
+import { createCategoryController } from "./categories.js?v=29";
 
 initThemeToggle();
 
@@ -186,18 +186,33 @@ async function initHomePage() {
     }
 
     try {
-        const catalog = await loadCatalog();
-        state.games = catalog.games;
-        state.platformOrder = catalog.platformOrder;
+        const applyCatalog = (catalog) => {
+            state.games = catalog.games;
+            state.platformOrder = catalog.platformOrder;
 
-        searchController.setGames(state.games);
-        navController.renderPlatforms(state.platformOrder, state.games);
-        categoryController.populateFilterOptions(
-            state.platformOrder,
-            state.games
-        );
+            searchController.setGames(state.games);
+            categoryController.populateFilterOptions(
+                state.platformOrder,
+                state.games
+            );
 
-        applyInitialRouteFromUrl();
+            applyInitialRouteFromUrl();
+
+            if (typeof window.requestAnimationFrame === "function") {
+                window.requestAnimationFrame(() => {
+                    navController.renderPlatforms(state.platformOrder, state.games);
+                });
+            } else {
+                navController.renderPlatforms(state.platformOrder, state.games);
+            }
+        };
+
+        const catalog = await loadCatalog(false, {
+            onBackgroundUpdate: (freshCatalog) => {
+                applyCatalog(freshCatalog);
+            },
+        });
+        applyCatalog(catalog);
     } catch (error) {
         console.error("NAPL: could not load games.", error);
         statusElement.textContent = "";

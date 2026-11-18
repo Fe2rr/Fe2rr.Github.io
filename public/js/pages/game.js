@@ -6,7 +6,7 @@
  */
 
 import { createSlug } from "../core/helpers.js?v=15";
-import { loadCatalog } from "../core/data.js";
+import { loadCatalog } from "../core/data.js?v=15";
 import { registerGameVisit } from "../services/visits.js";
 import { loadPortRatings, createRatingActions } from "../services/ratings.js";
 import {

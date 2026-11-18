@@ -88,6 +88,9 @@ export function createCategoryController(state, options = {}) {
     let catalogPlatformOrder = [];
     let catalogGames = [];
     let multiGameDevKeys = new Set();
+    let multiGameDevIndexBuilt = false;
+    let filterOptionsDirty = false;
+    let idleFilterHandle = 0;
     let activePickerKey = "";
     const dynamicFilterOptions = {
         platform: [],
@@ -144,6 +147,11 @@ export function createCategoryController(state, options = {}) {
         categoryFiltersToggle?.setAttribute("aria-expanded", String(nextOpen));
         if (categoryFiltersPanel) {
             categoryFiltersPanel.hidden = !nextOpen;
+        }
+        if (nextOpen && filterOptionsDirty && catalogGames.length > 0) {
+            rebuildDynamicFilterOptions();
+            syncTriggerStates();
+            renderActiveFilterTray();
         }
         if (!nextOpen) {
             activePickerKey = "";
@@ -220,6 +228,7 @@ export function createCategoryController(state, options = {}) {
     }
 
     function rebuildDynamicFilterOptions() {
+        ensureMultiGameDevKeys();
         const games = Array.isArray(catalogGames) ? catalogGames : [];
         const query = normalizeText(categorySearchInput?.value || "");
         const selectedDevKey = normalizeDeveloperName(state.selectedDeveloper);
@@ -419,11 +428,12 @@ export function createCategoryController(state, options = {}) {
                 label: entry.label,
                 count: entry.count,
             }));
+        filterOptionsDirty = false;
     }
 
-    function populateFilterOptions(platformOrder, games) {
-        catalogPlatformOrder = Array.isArray(platformOrder) ? platformOrder : [];
-        catalogGames = Array.isArray(games) ? games : [];
+    function ensureMultiGameDevKeys() {
+        if (multiGameDevIndexBuilt) return;
+        multiGameDevIndexBuilt = true;
 
         const globalDevCounts = new Map();
         for (const game of catalogGames) {
@@ -441,7 +451,36 @@ export function createCategoryController(state, options = {}) {
                 .filter(([, count]) => count > 1)
                 .map(([key]) => key)
         );
+    }
 
+    function scheduleIdleFilterWarmup() {
+        if (idleFilterHandle || !filterOptionsDirty || catalogGames.length === 0) {
+            return;
+        }
+        const runWarmup = () => {
+            idleFilterHandle = 0;
+            if (!filterOptionsDirty || catalogGames.length === 0) return;
+            rebuildDynamicFilterOptions();
+            syncTriggerStates();
+        };
+        if (typeof window !== "undefined" && typeof window.requestIdleCallback === "function") {
+            idleFilterHandle = window.requestIdleCallback(runWarmup, { timeout: 1200 });
+        } else if (typeof window !== "undefined") {
+            idleFilterHandle = window.setTimeout(runWarmup, 180);
+        }
+    }
+
+    function populateFilterOptions(platformOrder, games) {
+        catalogPlatformOrder = Array.isArray(platformOrder) ? platformOrder : [];
+        catalogGames = Array.isArray(games) ? games : [];
+        multiGameDevIndexBuilt = false;
+        filterOptionsDirty = true;
+
+        if (categoryFiltersAccordion?.classList.contains("is-open")) {
+            rebuildDynamicFilterOptions();
+        } else {
+            scheduleIdleFilterWarmup();
+        }
         syncFilterControls();
     }
 
@@ -667,8 +706,17 @@ export function createCategoryController(state, options = {}) {
                 : "";
         }
 
+        const filtersVisible =
+            Boolean(categoryFiltersAccordion?.classList.contains("is-open")) ||
+            Boolean(activePickerKey);
+
         if (!isMultiGameAppsView && catalogGames.length > 0) {
-            rebuildDynamicFilterOptions();
+            if (filtersVisible || hasAnyFilter) {
+                rebuildDynamicFilterOptions();
+            } else {
+                filterOptionsDirty = true;
+                scheduleIdleFilterWarmup();
+            }
         } else {
             activePickerKey = "";
         }
@@ -678,7 +726,11 @@ export function createCategoryController(state, options = {}) {
         }
 
         syncTriggerStates();
-        renderActiveFilterTray();
+        if (activePickerKey) {
+            renderActiveFilterTray();
+        } else if (filterTray) {
+            filterTray.hidden = true;
+        }
         syncSortControls();
     }
 

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <rect width="64" height="64" rx="14" fill="#11221B"/>
+  <!-- Outer port frame open on the right, beveled parallel to the arrow -->
+  <path
+    fill="#6EE7A0"
+    d="M12 12H50V24.6L43.4 18H18V46H43.4L50 39.4V52H12V12Z"
+  />
+  <!-- Geometric N with flared forward port arrow -->
+  <path
+    fill="#6EE7A0"
+    d="M21.8 22H27.4L36.8 35.4V22H42V29.2H45.2V24.4L55.6 32L45.2 39.6V34.8H42V42H36.4L27 28.8V42H21.8V22Z"
+  />
+</svg>

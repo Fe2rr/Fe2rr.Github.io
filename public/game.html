@@ -10,6 +10,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Game Details — NAPL</title>
+    <link rel="icon" href="favicon.ico" sizes="48x48">
+    <link rel="icon" type="image/svg+xml" href="assets/images/napl-mark.svg">
+    <link rel="icon" type="image/png" sizes="48x48" href="assets/images/favicon-48.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/images/favicon-32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="assets/images/favicon-16.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/images/apple-touch-icon.png">
+    <link rel="manifest" href="site.webmanifest">
     <meta
         name="description"
         content="Explore native Android ports, supported versions, compatibility information, and details for your favorite games."
@@ -37,7 +44,11 @@
         })();
     </script>
 
-    <link rel="stylesheet" href="assets/css/main.css?v=13">
+    <link rel="preload" href="assets/data/catalog.json" as="fetch" crossorigin="anonymous">
+    <link rel="modulepreload" href="js/core/catalog-schema.js?v=1">
+    <link rel="modulepreload" href="js/core/data.js?v=15">
+
+    <link rel="stylesheet" href="assets/css/main.css?v=14">
     <link rel="stylesheet" href="assets/css/components.css?v=15">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
     <link rel="stylesheet" href="assets/css/game.css?v=25">
@@ -74,7 +85,13 @@
         </svg>
     </button>
 
-    <h1 id="home-button" role="button" tabindex="0">NAPL</h1>
+    <h1 id="home-button" role="button" tabindex="0" aria-label="NAPL Home">
+        <svg class="brand-logo-mark" viewBox="10 10 48 44" fill="none" aria-hidden="true">
+            <path fill="currentColor" d="M12 12H50V24.6L43.4 18H18V46H43.4L50 39.4V52H12V12Z"/>
+            <path fill="currentColor" d="M21.8 22H27.4L36.8 35.4V22H42V29.2H45.2V24.4L55.6 32L45.2 39.6V34.8H42V42H36.4L27 28.8V42H21.8V22Z"/>
+        </svg>
+        <span>NAPL</span>
+    </h1>
 
     <div class="header-actions">
         <button
@@ -103,8 +120,14 @@
 <nav id="side-menu" aria-label="Menu">
     <div class="side-menu-header">
         <div class="side-menu-brand">
-            <span class="side-menu-title">NAPL</span>
-            <span class="side-menu-subtitle">Native Android Port List</span>
+            <svg class="brand-logo-mark" viewBox="10 10 48 44" fill="none" aria-hidden="true">
+                <path fill="currentColor" d="M12 12H50V24.6L43.4 18H18V46H43.4L50 39.4V52H12V12Z"/>
+                <path fill="currentColor" d="M21.8 22H27.4L36.8 35.4V22H42V29.2H45.2V24.4L55.6 32L45.2 39.6V34.8H42V42H36.4L27 28.8V42H21.8V22Z"/>
+            </svg>
+            <div class="side-menu-brand-text">
+                <span class="side-menu-title">NAPL</span>
+                <span class="side-menu-subtitle">Native Android Port List</span>
+            </div>
         </div>
         <button id="menu-close" type="button" aria-label="Close menu">
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -177,7 +200,7 @@
     <p>Native Android Port List</p>
 </footer>
 
-<script type="module" src="js/pages/game.js?v=26"></script>
+<script type="module" src="js/pages/game.js?v=27"></script>
 
 
 </body>

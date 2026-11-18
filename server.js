@@ -1,6 +1,7 @@
 import express from 'express';
 import fs from 'fs';
 import path from 'path';
+import zlib from 'zlib';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -10,6 +11,164 @@ const app = express();
 const PORT = 3000;
 const HOST = '0.0.0.0';
 const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev';
+const CATALOG_PATH = path.join(__dirname, 'public', 'assets', 'data', 'catalog.json');
+
+const COMPRESSIBLE_CONTENT_TYPE = /^(?:text\/|application\/(?:json|javascript|ecmascript|xml)|image\/svg\+xml)/i;
+
+function createCompressionMiddleware() {
+  return (req, res, next) => {
+    if (req.method === 'HEAD') return next();
+    const acceptEncoding = String(req.headers['accept-encoding'] || '');
+    const encoding = /\bbr\b/i.test(acceptEncoding)
+      ? 'br'
+      : /\bgzip\b/i.test(acceptEncoding)
+      ? 'gzip'
+      : '';
+
+    if (!encoding) return next();
+
+    let compressor = null;
+    let decided = false;
+    let passthrough = false;
+    let waitingUpstreamDrain = false;
+
+    const origWrite = res.write.bind(res);
+    const origEnd = res.end.bind(res);
+    const origSetHeader = res.setHeader.bind(res);
+    const origWriteHead = res.writeHead.bind(res);
+
+    function decideCompression(statusCode) {
+      if (decided) return;
+      decided = true;
+
+      const code = statusCode || res.statusCode || 200;
+      const contentType = String(res.getHeader('Content-Type') || '');
+      const existingEncoding = String(res.getHeader('Content-Encoding') || '');
+      const cacheControl = String(res.getHeader('Cache-Control') || '');
+      const contentLength = Number(res.getHeader('Content-Length') || 0);
+
+      if (
+        code === 204 ||
+        code === 304 ||
+        existingEncoding ||
+        /\bno-transform\b/i.test(cacheControl) ||
+        !COMPRESSIBLE_CONTENT_TYPE.test(contentType) ||
+        (contentLength > 0 && contentLength < 512)
+      ) {
+        passthrough = true;
+        return;
+      }
+
+      res.removeHeader('Content-Length');
+      origSetHeader('Content-Encoding', encoding);
+      const existingVary = String(res.getHeader('Vary') || '');
+      if (!/\baccept-encoding\b/i.test(existingVary)) {
+        origSetHeader('Vary', existingVary ? `${existingVary}, Accept-Encoding` : 'Accept-Encoding');
+      }
+
+      compressor =
+        encoding === 'br'
+          ? zlib.createBrotliCompress({
+              params: { [zlib.constants.BROTLI_PARAM_QUALITY]: 4 },
+            })
+          : zlib.createGzip({ level: 6 });
+
+      compressor.on('data', (chunk) => {
+        if (!origWrite(chunk)) {
+          compressor.pause();
+        }
+      });
+      compressor.on('drain', () => {
+        if (waitingUpstreamDrain) {
+          waitingUpstreamDrain = false;
+          res.emit('drain');
+        }
+      });
+      compressor.on('end', () => {
+        origEnd();
+      });
+      compressor.on('error', () => {
+        passthrough = true;
+        origEnd();
+      });
+
+      res.on('drain', () => {
+        if (compressor && !passthrough) {
+          compressor.resume();
+        }
+      });
+      res.on('close', () => {
+        if (compressor && !compressor.destroyed) {
+          compressor.destroy();
+        }
+      });
+    }
+
+    res.setHeader = (name, value) => {
+      if (decided && !passthrough && name.toLowerCase() === 'content-length') {
+        return res;
+      }
+      return origSetHeader(name, value);
+    };
+
+    res.writeHead = (statusCode, statusMessage, headers) => {
+      let headerObj = headers;
+      if (typeof statusMessage === 'object' && statusMessage !== null) {
+        headerObj = statusMessage;
+      }
+      if (headerObj && typeof headerObj === 'object') {
+        for (const [k, v] of Object.entries(headerObj)) {
+          origSetHeader(k, v);
+        }
+      }
+      decideCompression(statusCode);
+      if (typeof statusMessage === 'string') {
+        return origWriteHead(statusCode, statusMessage);
+      }
+      return origWriteHead(statusCode);
+    };
+
+    res.write = (chunk, enc, cb) => {
+      decideCompression(res.statusCode);
+      if (passthrough || !compressor) {
+        return origWrite(chunk, enc, cb);
+      }
+      const ok = compressor.write(chunk, enc, cb);
+      if (!ok) {
+        waitingUpstreamDrain = true;
+      }
+      return ok;
+    };
+
+    res.end = (chunk, enc, cb) => {
+      if (typeof chunk === 'function') {
+        cb = chunk;
+        chunk = undefined;
+      } else if (typeof enc === 'function') {
+        cb = enc;
+        enc = undefined;
+      }
+
+      decideCompression(res.statusCode);
+      if (passthrough || !compressor) {
+        return origEnd(chunk, enc, cb);
+      }
+      if (chunk !== undefined) {
+        compressor.write(chunk, enc);
+      }
+      if (cb) {
+        compressor.once('end', cb);
+      }
+      compressor.end();
+      return res;
+    };
+
+    next();
+  };
+}
+
+app.use(createCompressionMiddleware());
+app.use(express.json());
 
 // Load strict Android device list for compatibility validation (supports sharded manifest or raw array)
 const deviceMap = new Map();
@@ -55,6 +214,27 @@ try {
   console.warn('Warning: could not load devices.json for compatibility validation:', error);
 }
 
+app.get('/api/catalog-meta', (req, res) => {
+  try {
+    const stat = fs.statSync(CATALOG_PATH);
+    const doc = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
+    const totalPorts = (doc.games || []).reduce(
+      (sum, g) => sum + (Array.isArray(g.ports) ? g.ports.length : 0),
+      0
+    );
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    return res.json({
+      version: Number(doc.version) || 1,
+      updatedAt: String(doc.updatedAt || ''),
+      gamesCount: Array.isArray(doc.games) ? doc.games.length : 0,
+      portsCount: totalPorts,
+      sizeBytes: stat.size,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Could not read catalog metadata.' });
+  }
+});
+
 // In-memory compatibility reports for local preview
 const compatibilityReports = new Map();
 const VALID_COMPAT_STATUSES = new Set(['crash', 'low_fps', 'playable_30', 'playable_60']);
@@ -90,8 +270,6 @@ function buildPortSummary(portId) {
   }
   return summary;
 }
-
-app.use(express.json());
 
 // Proxy ratings API in preview to avoid Worker CORS origin restrictions
 app.all('/api/ratings/*', async (req, res) => {
@@ -457,10 +635,14 @@ app.get('/api/steam-cover/:appid', async (req, res) => {
 
 app.use(
   express.static(path.join(__dirname, 'public'), {
-    etag: false,
-    lastModified: false,
+    etag: true,
+    lastModified: true,
     setHeaders(res, filePath) {
-      if (/\.(html|css|js)$/i.test(filePath)) {
+      if (/catalog\.json$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
+      } else if (/\.json$/i.test(filePath)) {
+        res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
+      } else if (/\.(html|css|js)$/i.test(filePath)) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         res.setHeader('Pragma', 'no-cache');
         res.setHeader('Expires', '0');

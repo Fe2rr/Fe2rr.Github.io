@@ -7,7 +7,7 @@
 
 import { normalizeText } from "../core/helpers.js";
 import { loadCoverImage } from "../core/cover-fallback.js?v=2";
-import { loadCatalog } from "../core/data.js";
+import { loadCatalog } from "../core/data.js?v=15";
 import {
     COMPAT_STATUSES,
     getCompatStatusMeta,

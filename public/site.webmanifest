@@ -1,0 +1,26 @@
+{
+  "name": "NAPL — Native Android Port List",
+  "short_name": "NAPL",
+  "description": "Discover, explore and track native Android game ports.",
+  "start_url": "index.html",
+  "display": "standalone",
+  "background_color": "#11221b",
+  "theme_color": "#11221b",
+  "icons": [
+    {
+      "src": "assets/images/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/images/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "assets/images/napl-mark.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

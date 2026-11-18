@@ -292,7 +292,7 @@ header h1,
   justify-self: center;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
   font-family: var(--font-display);
   font-size: 21px;
   font-weight: 700;
@@ -306,8 +306,22 @@ header h1,
     transform var(--duration-fast) var(--ease-out);
 }
 
+.brand-logo-mark {
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  color: var(--accent);
+  transition:
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
 #home-button:hover {
   color: var(--accent);
+}
+
+#home-button:hover .brand-logo-mark {
+  transform: translateX(1px);
 }
 
 #home-button:active {
@@ -475,6 +489,12 @@ header h1,
 }
 
 .side-menu-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.side-menu-brand-text {
   display: flex;
   flex-direction: column;
   gap: 2px;

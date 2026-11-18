@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 64" fill="none">
+  <rect width="260" height="64" rx="12" fill="#11221B"/>
+  <path
+    fill="#6EE7A0"
+    d="M14 12H52V24.6L45.4 18H20V46H45.4L52 39.4V52H14V12Z"
+  />
+  <path
+    fill="#6EE7A0"
+    d="M23.8 22H29.4L38.8 35.4V22H44V29.2H47.2V24.4L57.6 32L47.2 39.6V34.8H44V42H38.4L29 28.8V42H23.8V22Z"
+  />
+  <text
+    x="74"
+    y="42"
+    fill="#EAF4EE"
+    font-family="Outfit, 'Plus Jakarta Sans', system-ui, sans-serif"
+    font-size="34"
+    font-weight="700"
+    letter-spacing="0.14em"
+  >NAPL</text>
+</svg>
