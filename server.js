@@ -268,11 +268,12 @@ app.post('/api/report-link', (req, res) => {
   }
 
   const portId = String(body.port_id || '').trim();
-  const token = String(body.token || '').trim();
+  const token = String(body.token || body.client_id || '').trim();
   const reason = String(body.reason || '').trim().slice(0, 120);
+  const note = String(body.note || '').replace(/\s+/g, ' ').trim().slice(0, 80);
   const url = String(body.url || '').trim().slice(0, 500);
 
-  if (!portId || !token || !reason) {
+  if (!portId || !token || (!reason && !note)) {
     return res.status(400).json({
       success: false,
       error: 'port_id, token, and reason are required.',
@@ -281,12 +282,13 @@ app.post('/api/report-link', (req, res) => {
 
   linkReports.set(`${portId}:${token}`, {
     portId,
-    reason,
+    reason: reason || note,
+    note,
     url,
     updatedAt: new Date().toISOString(),
   });
 
-  return res.json({ success: true, portId, reason });
+  return res.json({ success: true, portId, reason: reason || note, note });
 });
 
 // Sheet proxy endpoint for preview mode (avoids browser iframe CORS / redirect blocks)
@@ -368,6 +370,89 @@ app.post('/api/visit', async (req, res) => {
   }
 
   return res.json({ success: true, slug });
+});
+
+// Steam cover resolver/proxy for hashed Store asset paths (IStoreBrowseService)
+const steamCoverUrlCache = new Map();
+const STEAM_COVER_TTL_MS = 24 * 60 * 60 * 1000;
+
+async function fetchSteamAssetCandidateUrls(appid) {
+  const candidates = [];
+  const input = JSON.stringify({
+    ids: [{ appid: Number(appid) }],
+    context: { country_code: 'US' },
+    data_request: { include_assets: true },
+  });
+  const apiUrl = `https://api.steampowered.com/IStoreBrowseService/GetItems/v1/?input_json=${encodeURIComponent(input)}`;
+
+  try {
+    const apiRes = await fetch(apiUrl);
+    if (apiRes.ok) {
+      const payload = await apiRes.json();
+      const assets = payload?.response?.store_items?.[0]?.assets;
+      if (assets) {
+        const format = String(assets.asset_url_format || `steam/apps/${appid}/\${FILENAME}`);
+        const assetKeys = [
+          assets.library_capsule,
+          assets.library_capsule_2x,
+          assets.library_600x900,
+          assets.library_600x900_2x,
+          assets.header,
+        ].filter(Boolean);
+
+        for (const file of assetKeys) {
+          const pathPart = format.replace('${FILENAME}', file);
+          candidates.push(`https://shared.akamai.steamstatic.com/store_item_assets/${pathPart}`);
+        }
+      }
+    }
+  } catch (error) {
+    console.warn(`Steam asset lookup failed for app ${appid}:`, error);
+  }
+
+  candidates.push(
+    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appid}/library_600x900.jpg`,
+    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appid}/library_capsule.jpg`,
+    `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appid}/header.jpg`,
+    `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/library_600x900.jpg`,
+    `https://cdn.cloudflare.steamstatic.com/steam/apps/${appid}/header.jpg`
+  );
+
+  return [...new Set(candidates)];
+}
+
+app.get('/api/steam-cover/:appid', async (req, res) => {
+  const appid = String(req.params.appid || '').trim();
+  if (!/^\d{1,10}$/.test(appid)) {
+    return res.status(400).json({ error: 'Invalid Steam App ID.' });
+  }
+
+  const now = Date.now();
+  const cached = steamCoverUrlCache.get(appid);
+  const candidateUrls =
+    cached && now - cached.time < STEAM_COVER_TTL_MS
+      ? [cached.url]
+      : await fetchSteamAssetCandidateUrls(appid);
+
+  for (const url of candidateUrls) {
+    try {
+      const upstream = await fetch(url);
+      const contentType = upstream.headers.get('content-type') || '';
+      if (!upstream.ok || !contentType.toLowerCase().startsWith('image/')) {
+        continue;
+      }
+
+      steamCoverUrlCache.set(appid, { url, time: now });
+      const buffer = Buffer.from(await upstream.arrayBuffer());
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+      return res.send(buffer);
+    } catch {
+      // Try next candidate
+    }
+  }
+
+  return res.status(404).end();
 });
 
 app.use(
