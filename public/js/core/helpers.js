@@ -160,6 +160,29 @@ export function getMatchingPlatformPort(game, platform) {
     return bestPort;
 }
 
+const UNKNOWN_YEAR_VALUES = new Set([
+    "-",
+    "unknown",
+    "n/a",
+    "na",
+    "none",
+    "?",
+    "no information available",
+    "tba",
+    "tbd",
+]);
+
+export function normalizeYearValue(value) {
+    const clean = String(value ?? "")
+        .trim()
+        .replace(/\s+/g, " ");
+    const normalized = normalizeText(clean);
+    if (!normalized || UNKNOWN_YEAR_VALUES.has(normalized)) {
+        return "";
+    }
+    return clean;
+}
+
 const UNKNOWN_GENRE_VALUES = new Set([
     "-",
     "unknown",
