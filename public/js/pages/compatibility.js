@@ -6,6 +6,7 @@
  */
 
 import { normalizeText } from "../core/helpers.js";
+import { loadCoverImage } from "../core/cover-fallback.js?v=2";
 import { loadCatalog } from "../core/data.js";
 import {
     COMPAT_STATUSES,
@@ -17,8 +18,8 @@ import {
     groupIdenticalCompatReports,
 } from "../services/compatibility.js?v=18";
 import { initNavigation } from "../components/navigation.js?v=17";
-import { initSearch } from "../components/search.js";
-import { initThemeToggle } from "../components/theme.js";
+import { initSearch } from "../components/search.js?v=15";
+import { initThemeToggle } from "../components/theme.js?v=16";
 
 initThemeToggle();
 const headerSearch = initSearch();
@@ -489,20 +490,15 @@ function renderGroupedResults() {
         if (game.coverUrl && /^https?:\/\/\S+$/i.test(game.coverUrl)) {
             const img = document.createElement("img");
             img.className = "compat-game-cover";
-            img.src = game.coverUrl;
             img.alt = `${game.name} cover`;
             img.loading = "lazy";
             img.decoding = "async";
             img.referrerPolicy = "no-referrer";
-            img.addEventListener(
-                "error",
-                () => {
-                    img.remove();
-                    coverWrap.classList.add("cover-unavailable");
-                },
-                { once: true }
-            );
             coverWrap.appendChild(img);
+            loadCoverImage(img, game.coverUrl, () => {
+                img.remove();
+                coverWrap.classList.add("cover-unavailable");
+            });
         } else {
             coverWrap.classList.add("cover-unavailable");
         }
