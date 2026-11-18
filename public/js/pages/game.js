@@ -5,19 +5,19 @@
  * and shared navigation/search components.
  */
 
-import { createSlug } from "../core/helpers.js";
+import { createSlug } from "../core/helpers.js?v=15";
 import { loadCatalog } from "../core/data.js";
 import { registerGameVisit } from "../services/visits.js";
 import { loadPortRatings, createRatingActions } from "../services/ratings.js";
 import {
     loadGameCompatibility,
     createCompatibilityActions,
-} from "../services/compatibility.js";
+} from "../services/compatibility.js?v=19";
 import { initNavigation } from "../components/navigation.js?v=17";
-import { initSearch } from "../components/search.js";
-import { initThemeToggle } from "../components/theme.js";
+import { initSearch } from "../components/search.js?v=15";
+import { initThemeToggle } from "../components/theme.js?v=16";
 import { renderGameDetailSkeletons } from "../components/loading.js";
-import { displayGame } from "./game-render.js";
+import { displayGame } from "./game-render.js?v=25";
 
 initThemeToggle();
 const searchController = initSearch();
