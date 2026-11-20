@@ -891,12 +891,22 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
 
   const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
   const seenPortIds = new Set();
+  const seenPortSlugs = new Set();
   const normalizedPorts = rawPorts.map((p, idx) => {
     let portId = String(p?.portId || "").trim() || `${nextSlug}-port-${idx + 1}`;
     while (seenPortIds.has(portId)) {
       portId = `${portId}-${idx + 1}`;
     }
     seenPortIds.add(portId);
+    const basePortSlug = String(p?.slug || (nextSlug + "-" + slugify(p?.platform || "sin-plataforma")));
+    let portSlug = basePortSlug;
+    if (seenPortSlugs.has(portSlug)) {
+      const suffix = slugify(portId) || String(idx + 1);
+      portSlug = basePortSlug + "-" + suffix;
+      let n = 2;
+      while (seenPortSlugs.has(portSlug)) portSlug = basePortSlug + "-" + suffix + "-" + n++;
+    }
+    seenPortSlugs.add(portSlug);
     const url = String(p?.url || "").trim();
     const link = String(p?.link || "").trim();
     const githubRepo =
@@ -906,7 +916,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
 
     return {
       portId,
-      slug: String(p?.slug || (nextSlug + "-" + slugify(p?.platform || "sin-plataforma"))),
+      slug: portSlug,
       launchboxUrl: String(p?.launchboxUrl || ""),
       launchboxName: String(p?.launchboxName || ""),
       coverUrl: String(p?.coverUrl || rawGame.coverUrl || ""),
