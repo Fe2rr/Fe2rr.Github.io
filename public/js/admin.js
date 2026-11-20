@@ -38,6 +38,9 @@ let sidebarFilter = "all";
 let unsavedGame = false;
 let savingInFlight = false;
 let saveTimer = null;
+let saveQueued = false;
+let queuedSavePromise = null;
+let resolveQueuedSave = null;
 
 // Ephemeral per-editor UI states (cleared on switch)
 let launchboxStatus = { state: "", text: "", diff: null, undo: null };
@@ -162,9 +165,32 @@ function showAdmin() {
   $("admin-view").hidden = false;
 }
 
-function hydrateServerState(data, keepSelected = true) {
+function hydrateServerState(data, keepSelected = true, preserveGame = null) {
   if (data.catalog) {
-    catalog = data.catalog;
+    const nextCatalog = data.catalog;
+
+    // Keep the active editor object alive across autosave responses.
+    // Input handlers close over this object; replacing it makes later keystrokes
+    // update stale data and can restore old names or erase URLs on the next save.
+    if (preserveGame && data.saved?.slug) {
+      const freshGame = nextCatalog.games.find((g) => g.slug === data.saved.slug);
+      if (freshGame) {
+        const oldPorts = new Map((preserveGame.ports || []).map((p) => [p.portId, p]));
+        freshGame.ports = (freshGame.ports || []).map((freshPort) => {
+          const oldPort = oldPorts.get(freshPort.portId);
+          if (!oldPort) return freshPort;
+          Object.assign(oldPort, freshPort);
+          return oldPort;
+        });
+        Object.assign(preserveGame, freshGame);
+        nextCatalog.games = nextCatalog.games.map((g) =>
+          g.slug === data.saved.slug ? preserveGame : g
+        );
+        persistedSlugs.set(preserveGame, data.saved.slug);
+      }
+    }
+
+    catalog = nextCatalog;
     for (const g of catalog.games) {
       persistedSlugs.set(g, g.slug);
     }
@@ -553,6 +579,16 @@ function markUnsavedAndSchedule() {
 
 async function saveCurrentGame({ silent = false } = {}) {
   clearTimeout(saveTimer);
+  if (savingInFlight) {
+    saveQueued = true;
+    if (!queuedSavePromise) {
+      queuedSavePromise = new Promise((resolve) => {
+        resolveQueuedSave = resolve;
+      });
+    }
+    return queuedSavePromise;
+  }
+
   const game = gameBySlug(selectedSlug);
   if (!game) return;
 
@@ -574,8 +610,8 @@ async function saveCurrentGame({ silent = false } = {}) {
       });
     }
     selectedSlug = data.saved?.slug || game.slug;
-    hydrateServerState(data, true);
-    unsavedGame = false;
+    hydrateServerState(data, true, game);
+    unsavedGame = saveQueued;
     updateTopState();
     renderSidebar();
     if (!silent) {
@@ -586,6 +622,17 @@ async function saveCurrentGame({ silent = false } = {}) {
   } finally {
     savingInFlight = false;
     updateTopState();
+    if (saveQueued) {
+      saveQueued = false;
+      const resolve = resolveQueuedSave;
+      queuedSavePromise = null;
+      resolveQueuedSave = null;
+      try {
+        await saveCurrentGame({ silent: true });
+      } finally {
+        if (resolve) resolve();
+      }
+    }
   }
 }
 
