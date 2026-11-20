@@ -16,14 +16,7 @@ const CATALOG_SCHEMA_VERSION = 1;
 
 const PORT_STRING_FIELDS = [
     "portId",
-    "slug",
-    "launchboxUrl",
-    "launchboxName",
-    "coverUrl",
-    "genre",
-    "description",
     "project",
-    "platform",
     "developer",
     "year",
     "version",
@@ -99,30 +92,13 @@ function normalizeCatalogDocument(rawDoc, options = {}) {
         const description = cleanStr(rawGame.description);
         const launchboxUrl = cleanStr(rawGame.launchboxUrl);
 
-        const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
-        const ports = [];
-        const gamePlatforms = new Set();
-
-        for (const rawPort of rawPorts) {
-            if (!rawPort || typeof rawPort !== "object") continue;
-            const p = compactPort(rawPort, year);
-
-            if (p.platform) {
-                const platLabel = normalizePlatformLabel(p.platform);
-                p.platform = platLabel;
-                gamePlatforms.add(platLabel);
-
-                const platKey = normalizeText(platLabel);
-                if (
-                    !isMultiGameAppsPlatform(platLabel) &&
-                    !platformOrderSet.has(platKey)
-                ) {
-                    platformOrderSet.set(platKey, platLabel);
-                }
-            }
-
-            ports.push(p);
+        const platform = normalizePlatformLabel(rawGame.platform || rawGame.platforms?.[0] || "");
+        if (platform && !isMultiGameAppsPlatform(platform)) {
+            const platKey = normalizeText(platform);
+            if (!platformOrderSet.has(platKey)) platformOrderSet.set(platKey, platform);
         }
+        const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
+        const ports = rawPorts.filter((p) => p && typeof p === "object").map((p) => compactPort(p, year));
 
         const gameEntry = {
             name,
@@ -133,9 +109,7 @@ function normalizeCatalogDocument(rawDoc, options = {}) {
         if (genre) gameEntry.genre = genre;
         if (description) gameEntry.description = description;
         if (launchboxUrl) gameEntry.launchboxUrl = launchboxUrl;
-        if (gamePlatforms.size > 0) {
-            gameEntry.platforms = Array.from(gamePlatforms);
-        }
+        if (platform) gameEntry.platform = platform;
         gameEntry.ports = ports;
 
         normalizedGames.push(gameEntry);
@@ -169,9 +143,7 @@ export function hydrateCatalog(doc) {
         const gameDescription = String(rawGame.description || "");
         const slug = String(rawGame.slug || createSlug(gameName));
 
-        const platformSet = new Set(
-            Array.isArray(rawGame.platforms) ? rawGame.platforms.filter(Boolean) : []
-        );
+        const platform = String(rawGame.platform || rawGame.platforms?.[0] || "");
 
         const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
         const hydratedPorts = [];
@@ -181,15 +153,8 @@ export function hydrateCatalog(doc) {
             const port = {
                 game: gameName,
                 year: String(rawPort.year || gameYear || ""),
-                platform: String(rawPort.platform || ""),
                 project: String(rawPort.project || ""),
                 portId: String(rawPort.portId || ""),
-                slug: String(rawPort.slug || ""),
-                launchboxUrl: String(rawPort.launchboxUrl || ""),
-                launchboxName: String(rawPort.launchboxName || ""),
-                coverUrl: String(rawPort.coverUrl || gameCover),
-                genre: String(rawPort.genre || gameGenre),
-                description: String(rawPort.description || gameDescription),
                 link: String(rawPort.link || ""),
                 url: String(rawPort.url || ""),
                 dataUrl: String(rawPort.dataUrl || ""),
@@ -208,10 +173,6 @@ export function hydrateCatalog(doc) {
                 description: gameDescription,
             };
 
-            if (port.platform) {
-                platformSet.add(port.platform);
-            }
-
             hydratedPorts.push(port);
             allRows.push(port);
         }
@@ -223,7 +184,7 @@ export function hydrateCatalog(doc) {
             coverUrl: gameCover,
             genre: gameGenre,
             description: gameDescription,
-            platforms: Array.from(platformSet),
+            platform,
             ports: hydratedPorts,
         });
     }
