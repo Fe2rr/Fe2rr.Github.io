@@ -445,6 +445,13 @@ function portHtml(port, index) {
     diffBanner +
     "</div>" +
     '<div class="admin-port-details">' +
+    fieldHtml("Slug único de esta plataforma", port.slug || "", 'data-port-index="' + index + '" data-port-field="slug"') +
+    fieldHtml("URL de LaunchBox GamesDB", port.launchboxUrl || "", 'data-port-index="' + index + '" data-port-field="launchboxUrl"', "url", "", "https://gamesdb.launchbox-app.com/games/details/...") +
+    '<button type="button" class="button secondary small" data-lookup-launchbox-port="' + index + '">Obtener datos de LaunchBox</button>' +
+    fieldHtml("Título de LaunchBox", port.launchboxName || "", 'data-port-index="' + index + '" data-port-field="launchboxName") +
+    fieldHtml("Portada de esta plataforma", port.coverUrl || "", 'data-port-index="' + index + '" data-port-field="coverUrl"', "url") +
+    fieldHtml("Género", port.genre || "", 'data-port-index="' + index + '" data-port-field="genre") +
+    fieldHtml("Descripción", port.description || "", 'data-port-index="' + index + '" data-port-field="description"', "textarea", "full-width") +
     mainFields.map(fieldByKey).join("") +
     fieldByKey("link") +
     "</div>" +
