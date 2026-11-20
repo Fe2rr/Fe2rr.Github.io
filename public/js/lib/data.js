@@ -1,19 +1,21 @@
 /*
  * NAPL — CATALOG DATA LOADER & CLIENT CACHE
  *
- * Loads the static JSON database (`assets/data/catalog.json`) with instant
- * client-side CacheStorage / stale-while-revalidate caching and graceful
- * Google Sheets CSV fallback.
+ * Loads live catalog data from Cloudflare D1 (or local SQLite preview API)
+ * with instant CacheStorage stale-while-revalidate caching and graceful
+ * fallback to static `assets/data/catalog.json` and Google Sheets CSV.
  */
 
 import { hydrateCatalog, csvToCatalogDocument } from "./catalog-schema.js";
+import { resolveCatalogApiBase } from "./config.js";
 
 const CATALOG_JSON_URL = "assets/data/catalog.json";
 const SHEET_CSV_URL =
     "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
-const CATALOG_CACHE_NAME = "napl-catalog-v1";
-const CATALOG_META_STORAGE_KEY = "napl_catalog_cache_meta_v1";
-const CATALOG_SOFT_TTL_MS = 60 * 1000;
+const CATALOG_CACHE_NAME = "napl-catalog-v2";
+const CATALOG_CACHE_KEY = "/__napl_live_catalog__.json";
+const CATALOG_META_STORAGE_KEY = "napl_catalog_cache_meta_v2";
+const CATALOG_SOFT_TTL_MS = 30 * 1000;
 
 let catalogPromise = null;
 let revalidationPromise = null;
@@ -49,7 +51,7 @@ async function readCachedCatalogDoc() {
     }
     try {
         const cache = await window.caches.open(CATALOG_CACHE_NAME);
-        const match = await cache.match(CATALOG_JSON_URL);
+        const match = await cache.match(CATALOG_CACHE_KEY);
         if (!match) return null;
         const doc = await match.json();
         return doc && Array.isArray(doc.games) ? doc : null;
@@ -71,13 +73,40 @@ async function writeCachedCatalogDoc(doc) {
                 "Content-Type": "application/json; charset=utf-8",
             },
         });
-        await cache.put(CATALOG_JSON_URL, res);
+        await cache.put(CATALOG_CACHE_KEY, res);
     } catch {
         // Ignore CacheStorage write errors
     }
 }
 
-async function fetchJsonCatalog(bypassBrowserCache = false) {
+async function fetchLiveDbCatalog(bypassBrowserCache = false) {
+    const apiBase = resolveCatalogApiBase();
+    const endpoint = `${apiBase}/api/public/catalog`;
+    const url = bypassBrowserCache ? `${endpoint}?t=${Date.now()}` : endpoint;
+    const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
+    const timer = controller ? setTimeout(() => controller.abort(), 5500) : null;
+
+    try {
+        const response = await fetch(url, {
+            method: "GET",
+            cache: bypassBrowserCache ? "no-store" : "default",
+            signal: controller ? controller.signal : undefined,
+        });
+        if (!response.ok) {
+            throw new Error(`Live D1 catalog HTTP ${response.status}.`);
+        }
+        const doc = await response.json();
+        if (!doc || !Array.isArray(doc.games) || !doc.games.length) {
+            throw new Error("Live D1 catalog is empty.");
+        }
+        await writeCachedCatalogDoc(doc);
+        return doc;
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+async function fetchStaticJsonCatalog(bypassBrowserCache = false) {
     const url = bypassBrowserCache
         ? `${CATALOG_JSON_URL}?t=${Date.now()}`
         : CATALOG_JSON_URL;
@@ -117,9 +146,13 @@ async function fetchFallbackSheetCatalog() {
 
 async function loadFreshCatalogDoc(force = false) {
     try {
-        return await fetchJsonCatalog(force);
+        return await fetchLiveDbCatalog(force);
     } catch {
-        return await fetchFallbackSheetCatalog();
+        try {
+            return await fetchStaticJsonCatalog(force);
+        } catch {
+            return await fetchFallbackSheetCatalog();
+        }
     }
 }
 
@@ -128,7 +161,7 @@ function scheduleBackgroundRevalidation(cachedDoc, onBackgroundUpdate) {
 
     revalidationPromise = (async () => {
         try {
-            const freshDoc = await fetchJsonCatalog(true);
+            const freshDoc = await loadFreshCatalogDoc(true);
             const prevStamp = String(cachedDoc?.updatedAt || "");
             const nextStamp = String(freshDoc?.updatedAt || "");
 

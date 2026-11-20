@@ -1,0 +1,19 @@
+name = "napl-admin-api"
+main = "napl-admin-worker.js"
+compatibility_date = "2025-01-01"
+
+# 1. Crear base D1:
+#    npx wrangler d1 create napl-catalog-db
+# 2. Copiar el database_id generado aquí abajo:
+[[d1_databases]]
+binding = "DB"
+database_name = "napl-catalog-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+
+# Sincronización automática de repositorios de GitHub cada 6 horas
+[triggers]
+crons = ["0 */6 * * *"]
+
+[vars]
+AUTO_PUBLISH_CRON = "true"
+CRON_BATCH_SIZE = "20"

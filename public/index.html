@@ -121,7 +121,7 @@
     <link rel="stylesheet" href="assets/css/main.css?v=14">
     <link rel="stylesheet" href="assets/css/components.css?v=15">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
-    <link rel="stylesheet" href="assets/css/home.css?v=22">
+    <link rel="stylesheet" href="assets/css/home.css?v=26">
     <link rel="stylesheet" href="assets/css/game.css?v=25">
     <link rel="stylesheet" href="assets/css/compatibility.css?v=6">
     <link rel="stylesheet" href="assets/css/skeleton.css?v=10">
@@ -267,79 +267,76 @@
         aria-label="Game Spotlight"
     >
         <div id="spotlight-skeleton" class="spotlight-skeleton" aria-hidden="true">
-            <div class="skeleton spotlight-skeleton-cover"></div>
-            <div class="spotlight-skeleton-body">
-                <div class="skeleton spotlight-skeleton-kicker"></div>
-                <div class="skeleton spotlight-skeleton-title"></div>
-                <div class="skeleton spotlight-skeleton-meta"></div>
-                <div class="skeleton spotlight-skeleton-desc"></div>
-                <div class="skeleton spotlight-skeleton-actions">
-                    <div class="skeleton spotlight-skeleton-btn"></div>
-                    <div class="skeleton spotlight-skeleton-nav"></div>
+            <div class="spotlight-skeleton-content">
+                <div class="skeleton spotlight-skeleton-cover"></div>
+                <div class="spotlight-skeleton-body">
+                    <div class="skeleton spotlight-skeleton-kicker"></div>
+                    <div class="skeleton spotlight-skeleton-title"></div>
+                    <div class="skeleton spotlight-skeleton-meta"></div>
                 </div>
             </div>
         </div>
 
         <article id="spotlight-card" class="spotlight-card" hidden>
-            <a
-                id="spotlight-cover-link"
-                class="spotlight-cover-frame"
-                href="./"
-                aria-label="View featured game"
+            <img
+                id="spotlight-backdrop"
+                class="spotlight-backdrop"
+                alt=""
+                aria-hidden="true"
+                loading="eager"
+                decoding="async"
+                referrerpolicy="no-referrer"
             >
-                <img
-                    id="spotlight-cover"
-                    class="spotlight-cover"
-                    alt=""
-                    loading="eager"
-                    decoding="async"
-                    referrerpolicy="no-referrer"
-                >
-            </a>
 
-            <div class="spotlight-body">
-                <div class="spotlight-top-row">
-                    <span class="spotlight-kicker">Trending Spotlight</span>
-                    <span id="spotlight-meta" class="spotlight-meta"></span>
+            <button
+                type="button"
+                id="spotlight-prev"
+                class="spotlight-nav-btn spotlight-nav-prev"
+                aria-label="Previous featured game"
+                title="Previous featured game"
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m15 18-6-6 6-6"/>
+                </svg>
+            </button>
+
+            <div class="spotlight-content">
+                <div id="spotlight-cover-frame" class="spotlight-cover-frame">
+                    <img
+                        id="spotlight-cover"
+                        class="spotlight-cover"
+                        alt=""
+                        loading="eager"
+                        decoding="async"
+                        referrerpolicy="no-referrer"
+                    >
                 </div>
 
-                <h3 class="spotlight-title">
-                    <a id="spotlight-title-link" href="./"></a>
-                </h3>
-
-                <p id="spotlight-port-line" class="spotlight-port-line"></p>
-                <p id="spotlight-description" class="spotlight-description"></p>
-
-                <div class="spotlight-actions">
-                    <a id="spotlight-cta" class="spotlight-cta" href="./">
-                        View Port <span aria-hidden="true">→</span>
-                    </a>
-                    <div class="spotlight-nav" role="group" aria-label="Spotlight navigation">
-                        <button
-                            type="button"
-                            id="spotlight-prev"
-                            class="spotlight-nav-btn"
-                            aria-label="Previous featured game"
-                        >
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="m15 18-6-6 6-6"/>
-                            </svg>
-                            <span>Previous</span>
-                        </button>
-                        <button
-                            type="button"
-                            id="spotlight-next"
-                            class="spotlight-nav-btn"
-                            aria-label="Next featured game"
-                        >
-                            <span>Next</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-                                <path d="m9 18 6-6-6-6"/>
-                            </svg>
-                        </button>
+                <div class="spotlight-body">
+                    <div class="spotlight-top-row">
+                        <span class="spotlight-kicker">Trending Spotlight</span>
+                        <span id="spotlight-meta" class="spotlight-meta"></span>
                     </div>
+
+                    <h3 class="spotlight-title">
+                        <a id="spotlight-title-link" href="./"></a>
+                    </h3>
+
+                    <p id="spotlight-port-line" class="spotlight-port-line"></p>
                 </div>
             </div>
+
+            <button
+                type="button"
+                id="spotlight-next"
+                class="spotlight-nav-btn spotlight-nav-next"
+                aria-label="Next featured game"
+                title="Next featured game"
+            >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                    <path d="m9 18 6-6-6-6"/>
+                </svg>
+            </button>
         </article>
     </section>
 

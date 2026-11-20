@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
 import { fileURLToPath } from 'url';
+import { createLocalD1Store } from './lib/local-d1.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +13,12 @@ const PORT = 3000;
 const HOST = '0.0.0.0';
 const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev';
 const CATALOG_PATH = path.join(__dirname, 'public', 'assets', 'data', 'catalog.json');
+const SCHEMA_PATH = path.join(__dirname, 'cloudflare', 'schema.sql');
+const localD1 = createLocalD1Store({
+  rootDir: __dirname,
+  catalogJsonPath: CATALOG_PATH,
+  schemaSqlPath: SCHEMA_PATH,
+});
 
 const COMPRESSIBLE_CONTENT_TYPE = /^(?:text\/|application\/(?:json|javascript|ecmascript|xml)|image\/svg\+xml)/i;
 
@@ -168,7 +175,7 @@ function createCompressionMiddleware() {
 }
 
 app.use(createCompressionMiddleware());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 // Load strict Android device list for compatibility validation (supports sharded manifest or raw array)
 const deviceMap = new Map();
@@ -216,22 +223,178 @@ try {
 
 app.get('/api/catalog-meta', (req, res) => {
   try {
-    const stat = fs.statSync(CATALOG_PATH);
-    const doc = JSON.parse(fs.readFileSync(CATALOG_PATH, 'utf8'));
-    const totalPorts = (doc.games || []).reduce(
+    const { catalog } = localD1.readCatalog({ includeInternal: false });
+    const totalPorts = (catalog.games || []).reduce(
       (sum, g) => sum + (Array.isArray(g.ports) ? g.ports.length : 0),
       0
     );
     res.setHeader('Cache-Control', 'no-cache, must-revalidate');
     return res.json({
-      version: Number(doc.version) || 1,
-      updatedAt: String(doc.updatedAt || ''),
-      gamesCount: Array.isArray(doc.games) ? doc.games.length : 0,
+      version: Number(catalog.version) || 1,
+      updatedAt: String(catalog.updatedAt || ''),
+      gamesCount: Array.isArray(catalog.games) ? catalog.games.length : 0,
       portsCount: totalPorts,
-      sizeBytes: stat.size,
+      sizeBytes: Buffer.byteLength(JSON.stringify(catalog), 'utf8'),
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Could not read catalog metadata.' });
+  }
+});
+
+// Public live catalog served from local D1 parity database
+app.get('/api/public/catalog', (req, res) => {
+  try {
+    const { catalog } = localD1.readCatalog({ includeInternal: false });
+    const etag = `"napl-${catalog.updatedAt}"`;
+    if (req.headers['if-none-match'] === etag) {
+      res.setHeader('ETag', etag);
+      res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+      return res.status(304).end();
+    }
+    res.setHeader('ETag', etag);
+    res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
+    return res.json(catalog);
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Could not read live catalog.' });
+  }
+});
+
+// Admin + D1 parity endpoints (mirroring Cloudflare Worker API)
+function requireAdminAuth(req, res, next) {
+  if (!localD1.verifyToken(req.headers.authorization)) {
+    return res.status(401).json({ error: 'Sesión inválida o vencida. Iniciá sesión nuevamente.' });
+  }
+  return next();
+}
+
+app.get('/api/health', (req, res) => {
+  return res.json({
+    ok: true,
+    localMode: true,
+    d1: true,
+    hasCustomPassword: localD1.hasCustomPassword(),
+    configured: {
+      adminPassword: true,
+      githubToken: Boolean(process.env.GITHUB_TOKEN),
+      sessionSecret: true,
+      d1: true,
+    },
+  });
+});
+
+app.post('/api/login', (req, res) => {
+  const password = String(req.body?.password || '');
+  if (!localD1.verifyPassword(password)) {
+    return res.status(401).json({ error: 'Contraseña incorrecta.' });
+  }
+  return res.json({ token: localD1.createToken(), expiresIn: 8 * 60 * 60 * 1000 });
+});
+
+app.post('/api/logout', (req, res) => {
+  return res.json({ success: true });
+});
+
+app.get('/api/catalog', requireAdminAuth, (req, res) => {
+  try {
+    const data = localD1.readCatalog({ includeInternal: true });
+    return res.json({ ...data, exists: data.catalog.games.length > 0 });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'No se pudo leer el catálogo.' });
+  }
+});
+
+app.post('/api/games', requireAdminAuth, (req, res) => {
+  try {
+    const saved = localD1.saveSingleGame(null, req.body?.game || req.body, true);
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ success: true, saved, ...state });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'No se pudo crear el juego.' });
+  }
+});
+
+app.put('/api/games/:slug', requireAdminAuth, (req, res) => {
+  try {
+    const saved = localD1.saveSingleGame(req.params.slug, req.body?.game || req.body, false);
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ success: true, saved, ...state });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'No se pudo guardar el juego.' });
+  }
+});
+
+app.delete('/api/games/:slug', requireAdminAuth, (req, res) => {
+  try {
+    const removed = localD1.deleteGame(req.params.slug);
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ success: true, removed, ...state });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'No se pudo eliminar el juego.' });
+  }
+});
+
+app.post('/api/lookup/github', requireAdminAuth, async (req, res) => {
+  try {
+    const github = await localD1.inspectGithubRepo(req.body?.url || req.body?.repo);
+    return res.json({ success: true, github });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'Error consultando GitHub.' });
+  }
+});
+
+app.post('/api/lookup/launchbox', requireAdminAuth, async (req, res) => {
+  try {
+    const launchbox = await localD1.inspectLaunchboxUrl(req.body?.url);
+    return res.json({ success: true, launchbox });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'Error consultando LaunchBox.' });
+  }
+});
+
+app.post('/api/ports/sync', requireAdminAuth, async (req, res) => {
+  try {
+    const portId = String(req.body?.portId || '').trim();
+    if (!portId) return res.status(400).json({ error: 'portId requerido.' });
+    const result = await localD1.syncSinglePort(portId);
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ success: true, result, ...state });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'Error sincronizando port.' });
+  }
+});
+
+app.post('/api/sync-github', requireAdminAuth, async (req, res) => {
+  try {
+    const sync = await localD1.runGithubSyncBatch({
+      source: 'manual',
+      limit: req.body?.limit || 20,
+      offset: req.body?.offset || 0,
+      useOffset: Boolean(req.body?.useOffset),
+    });
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ success: true, sync, ...state });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'Error en sincronización de GitHub.' });
+  }
+});
+
+app.post('/api/import-sheets', requireAdminAuth, async (req, res) => {
+  try {
+    const imported = await localD1.importSheets();
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ ...state, summary: imported.summary });
+  } catch (error) {
+    return res.status(502).json({ error: error?.message || 'Error importando hoja CSV.' });
+  }
+});
+
+app.post('/api/publish', requireAdminAuth, async (req, res) => {
+  try {
+    const result = await localD1.publishCatalog(req.body?.catalog);
+    const state = localD1.readCatalog({ includeInternal: true });
+    return res.json({ success: true, ...result, ...state });
+  } catch (error) {
+    return res.status(500).json({ error: error?.message || 'No se pudo publicar el catálogo.' });
   }
 });
 
@@ -687,6 +850,12 @@ app.use(
     },
   })
 );
+
+const SIX_HOURS_MS = 6 * 60 * 60 * 1000;
+const scheduledSyncTimer = setInterval(() => {
+  localD1.runGithubSyncBatch({ source: 'cron', limit: 20, useOffset: false }).catch(() => {});
+}, SIX_HOURS_MS);
+scheduledSyncTimer.unref();
 
 app.listen(PORT, HOST, () => {
   console.log(`Server running at http://${HOST}:${PORT}`);

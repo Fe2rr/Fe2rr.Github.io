@@ -1,32 +1,48 @@
-# NAPL Admin API (Cloudflare Worker)
+# NAPL API & Database Worker (Cloudflare Worker + D1)
 
-Worker deployed as `napl-admin-api` for the NAPL-prueba repository.
+Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudflare D1**, con:
+- Lectura pública en vivo (`GET /api/public/catalog`) con soporte `ETag` y CORS.
+- Autenticación de administrador y operaciones CRUD directas sobre juegos y ports en D1.
+- Autocompletado server-side al pegar URLs de **GitHub** (`POST /api/lookup/github`) y **LaunchBox GamesDB** (`POST /api/lookup/launchbox`).
+- Sincronización automática programada (Cron Trigger cada 6 horas) y manual (`POST /api/sync-github`) de versiones, fechas, redirecciones y repositorios caídos en GitHub.
+- Publicación de instantánea hacia `public/assets/data/catalog.json` en `Fe2rr/Napl-prueba` (`POST /api/publish`) para mantener GitHub Pages y el fallback estático al día.
 
-## Required secrets
+## Configuración en Cloudflare
 
-Configure these under Cloudflare Dashboard → Workers & Pages → napl-admin-api → Settings → Variables and Secrets:
+1. **Crear la base de datos D1** (desde Dashboard o CLI):
+   ```bash
+   npx wrangler d1 create napl-catalog-db
+   ```
+   Copiá el `database_id` en `cloudflare/wrangler.toml` (o enlazá la base con nombre de binding **`DB`** desde *Workers & Pages → napl-admin-api → Settings → Bindings*).
 
-- `ADMIN_PASSWORD` — a strong password used by the administrator.
-- `GITHUB_TOKEN` — GitHub fine-grained PAT with **Contents: Read and write** for `Fe2rr/Napl-prueba`.
+2. **Aplicar el esquema SQL**:
+   ```bash
+   npx wrangler d1 execute napl-catalog-db --remote --file=cloudflare/schema.sql
+   ```
+   *(El Worker también inicializa las tablas automáticamente si no existen y siembra D1 desde `catalog.json` en la primera lectura si la base está vacía).*
 
-`SESSION_SECRET` is generated and already configured as a Worker secret. Do not replace it unless you intend to invalidate active sessions.
+3. **Variables y Secretos requeridos** (*Settings → Variables and Secrets*):
+   - `ADMIN_PASSWORD`: contraseña de acceso al panel Admin.
+   - `GITHUB_TOKEN`: Fine-grained PAT con **Contents: Read and write** para `Fe2rr/Napl-prueba` (también amplía el límite de consultas GitHub a 5.000 req/h).
+   - `SESSION_SECRET`: secreto HMAC ya configurado para firmar tokens de sesión.
+   - `ADMIN_ORIGIN` *(opcional)*: orígenes extra separados por coma además de `https://fe2rr.github.io`.
+   - `AUTO_PUBLISH_CRON` *(opcional, default `"true"`)*: si es `"true"`, cuando el Cron detecta cambios en GitHub actualiza también `public/assets/data/catalog.json` en GitHub.
 
-## Fixed target
+4. **Desplegar Worker y Cron**:
+   ```bash
+   npx wrangler deploy --config cloudflare/wrangler.toml
+   ```
 
-- Repository: `Fe2rr/Napl-prueba`
-- Branch: `main`
-- Catalog path: `public/assets/data/catalog.json`
-- Admin page: `https://fe2rr.github.io/Napl-prueba/admin.html`
-- API: `https://napl-admin-api.federicoxastro.workers.dev`
+## Endpoints principales
 
-The public site remains static. The Worker is only used by the administrator to read/import/publish catalog data. Supabase is not used for the catalog.
-
-## API
-
-- `GET /api/health` — configuration status (no secrets exposed)
-- `POST /api/login` — password login, returns an expiring signed session token
-- `GET /api/catalog` — read the JSON catalog (authenticated)
-- `POST /api/import-sheets` — import Google Sheets CSV into a preview (authenticated; does not publish)
-- `POST /api/publish` — validate and commit the catalog JSON to GitHub (authenticated)
-
-The admin session is stored in `sessionStorage`, expires after 8 hours, and is not the GitHub token. GitHub credentials never reach the browser.
+- `GET /api/health` — estado de D1 y secretos configurados.
+- `GET /api/public/catalog` — catálogo público en vivo desde D1 (`ETag` + caché corta).
+- `POST /api/login` / `POST /api/logout` — sesión de administrador (Bearer token de 8h).
+- `GET /api/catalog` — catálogo completo, estadísticas y últimos logs de sincronización.
+- `POST /api/games` / `PUT /api/games/:slug` / `DELETE /api/games/:slug` — CRUD directo en D1.
+- `POST /api/ports/sync` — sincroniza un port individual de GitHub y lo guarda en D1.
+- `POST /api/lookup/github` — extrae proyecto, desarrollador, versión, fecha y descarga desde una URL de GitHub.
+- `POST /api/lookup/launchbox` — extrae título, año, género, descripción y portada desde LaunchBox GamesDB.
+- `POST /api/sync-github` — ejecuta lote de revisión de repositorios en GitHub y registra historial.
+- `POST /api/import-sheets` — importa CSV de Google Sheets a D1.
+- `POST /api/publish` — publica la instantánea actual de D1 en `Fe2rr/Napl-prueba` (`public/assets/data/catalog.json`).

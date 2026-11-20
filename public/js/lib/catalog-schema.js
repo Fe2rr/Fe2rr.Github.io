@@ -27,6 +27,8 @@ const PORT_STRING_FIELDS = [
     "link",
     "url",
     "dataUrl",
+    "githubRepo",
+    "githubStatus",
     "lastUpdate",
     "dateAdded",
     "notes",
@@ -89,6 +91,7 @@ function normalizeCatalogDocument(rawDoc, options = {}) {
         const coverUrl = cleanStr(rawGame.coverUrl);
         const genre = cleanStr(rawGame.genre);
         const description = cleanStr(rawGame.description);
+        const launchboxUrl = cleanStr(rawGame.launchboxUrl);
 
         const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
         const ports = [];
@@ -123,6 +126,7 @@ function normalizeCatalogDocument(rawDoc, options = {}) {
         if (coverUrl) gameEntry.coverUrl = coverUrl;
         if (genre) gameEntry.genre = genre;
         if (description) gameEntry.description = description;
+        if (launchboxUrl) gameEntry.launchboxUrl = launchboxUrl;
         if (gamePlatforms.size > 0) {
             gameEntry.platforms = Array.from(gamePlatforms);
         }
@@ -177,6 +181,8 @@ export function hydrateCatalog(doc) {
                 link: String(rawPort.link || ""),
                 url: String(rawPort.url || ""),
                 dataUrl: String(rawPort.dataUrl || ""),
+                githubRepo: String(rawPort.githubRepo || ""),
+                githubStatus: String(rawPort.githubStatus || ""),
                 developer: String(rawPort.developer || ""),
                 version: String(rawPort.version || ""),
                 controller: String(rawPort.controller || ""),

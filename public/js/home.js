@@ -96,7 +96,10 @@ function runWithViewTransition(updateFn, { animate = true } = {}) {
         !prefersReducedMotion &&
         typeof document.startViewTransition === "function"
     ) {
-        return document.startViewTransition(updateFn);
+        const transition = document.startViewTransition(updateFn);
+        transition?.ready?.catch?.(() => {});
+        transition?.finished?.catch?.(() => {});
+        return transition;
     }
 
     updateFn();

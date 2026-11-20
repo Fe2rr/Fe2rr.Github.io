@@ -140,14 +140,13 @@ export function createSpotlightController() {
     const section = document.getElementById("game-spotlight");
     const skeleton = document.getElementById("spotlight-skeleton");
     const card = document.getElementById("spotlight-card");
-    const coverLink = document.getElementById("spotlight-cover-link");
+    const backdropImg = document.getElementById("spotlight-backdrop");
+    const coverFrame = document.getElementById("spotlight-cover-frame");
     const coverImg = document.getElementById("spotlight-cover");
     const kickerEl = card?.querySelector(".spotlight-kicker") || null;
     const metaEl = document.getElementById("spotlight-meta");
     const titleLink = document.getElementById("spotlight-title-link");
     const portLineEl = document.getElementById("spotlight-port-line");
-    const descriptionEl = document.getElementById("spotlight-description");
-    const ctaLink = document.getElementById("spotlight-cta");
     const prevButton = document.getElementById("spotlight-prev");
     const nextButton = document.getElementById("spotlight-next");
 
@@ -229,25 +228,24 @@ export function createSpotlightController() {
         }, 220);
     }
 
-    function attachDetailTransition(anchor) {
-        if (!anchor) return;
-        anchor.addEventListener("click", (event) => {
-            if (
-                event.button !== 0 ||
-                event.metaKey ||
-                event.ctrlKey ||
-                event.shiftKey ||
-                event.altKey
-            ) {
-                return;
-            }
-            clearHeroViewTransitions();
-            if (coverLink) coverLink.style.viewTransitionName = "napl-hero-cover";
-            const titleHeading = card?.querySelector(".spotlight-title");
-            if (titleHeading) {
-                titleHeading.style.viewTransitionName = "napl-hero-title";
-            }
-        });
+    function applyDetailTransition() {
+        clearHeroViewTransitions();
+        if (coverFrame) coverFrame.style.viewTransitionName = "napl-hero-cover";
+        const titleHeading = card?.querySelector(".spotlight-title");
+        if (titleHeading) {
+            titleHeading.style.viewTransitionName = "napl-hero-title";
+        }
+    }
+
+    function syncBackdropCover(src) {
+        if (!backdropImg) return;
+        if (src) {
+            backdropImg.src = src;
+            backdropImg.classList.add("is-loaded");
+        } else {
+            backdropImg.classList.remove("is-loaded");
+            backdropImg.removeAttribute("src");
+        }
     }
 
     function preloadAdjacentEntries() {
@@ -299,17 +297,12 @@ export function createSpotlightController() {
         const gameUrl = new URL("./", window.location.href);
         gameUrl.searchParams.set("game", game.slug);
 
-        if (coverLink) {
-            coverLink.href = gameUrl.href;
-            coverLink.setAttribute("aria-label", `View ${game.name}`);
-            coverLink.classList.remove("cover-unavailable", "is-loaded");
+        if (coverFrame) {
+            coverFrame.classList.remove("cover-unavailable", "is-loaded");
         }
         if (titleLink) {
             titleLink.href = gameUrl.href;
             titleLink.textContent = game.name;
-        }
-        if (ctaLink) {
-            ctaLink.href = gameUrl.href;
         }
         if (kickerEl) {
             kickerEl.textContent = isTrending
@@ -348,44 +341,34 @@ export function createSpotlightController() {
                 : `Port: ${portName}`;
         }
 
-        if (descriptionEl) {
-            const rawDesc = String(game.description || "").trim();
-            if (rawDesc) {
-                descriptionEl.textContent = rawDesc;
-                descriptionEl.hidden = false;
-            } else {
-                const genre = String(game.genre || "").trim();
-                descriptionEl.textContent = genre
-                    ? `${genre} title with playable native Android port details and build links.`
-                    : "Explore native Android port builds, compatibility info, and project links.";
-                descriptionEl.hidden = false;
-            }
-        }
-
         if (coverImg) {
             const token = ++renderToken;
             coverImg.alt = `${game.name} cover`;
             coverImg.hidden = false;
             coverImg.removeAttribute("src");
+            syncBackdropCover("");
 
             const onLoaded = () => {
                 if (token !== renderToken) return;
-                coverLink?.classList.add("is-loaded");
+                coverFrame?.classList.add("is-loaded");
+                syncBackdropCover(coverImg.currentSrc || coverImg.src);
             };
             coverImg.addEventListener("load", onLoaded, { once: true });
 
             loadCoverImage(coverImg, String(game.coverUrl || "").trim(), () => {
                 if (token !== renderToken) return;
                 coverImg.hidden = true;
-                coverLink?.classList.remove("is-loaded");
-                coverLink?.classList.add("cover-unavailable");
+                coverFrame?.classList.remove("is-loaded");
+                coverFrame?.classList.add("cover-unavailable");
+                syncBackdropCover("");
                 if (queue.length > 1) {
                     handleBrokenCurrentEntry(game.slug, direction);
                 }
             });
 
             if (coverImg.complete && coverImg.naturalWidth > 0) {
-                coverLink?.classList.add("is-loaded");
+                coverFrame?.classList.add("is-loaded");
+                syncBackdropCover(coverImg.currentSrc || coverImg.src);
             }
         }
 
@@ -513,17 +496,47 @@ export function createSpotlightController() {
         }
     }
 
-    prevButton?.addEventListener("click", () => {
+    prevButton?.addEventListener("click", (event) => {
+        event.stopPropagation();
         stepSlide(-1, true);
     });
 
-    nextButton?.addEventListener("click", () => {
+    nextButton?.addEventListener("click", (event) => {
+        event.stopPropagation();
         stepSlide(1, true);
     });
 
-    attachDetailTransition(coverLink);
-    attachDetailTransition(titleLink);
-    attachDetailTransition(ctaLink);
+    titleLink?.addEventListener("click", (event) => {
+        if (
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+        ) {
+            return;
+        }
+        applyDetailTransition();
+    });
+
+    card?.addEventListener("click", (event) => {
+        if (event.target?.closest?.("button, .spotlight-nav, a")) return;
+        if (event.button !== 0) return;
+        if (window.getSelection?.()?.toString()) return;
+        if (!titleLink?.getAttribute("href")) return;
+
+        titleLink.dispatchEvent(
+            new MouseEvent("click", {
+                bubbles: true,
+                cancelable: true,
+                view: window,
+                ctrlKey: event.ctrlKey,
+                metaKey: event.metaKey,
+                shiftKey: event.shiftKey,
+                altKey: event.altKey,
+            })
+        );
+    });
 
     section?.addEventListener("pointerenter", () => {
         isHovering = true;
