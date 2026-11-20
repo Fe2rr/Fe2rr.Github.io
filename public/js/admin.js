@@ -885,13 +885,16 @@ function bindEditorEvents(root, game) {
       const key = input.dataset.gameField;
       const old = game[key];
       game[key] = input.value;
-      if (key === "name" && (!game.slug || game.slug === slugify(old))) {
-        const candidate = slugify(input.value);
-        if (candidate) {
-          game.slug = candidate;
-          const slugInput = root.querySelector('[data-game-field="slug"]');
-          if (slugInput) slugInput.value = game.slug;
-          selectedSlug = game.slug;
+      if (key === "name") {
+        const previousBase = slugify(old);
+        const nextBase = slugify(input.value);
+        if (nextBase) {
+          game.ports.forEach((port) => {
+            const platformSlug = slugify(port.platform || "sin-plataforma");
+            if (port.slug === previousBase + "-" + platformSlug) {
+              port.slug = nextBase + "-" + platformSlug;
+            }
+          });
         }
       }
       if (key === "slug") selectedSlug = game.slug;
