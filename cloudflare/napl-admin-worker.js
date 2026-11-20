@@ -442,9 +442,14 @@ function validateCatalog(input) {
     if (!g || typeof g.name !== "string" || !g.name.trim()) {
       throw new Error("Cada juego necesita nombre.");
     }
-    const s = String(g.slug || slugify(g.name)).trim();
-    if (!s || slugs.has(s)) {
-      throw new Error(`Slug vacío o duplicado: ${s}`);
+    const baseSlug = String(g.slug || slugify(g.name)).trim();
+    if (!baseSlug) {
+      throw new Error("Slug vacío.");
+    }
+    let s = baseSlug;
+    let suffix = 2;
+    while (slugs.has(s)) {
+      s = `${baseSlug}-${suffix++}`;
     }
     slugs.add(s);
     if (!Array.isArray(g.ports)) {
@@ -872,8 +877,15 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
     throw new Error("El juego necesita un nombre.");
   }
 
-  const nextSlug = String(rawGame.slug || slugify(rawGame.name)).trim();
-  if (!nextSlug) throw new Error("Slug inválido.");
+  const baseSlug = String(rawGame.slug || slugify(rawGame.name)).trim();
+  if (!baseSlug) throw new Error("Slug inválido.");
+  let nextSlug = baseSlug;
+  if (isCreate || nextSlug !== targetSlug) {
+    let suffix = 2;
+    while (await env.DB.prepare("SELECT slug FROM games WHERE slug = ?").bind(nextSlug).first()) {
+      nextSlug = `${baseSlug}-${suffix++}`;
+    }
+  }
   const now = new Date().toISOString();
 
   let sortOrder = 0;
@@ -888,13 +900,6 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
   } else {
     const minRow = await env.DB.prepare("SELECT MIN(sort_order) AS min_order FROM games").first();
     sortOrder = minRow && minRow.min_order != null ? Number(minRow.min_order) - 1 : 0;
-  }
-
-  if ((isCreate || nextSlug !== targetSlug)) {
-    const conflict = await env.DB.prepare("SELECT slug FROM games WHERE slug = ?").bind(nextSlug).first();
-    if (conflict) {
-      throw new Error(`Ya existe un juego con el slug '${nextSlug}'.`);
-    }
   }
 
   const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
