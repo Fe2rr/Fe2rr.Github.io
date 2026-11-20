@@ -448,6 +448,12 @@ function validateCatalog(input) {
       const o = {};
       for (const k of [
         "portId",
+        "slug",
+        "launchboxUrl",
+        "launchboxName",
+        "coverUrl",
+        "genre",
+        "description",
         "project",
         "platform",
         "developer",
@@ -744,6 +750,12 @@ async function readCatalogFromD1(env, options = {}) {
 
     const port = {
       portId: r.port_id,
+      slug: r.slug || (r.game_slug + "-" + slugify(r.platform || "sin-plataforma")),
+      launchboxUrl: r.launchbox_url || "",
+      launchboxName: r.launchbox_name || "",
+      coverUrl: r.cover_url || "",
+      genre: r.genre || "",
+      description: r.description || "",
       project: r.project,
       platform: r.platform,
       developer: r.developer,
@@ -882,6 +894,12 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
 
     return {
       portId,
+      slug: String(p?.slug || (nextSlug + "-" + slugify(p?.platform || "sin-plataforma"))),
+      launchboxUrl: String(p?.launchboxUrl || ""),
+      launchboxName: String(p?.launchboxName || ""),
+      coverUrl: String(p?.coverUrl || rawGame.coverUrl || ""),
+      genre: String(p?.genre || rawGame.genre || ""),
+      description: String(p?.description || rawGame.description || ""),
       project: String(p?.project || ""),
       platform: String(p?.platform || ""),
       developer: String(p?.developer || ""),
