@@ -37,7 +37,6 @@ let selectedSlug = "";
 let sidebarFilter = "all";
 let unsavedGame = false;
 let savingInFlight = false;
-let saveTimer = null;
 let saveQueued = false;
 let queuedSavePromise = null;
 let resolveQueuedSave = null;
@@ -115,7 +114,6 @@ function setNotice(message, type = "") {
 function updateTopState() {
   const dot = $("state-dot");
   const label = $("save-state");
-  const publishBtn = $("publish-button");
 
   dot.classList.remove("pending", "saving");
   if (savingInFlight) {
@@ -131,7 +129,6 @@ function updateTopState() {
     label.textContent = "Sincronizado (D1 + GitHub)";
   }
 
-  publishBtn.disabled = savingInFlight || (!stats.pendingGitHubSync && !unsavedGame);
   $("catalog-count").textContent = `${catalog.games.length} juegos · ${catalog.games.reduce(
     (n, g) => n + g.ports.length,
     0
@@ -343,9 +340,7 @@ function renderSidebar() {
 
   root.querySelectorAll("[data-game]").forEach((button) => {
     button.addEventListener("click", async () => {
-      if (unsavedGame) {
-        await saveCurrentGame({ silent: true });
-      }
+      if (unsavedGame && !confirm("Hay cambios sin guardar. ¿Descartarlos y cambiar de juego?")) return;
       selectedSlug = button.dataset.game;
       launchboxStatus = { state: "", text: "", diff: null, undo: null };
       portUiState.clear();
@@ -526,7 +521,7 @@ function renderEditor() {
     esc(game.slug) +
     " · " +
     game.ports.length +
-    ' ports</p></div><div class="editor-heading-actions"><button class="button primary" id="save-game-db" type="button">Guardar en D1</button><button class="button danger-button" id="delete-game" type="button">Eliminar juego</button></div></div>' +
+    ' ports</p></div><div class="editor-heading-actions"><button class="button primary" id="save-game-db" type="button">Guardar cambios</button><button class="button danger-button" id="delete-game" type="button">Eliminar juego</button></div></div>' +
     '<section class="admin-game-hero"><div class="admin-cover-column"><div class="admin-cover-frame"><img class="cover-preview" id="cover-preview" src="' +
     esc(game.coverUrl || "") +
     '" alt="Portada de ' +
@@ -578,14 +573,9 @@ function syncPlatforms(game) {
 function markUnsavedAndSchedule() {
   unsavedGame = true;
   updateTopState();
-  clearTimeout(saveTimer);
-  saveTimer = setTimeout(() => {
-    saveCurrentGame({ silent: true });
-  }, 750);
 }
 
 async function saveCurrentGame({ silent = false } = {}) {
-  clearTimeout(saveTimer);
   if (savingInFlight) {
     saveQueued = true;
     if (!queuedSavePromise) {
@@ -622,7 +612,11 @@ async function saveCurrentGame({ silent = false } = {}) {
     updateTopState();
     renderSidebar();
     if (!silent) {
-      setNotice("Juego guardado directamente en Cloudflare D1 / DB.", "success");
+      if (data.publishError) {
+        setNotice("Juego guardado en D1, pero GitHub no pudo actualizarse: " + data.publishError + ". Podés reintentar con «Publicar en GitHub».", "error");
+      } else {
+        setNotice("Juego guardado y catálogo publicado en GitHub.", "success");
+      }
     }
   } catch (error) {
     setNotice("No se pudo guardar en DB: " + error.message, "error");
@@ -805,7 +799,17 @@ async function runGithubAutofill(game, index, rawUrl) {
 }
 
 function bindEditorEvents(root, game) {
-  $("save-game-db")?.addEventListener("click", () => saveCurrentGame({ silent: false }));
+  $("save-game-db")?.addEventListener("click", async () => {
+    const btn = $("save-game-db");
+    btn.disabled = true;
+    btn.textContent = "Guardando y publicando…";
+    try {
+      await saveCurrentGame({ silent: false });
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Guardar cambios";
+    }
+  });
 
   $("delete-game")?.addEventListener("click", async () => {
     if (!confirm('¿Eliminar "' + game.name + '" y todos sus ports de la base de datos?')) return;
