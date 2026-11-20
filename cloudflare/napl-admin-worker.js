@@ -304,227 +304,50 @@ function col(row, names) {
 }
 
 function fromRows(rows) {
-  let currentGame = "";
-  let currentYear = "";
-  const flat = [];
-  const platforms = new Map();
+  let currentGame = "", currentYear = "";
+  const platforms = new Map(), groups = new Map();
   for (const row of rows) {
-    const gv = col(row, ["GAME", "GAME NAME", "NAME", "JUEGO"]);
-    const yv = col(row, ["YEAR", "ANO", "AÑO"]);
-    const platform = col(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"]);
-    if (gv) currentGame = gv;
-    if (yv) currentYear = yv;
-    if (platform) {
-      const k = norm(platform);
-      if (k !== "multi game apps" && !platforms.has(k)) {
-        platforms.set(k, platform);
-      }
-    }
-    const project = col(row, ["PROJECT", "PROYECTO"]);
-    const rawId = col(row, ["PORTS_ID", "PORT ID", "PORT_ID"]);
-    const portId =
-      /^unofficial-port(?:-\d+)?$/i.test(rawId) && currentGame
-        ? `${slugify(currentGame)}-${rawId.toLowerCase()}`
-        : rawId;
-    const url = col(row, ["URL", "PORT URL", "PORT LINK"]);
-    const link = col(row, ["LINK", "PROJECT LINK", "ENLACE"]);
-    const port = {
-      portId,
-      project,
-      platform,
-      developer: col(row, ["DEVELOPER", "DEVELOPER/PUBLISHER", "DESARROLLADOR"]),
-      year: currentYear,
-      version: col(row, ["VERSION", "VERSIÓN"]),
-      controller: col(row, ["CONTROLLER SUPPORT", "CONTROLLER", "GAMEPAD", "MANDO"]),
-      files: col(row, ["NEEDS GAME FILES?", "NEEDS GAME FILES", "GAME FILES", "NECESITA ARCHIVOS"]),
-      works: col(row, ["WORKS?", "WORKS", "FUNCIONA"]),
-      link,
-      url,
-      dataUrl: col(row, ["DATA URL", "DATA LINK", "GAME FILES URL"]),
-      githubRepo: normalizeGithubSlug(url) || normalizeGithubSlug(link),
-      lastUpdate: col(row, ["LAST UPDATE", "LAST UPDATED", "ÚLTIMA ACTUALIZACIÓN"]),
-      dateAdded: col(row, ["DATE ADDED"]),
-      notes: col(row, ["NOTES", "NOTE", "NOTAS"]),
-      slug: "",
-      launchboxUrl: col(row, ["LAUNCHBOX_URL", "LAUNCHBOX URL"]),
-      launchboxName: col(row, ["LAUNCHBOX_NAME", "LAUNCHBOX NAME"]),
-      coverUrl: col(row, ["COVER_URL", "COVER URL", "COVER", "COVER IMAGE", "IMAGE URL", "PORTADA"]),
-      genre: col(row, ["GENRE", "GÉNERO", "GENERO"]),
-      description: col(row, ["DESCRIPTION", "DESCRIPCIÓN", "DESCRIPCION"]),
-    };
-    const has = [
-      port.project,
-      port.link,
-      port.url,
-      port.dataUrl,
-      port.developer,
-      port.version,
-      port.controller,
-      port.files,
-      port.works,
-      port.lastUpdate,
-      port.dateAdded,
-      port.notes,
-      port.launchboxUrl,
-      port.launchboxName,
-      port.coverUrl,
-      port.genre,
-      port.description,
-    ].some((v) => String(v || "").trim());
-    if (!currentGame || !has) continue;
-    flat.push({
-      game: currentGame,
-      year: currentYear,
-      coverUrl: port.coverUrl,
-      genre: port.genre,
-      description: port.description,
-      port,
-    });
+    const gv=col(row,["GAME","GAME NAME","NAME","JUEGO"]), yv=col(row,["YEAR","ANO","AÑO"]);
+    const platform=col(row,["PLATFORM","PLATAFORM","PLATAFORMA"]);
+    if(gv)currentGame=gv; if(yv)currentYear=yv; if(!currentGame)continue;
+    if(platform && norm(platform)!=="multi game apps" && !platforms.has(norm(platform)))platforms.set(norm(platform),platform);
+    const key=norm(currentGame)+"|"+norm(platform);
+    if(!groups.has(key))groups.set(key,{name:currentGame,platform,year:currentYear||"",coverUrl:"",genre:"",description:"",launchboxUrl:"",ports:[]});
+    const g=groups.get(key); if(!g.year&&currentYear)g.year=currentYear;
+    const lb=col(row,["LAUNCHBOX_URL","LAUNCHBOX URL"]);
+    if(!g.launchboxUrl&&lb)g.launchboxUrl=lb;
+    for(const [field,names] of [["coverUrl",["COVER_URL","COVER URL","COVER","COVER IMAGE","IMAGE URL","PORTADA"]],["genre",["GENRE","GÉNERO","GENERO"]],["description",["DESCRIPTION","DESCRIPCIÓN","DESCRIPCION"]]]){const v=col(row,names);if(!g[field]&&v)g[field]=v;}
+    const url=col(row,["URL","PORT URL","PORT LINK"]),link=col(row,["LINK","PROJECT LINK","ENLACE"]);
+    const p={portId:col(row,["PORTS_ID","PORT ID","PORT_ID"]),project:col(row,["PROJECT","PROYECTO"]),
+      developer:col(row,["DEVELOPER","DEVELOPER/PUBLISHER","DESARROLLADOR"]),year:currentYear,
+      version:col(row,["VERSION","VERSIÓN"]),controller:col(row,["CONTROLLER SUPPORT","CONTROLLER","GAMEPAD","MANDO"]),
+      files:col(row,["NEEDS GAME FILES?","NEEDS GAME FILES","GAME FILES","NECESITA ARCHIVOS"]),
+      works:col(row,["WORKS?","WORKS","FUNCIONA"]),link,url,dataUrl:col(row,["DATA URL","DATA LINK","GAME FILES URL"]),
+      githubRepo:normalizeGithubSlug(url)||normalizeGithubSlug(link),lastUpdate:col(row,["LAST UPDATE","LAST UPDATED","ÚLTIMA ACTUALIZACIÓN"]),
+      dateAdded:col(row,["DATE ADDED"]),notes:col(row,["NOTES","NOTE","NOTAS"])};
+    if(/^unofficial-port(?:-\d+)?$/i.test(p.portId))p.portId=slugify(currentGame)+"-"+p.portId.toLowerCase();
+    if(Object.entries(p).some(([k,v])=>k!=="year"&&String(v||"").trim()))g.ports.push(p);
   }
-
-  const groups = new Map();
-  for (const x of flat) {
-    const k = norm(x.game);
-    if (!k) continue;
-    if (!groups.has(k)) {
-      groups.set(k, {
-        name: x.game,
-        slug: slugify(x.game),
-        year: x.year || "",
-        coverUrl: x.coverUrl || "",
-        genre: x.genre || "",
-        description: x.description || "",
-        launchboxUrl: "",
-        platforms: [],
-        ports: [],
-      });
-    }
-    const g = groups.get(k);
-    if (!g.year && x.year) g.year = x.year;
-    if (!g.coverUrl && x.coverUrl) g.coverUrl = x.coverUrl;
-    if (!g.genre && x.genre) g.genre = x.genre;
-    if (!g.description && x.description) g.description = x.description;
-    if (x.port.platform && !g.platforms.includes(x.port.platform)) {
-      g.platforms.push(x.port.platform);
-    }
-    const basePortSlug = slugify(x.game) + "-" + slugify(x.port.platform || "sin-plataforma");
-    const used = new Set(g.ports.map((p) => p.slug));
-    let portSlug = basePortSlug;
-    if (used.has(portSlug)) {
-      const suffix = slugify(x.port.portId || x.port.project || "port");
-      portSlug = basePortSlug + "-" + (suffix || (g.ports.length + 1));
-      let n = 2;
-      while (used.has(portSlug)) portSlug = basePortSlug + "-" + (suffix || "port") + "-" + n++;
-    }
-    x.port.slug = portSlug;
-    g.ports.push(x.port);
-  }
-
-  return {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    platformOrder: Array.from(platforms.values()),
-    games: Array.from(groups.values()),
-  };
+  const seen=new Set();
+  const games=Array.from(groups.values()).map(g=>{const base=slugify(g.name)+"-"+(slugify(g.platform)||"sin-plataforma");let n=1,slug=base+"-"+n;while(seen.has(slug))slug=base+"-"+(++n);seen.add(slug);return {...g,slug};});
+  return {version:1,updatedAt:new Date().toISOString(),platformOrder:Array.from(platforms.values()),games};
 }
 
 function validateCatalog(input) {
-  if (!input || !Array.isArray(input.games) || !Array.isArray(input.platformOrder)) {
-    throw new Error("Formato JSON inválido.");
-  }
-  if (input.games.length > 5000) {
-    throw new Error("Máximo 5.000 juegos.");
-  }
-  const slugs = new Set();
-  const ids = new Set();
-  const portSlugs = new Set();
-  const games = input.games.map((g) => {
-    if (!g || typeof g.name !== "string" || !g.name.trim()) {
-      throw new Error("Cada juego necesita nombre.");
-    }
-    const baseSlug = String(g.slug || slugify(g.name)).trim();
-    if (!baseSlug) {
-      throw new Error("Slug vacío.");
-    }
-    let s = baseSlug;
-    let suffix = 2;
-    while (slugs.has(s)) {
-      s = `${baseSlug}-${suffix++}`;
-    }
-    slugs.add(s);
-    if (!Array.isArray(g.ports)) {
-      throw new Error(`Ports inválidos en ${g.name}`);
-    }
-    const ports = g.ports.map((p, idx) => {
-      const o = {};
-      for (const k of [
-        "portId",
-        "slug",
-        "launchboxUrl",
-        "launchboxName",
-        "coverUrl",
-        "genre",
-        "description",
-        "project",
-        "platform",
-        "developer",
-        "year",
-        "version",
-        "controller",
-        "files",
-        "works",
-        "link",
-        "url",
-        "dataUrl",
-        "githubRepo",
-        "githubStatus",
-        "lastCheckedAt",
-        "lastUpdate",
-        "dateAdded",
-        "notes",
-      ]) {
-        o[k] = String(p?.[k] == null ? "" : p[k]);
-      }
-      if (!o.portId) {
-        o.portId = `${s}-port-${idx + 1}`;
-      }
-      if (!o.slug) o.slug = `${s}-${slugify(o.platform || "sin-plataforma")}`;
-      const basePortSlug = o.slug;
-      let uniquePortSlug = basePortSlug;
-      let portSuffix = 2;
-      while (portSlugs.has(uniquePortSlug)) uniquePortSlug = basePortSlug + "-" + portSuffix++;
-      o.slug = uniquePortSlug;
-      portSlugs.add(o.slug);
-      if (ids.has(o.portId)) {
-        throw new Error(`ID de port duplicado: ${o.portId}`);
-      }
-      ids.add(o.portId);
-      if (!o.githubRepo) {
-        o.githubRepo = normalizeGithubSlug(o.url) || normalizeGithubSlug(o.link);
-      } else {
-        o.githubRepo = normalizeGithubSlug(o.githubRepo) || o.githubRepo;
-      }
-      return o;
-    });
-    return {
-      name: g.name.trim(),
-      slug: s,
-      year: String(g.year || ""),
-      coverUrl: String(g.coverUrl || ""),
-      genre: String(g.genre || ""),
-      description: String(g.description || ""),
-      launchboxUrl: String(g.launchboxUrl || ""),
-      platform: g.platform || "",
-      ports,
-    };
+  if(!input||!Array.isArray(input.games)||!Array.isArray(input.platformOrder))throw new Error("Formato JSON inválido.");
+  const slugs=new Set(),ids=new Set();
+  const games=input.games.map(g=>{
+    if(!g||typeof g.name!=="string"||!g.name.trim())throw new Error("Cada juego necesita nombre.");
+    const platform=String(g.platform||"").trim(),base=slugify(g.name)+"-"+(slugify(platform)||"sin-plataforma");
+    let slug=String(g.slug||"").trim();if(!slug||!slug.startsWith(base+"-")){let n=1;slug=base+"-"+n;while(slugs.has(slug))slug=base+"-"+(++n);}
+    if(slugs.has(slug))throw new Error("Slug duplicado: "+slug);slugs.add(slug);
+    if(!Array.isArray(g.ports))throw new Error("Ports inválidos en "+g.name);
+    const ports=g.ports.map((p,i)=>{const o={};for(const k of ["portId","project","developer","year","version","controller","files","works","link","url","dataUrl","githubRepo","githubStatus","lastCheckedAt","lastUpdate","dateAdded","notes"])o[k]=String(p?.[k]??"");
+      if(!o.portId)o.portId=slug+"-port-"+(i+1);if(ids.has(o.portId))throw new Error("ID de port duplicado: "+o.portId);ids.add(o.portId);
+      o.githubRepo=normalizeGithubSlug(o.githubRepo)||normalizeGithubSlug(o.url)||normalizeGithubSlug(o.link);return o;});
+    return {name:g.name.trim(),platform,slug,year:String(g.year||""),coverUrl:String(g.coverUrl||""),genre:String(g.genre||""),description:String(g.description||""),launchboxUrl:String(g.launchboxUrl||""),ports};
   });
-
-  return {
-    version: 1,
-    updatedAt: new Date().toISOString(),
-    platformOrder: input.platformOrder.map(String).filter(Boolean),
-    games,
-  };
+  return {version:1,updatedAt:new Date().toISOString(),platformOrder:[...new Set(input.platformOrder.map(x=>String(x).trim()).filter(Boolean))],games};
 }
 
 async function ensureSchema(env) {
