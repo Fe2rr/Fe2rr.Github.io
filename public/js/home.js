@@ -5,7 +5,7 @@
 import { loadCatalog } from "./lib/data.js";
 import { clearHeroViewTransitions } from "./lib/helpers.js";
 import { initNavigation } from "./ui/navigation.js";
-import { initSearch } from "./ui/search.js";
+import { initSearch } from "./ui/search.js?v=2";
 import { initThemeToggle } from "./ui/theme.js";
 import { renderErrorBox, renderListSkeletons } from "./ui/loading.js";
 import { createCategoryController } from "./ui/categories.js";
