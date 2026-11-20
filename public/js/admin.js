@@ -370,7 +370,6 @@ function portHtml(port, index) {
     .map((x) => '<a href="' + esc(x[1]) + '" target="_blank" rel="noopener">' + esc(x[0]) + " ↗</a>")
     .join("");
 
-  const mainFields = ["platform", "developer", "version", "controller", "files", "works", "lastUpdate"];
   const fieldByKey = (key) =>
     fieldHtml(
       fieldLabels[key],
@@ -414,37 +413,38 @@ function portHtml(port, index) {
     "</div>" +
     '<div class="admin-port-heading"><h3 class="admin-port-title">' +
     esc(port.project || "Untitled port") +
-    "</h3><span>" +
-    esc(port.platform || "Sin plataforma") +
-    "</span></div>" +
+    "</h3></div>" +
+    "</div>" +
+    '<div class="admin-port-body">' +
+    '<div class="admin-port-details">' +
+    fieldByKey("platform") +
     fieldHtml(
       "Nombre del proyecto",
       port.project,
       'data-port-index="' + index + '" data-port-field="project"'
     ) +
-    "</div>" +
-    '<div class="admin-port-body">' +
-    '<div class="autofill-box">' +
-    '<div class="autofill-row">' +
+    fieldByKey("link") +
     fieldHtml(
-      "Repositorio GitHub (pegar URL para autocompletar)",
-      port.githubRepo || "",
-      'data-port-index="' + index + '" data-port-field="githubRepo"',
-      "text",
+      "URL",
+      port.url,
+      'data-port-index="' + index + '" data-port-field="url"',
+      "url",
       "",
-      "https://github.com/usuario/repositorio o usuario/repo"
+      "https://github.com/... o enlace directo de descarga"
     ) +
-    '<button type="button" class="button secondary small" data-lookup-port="' +
-    index +
-    '">Leer GH</button>' +
+    '<details class="admin-port-advanced"><summary>Datos detectados de GitHub</summary><div class="admin-port-details">' +
+    fieldHtml("Repositorio detectado", port.githubRepo || "", 'data-port-index="' + index + '" data-port-field="githubRepo"') +
+    '<div class="autofill-row"><button type="button" class="button secondary small" data-lookup-port="' + index + '">Leer / actualizar GitHub</button>' +
     (port.portId && port.githubRepo
       ? '<button type="button" class="button secondary small" data-sync-port="' + index + '">Sync</button>'
       : "") +
     "</div>" +
+    fieldByKey("developer") +
+    fieldByKey("version") +
+    fieldByKey("lastUpdate") +
     statusLine +
     diffBanner +
-    "</div>" +
-    '<div class="admin-port-details">' +
+    "</div></details>" +
     '<details class="admin-port-advanced"><summary>Datos de LaunchBox de esta plataforma</summary><div class="admin-port-details">' +
     fieldHtml("Slug único de esta plataforma", port.slug || "", 'data-port-index="' + index + '" data-port-field="slug"') +
     fieldHtml("URL de LaunchBox GamesDB", port.launchboxUrl || "", 'data-port-index="' + index + '" data-port-field="launchboxUrl"', "url", "", "https://gamesdb.launchbox-app.com/games/details/...") +
@@ -455,25 +455,10 @@ function portHtml(port, index) {
     fieldHtml("Género", port.genre || "", 'data-port-index="' + index + '" data-port-field="genre"') +
     fieldHtml("Descripción", port.description || "", 'data-port-index="' + index + '" data-port-field="description"', "textarea", "full-width") +
     "</div></details>" +
-    mainFields.map(fieldByKey).join("") +
-    fieldByKey("link") +
-    "</div>" +
-    '<div class="admin-port-links">' +
-    fieldHtml(
-      "Enlace del port / descarga (también autocompleta si pegás GitHub)",
-      port.url,
-      'data-port-index="' + index + '" data-port-field="url"',
-      "url",
-      "",
-      "https://github.com/... o enlace directo .apk"
-    ) +
-    fieldHtml(
-      "Enlace de archivos del juego",
-      port.dataUrl,
-      'data-port-index="' + index + '" data-port-field="dataUrl"',
-      "url"
-    ) +
-    "</div>" +
+    fieldByKey("controller") +
+    fieldByKey("files") +
+    fieldByKey("works") +
+    fieldByKey("dataUrl") +
     '<div class="admin-port-link-preview">' +
     (linkButtons || '<span class="admin-no-links">Todavía no hay enlaces disponibles</span>') +
     "</div>" +
@@ -938,7 +923,7 @@ function bindEditorEvents(root, game) {
       }
     });
 
-    if (field === "githubRepo" || field === "url") {
+    if (field === "url") {
       input.addEventListener("paste", (e) => {
         const pasted = e.clipboardData?.getData("text") || "";
         setTimeout(() => {
