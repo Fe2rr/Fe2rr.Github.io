@@ -554,6 +554,22 @@ async function ensureSchema(env) {
   ];
 
   await env.DB.batch(statements.map((sql) => env.DB.prepare(sql)));
+  const additions = [
+    ["slug", "TEXT"],
+    ["launchbox_url", "TEXT"],
+    ["launchbox_name", "TEXT"],
+    ["cover_url", "TEXT"],
+    ["genre", "TEXT"],
+    ["description", "TEXT"],
+  ];
+  for (const [column, type] of additions) {
+    try {
+      await env.DB.prepare("ALTER TABLE ports ADD COLUMN " + column + " " + type).run();
+    } catch (error) {
+      if (!/duplicate column/i.test(String(error?.message || error))) throw error;
+    }
+  }
+  await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_ports_slug ON ports(slug) WHERE slug IS NOT NULL AND slug <> \"\"").run();
   schemaBootstrapped = true;
 }
 
