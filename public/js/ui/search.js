@@ -6,6 +6,13 @@
 
 import { normalizeText, clearHeroViewTransitions } from "../lib/helpers.js";
 
+function normalizeSearchText(value) {
+    return normalizeText(value)
+        .replace(/[^a-z0-9]+/g, " ")
+        .trim()
+        .replace(/\\s+/g, " ");
+}
+
 export function initSearch(options = {}) {
     const { onCloseFallback = null, onQueryChange = null } = options;
 
@@ -58,7 +65,7 @@ export function initSearch(options = {}) {
     function renderSuggestions() {
         if (!searchInput || !searchResults) return;
 
-        const query = normalizeText(searchInput.value);
+        const query = normalizeSearchText(searchInput.value);
         searchResults.replaceChildren();
         onQueryChange?.(Boolean(query));
 
@@ -68,10 +75,10 @@ export function initSearch(options = {}) {
         }
 
         const matches = games
-            .filter((game) => normalizeText(game.name).includes(query))
+            .filter((game) => normalizeSearchText(game.name).includes(query))
             .sort((a, b) => {
-                const nameA = normalizeText(a.name);
-                const nameB = normalizeText(b.name);
+                const nameA = normalizeSearchText(a.name);
+                const nameB = normalizeSearchText(b.name);
                 const startsA = nameA.startsWith(query);
                 const startsB = nameB.startsWith(query);
 
