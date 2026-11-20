@@ -927,6 +927,7 @@ function bindEditorEvents(root, game) {
 
     input.addEventListener("change", () => {
       if (field === "platform") {
+        p.slug = slugify(game.name) + "-" + slugify(p.platform || "sin-plataforma");
         syncPlatforms(game);
         renderSidebar();
       }
@@ -1057,10 +1058,17 @@ function bindEditorEvents(root, game) {
 
   $("add-port")?.addEventListener("click", async () => {
     const i = game.ports.length + 1;
+    const platform = catalog.platformOrder[0] || "";
     game.ports.push({
       portId: `${game.slug}-port-${Date.now().toString(36)}-${i}`,
+      slug: slugify(game.name) + "-" + slugify(platform || "sin-plataforma"),
+      launchboxUrl: "",
+      launchboxName: "",
+      coverUrl: "",
+      genre: "",
+      description: "",
       project: "",
-      platform: catalog.platformOrder[0] || "",
+      platform,
       developer: "",
       year: game.year || "",
       version: "",
