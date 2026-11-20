@@ -639,13 +639,6 @@ async function runLaunchboxAutofill(game, urlValue) {
     };
 
     tryFill("name", "Nombre", lb.name, isFreshPlaceholder);
-    if (isFreshPlaceholder && lb.name) {
-      const nextSlug = slugify(lb.name);
-      if (nextSlug && !gameBySlug(nextSlug)) {
-        game.slug = nextSlug;
-        selectedSlug = nextSlug;
-      }
-    }
     tryFill("year", "Año", lb.year);
     tryFill("genre", "Género", lb.genre);
     tryFill("description", "Descripción", lb.description);
