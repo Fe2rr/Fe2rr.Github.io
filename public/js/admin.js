@@ -700,7 +700,7 @@ async function runLaunchboxAutofill(game, urlValue) {
     };
     renderEditor();
     renderSidebar();
-    await saveCurrentGame({ silent: true });
+    markUnsavedAndSchedule();
   } catch (error) {
     launchboxStatus = { state: "error", text: error.message, diff: null, undo: null };
     renderEditor();
@@ -740,7 +740,7 @@ async function runGithubAutofill(game, index, rawUrl) {
         undo: snapshot,
       });
       renderEditor();
-      await saveCurrentGame({ silent: true });
+      markUnsavedAndSchedule();
       return;
     }
 
@@ -791,7 +791,7 @@ async function runGithubAutofill(game, index, rawUrl) {
     });
     renderEditor();
     renderSidebar();
-    await saveCurrentGame({ silent: true });
+    markUnsavedAndSchedule();
   } catch (error) {
     portUiState.set(index, { state: "error", text: error.message });
     renderEditor();
@@ -855,7 +855,7 @@ function bindEditorEvents(root, game) {
     launchboxStatus.diff = null;
     renderEditor();
     renderSidebar();
-    await saveCurrentGame({ silent: true });
+    markUnsavedAndSchedule();
   });
 
   $("dismiss-launchbox-diff")?.addEventListener("click", () => {
@@ -870,7 +870,7 @@ function bindEditorEvents(root, game) {
     launchboxStatus = { state: "", text: "Autocompletado de LaunchBox revertido.", diff: null, undo: null };
     renderEditor();
     renderSidebar();
-    await saveCurrentGame({ silent: true });
+    markUnsavedAndSchedule();
   });
 
   root.querySelectorAll("[data-game-field]").forEach((input) => {
@@ -954,7 +954,10 @@ function bindEditorEvents(root, game) {
       const idx = Number(btn.dataset.syncPort);
       const p = game.ports[idx];
       if (!p?.portId) return;
-      if (unsavedGame) await saveCurrentGame({ silent: true });
+      if (unsavedGame) {
+        setNotice("Guardá los cambios antes de sincronizar este port.", "error");
+        return;
+      }
       portUiState.set(idx, { state: "loading", text: "Sincronizando port desde GitHub…" });
       renderEditor();
       try {
@@ -989,7 +992,7 @@ function bindEditorEvents(root, game) {
       ui.diff = null;
       renderEditor();
       renderSidebar();
-      await saveCurrentGame({ silent: true });
+      markUnsavedAndSchedule();
     });
   });
 
@@ -1011,7 +1014,7 @@ function bindEditorEvents(root, game) {
       portUiState.set(idx, { state: "", text: "Autocompletado revertido." });
       renderEditor();
       renderSidebar();
-      await saveCurrentGame({ silent: true });
+      markUnsavedAndSchedule();
     });
   });
 
@@ -1023,7 +1026,7 @@ function bindEditorEvents(root, game) {
       portUiState.clear();
       renderEditor();
       renderSidebar();
-      await saveCurrentGame({ silent: true });
+      markUnsavedAndSchedule();
     });
   });
 
@@ -1049,7 +1052,7 @@ function bindEditorEvents(root, game) {
     });
     renderEditor();
     renderSidebar();
-    await saveCurrentGame({ silent: true });
+    markUnsavedAndSchedule();
   });
 }
 
@@ -1208,7 +1211,7 @@ $("sidebar-filters").addEventListener("click", (e) => {
 });
 
 $("new-game-button").addEventListener("click", async () => {
-  if (unsavedGame) await saveCurrentGame({ silent: true });
+  if (unsavedGame) markUnsavedAndSchedule();
   let base = "nuevo-juego";
   let slug = base;
   let n = 2;
@@ -1293,7 +1296,10 @@ $("download-button").addEventListener("click", () => {
 });
 
 $("publish-button").addEventListener("click", async () => {
-  if (unsavedGame) await saveCurrentGame({ silent: true });
+  if (unsavedGame) {
+    setNotice("Guardá los cambios antes de publicar el catálogo.", "error");
+    return;
+  }
   if (!confirm("Se sincronizará la instantánea de D1 hacia catalog.json en GitHub/respaldo. ¿Continuar?")) {
     return;
   }
