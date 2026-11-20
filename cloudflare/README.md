@@ -1,5 +1,14 @@
 # NAPL API & Database Worker (Cloudflare Worker + D1)
 
+## Producción — 20 de noviembre de 2026
+
+- D1 `napl-catalog-db` creada y esquema aplicado.
+- Worker `napl-admin-api` desplegado con binding `DB`.
+- Secretos `ADMIN_PASSWORD`, `GITHUB_TOKEN` y `SESSION_SECRET` conservados.
+- Cron Trigger activo cada 6 horas (`0 */6 * * *`).
+- El endpoint público usa caché en Cloudflare Edge durante 60 segundos para reducir lecturas de D1.
+- La primera solicitud al catálogo público o al panel Admin siembra D1 desde `public/assets/data/catalog.json` cuando la base está vacía.
+
 Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudflare D1**, con:
 - Lectura pública en vivo (`GET /api/public/catalog`) con soporte `ETag` y CORS.
 - Autenticación de administrador y operaciones CRUD directas sobre juegos y ports en D1.
