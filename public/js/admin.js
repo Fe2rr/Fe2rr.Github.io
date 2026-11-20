@@ -450,6 +450,7 @@ function portHtml(port, index) {
     fieldHtml("URL de LaunchBox GamesDB", port.launchboxUrl || "", 'data-port-index="' + index + '" data-port-field="launchboxUrl"', "url", "", "https://gamesdb.launchbox-app.com/games/details/...") +
     '<button type="button" class="button secondary small" data-lookup-launchbox-port="' + index + '">Obtener datos de LaunchBox</button>' +
     fieldHtml("Título de LaunchBox", port.launchboxName || "", 'data-port-index="' + index + '" data-port-field="launchboxName"') +
+    fieldByKey("year") +
     fieldHtml("Portada de esta plataforma", port.coverUrl || "", 'data-port-index="' + index + '" data-port-field="coverUrl"', "url") +
     fieldHtml("Género", port.genre || "", 'data-port-index="' + index + '" data-port-field="genre"') +
     fieldHtml("Descripción", port.description || "", 'data-port-index="' + index + '" data-port-field="description"', "textarea", "full-width") +
@@ -483,7 +484,6 @@ function portHtml(port, index) {
     (port.lastCheckedAt ? " · Revisado " + esc(formatShortDate(port.lastCheckedAt)) : "") +
     '</summary><div class="admin-port-details">' +
     fieldByKey("portId") +
-    fieldByKey("year") +
     fieldByKey("dateAdded") +
     "</div></details>" +
     '<div class="admin-port-actions"><span class="admin-port-id">' +
