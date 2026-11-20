@@ -304,12 +304,13 @@ function col(row, names) {
 }
 
 function fromRows(rows) {
-  let currentGame = "", currentYear = "";
+  let currentGame = "", currentYear = "", currentPlatform = "";
   const platforms = new Map(), groups = new Map();
   for (const row of rows) {
     const gv=col(row,["GAME","GAME NAME","NAME","JUEGO"]), yv=col(row,["YEAR","ANO","AÑO"]);
-    const platform=col(row,["PLATFORM","PLATAFORM","PLATAFORMA"]);
-    if(gv)currentGame=gv; if(yv)currentYear=yv; if(!currentGame)continue;
+    const platformValue=col(row,["PLATFORM","PLATAFORM","PLATAFORMA"]);
+    if(gv)currentGame=gv; if(yv)currentYear=yv; if(platformValue)currentPlatform=platformValue; if(!currentGame)continue;
+    const platform=currentPlatform;
     if(platform && norm(platform)!=="multi game apps" && !platforms.has(norm(platform)))platforms.set(norm(platform),platform);
     const key=norm(currentGame)+"|"+norm(platform);
     if(!groups.has(key))groups.set(key,{name:currentGame,platform,year:currentYear||"",coverUrl:"",genre:"",description:"",launchboxUrl:"",ports:[]});
