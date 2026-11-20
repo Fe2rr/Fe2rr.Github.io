@@ -152,6 +152,7 @@ export function hydrateCatalog(doc) {
             if (!rawPort) continue;
             const port = {
                 game: gameName,
+                platform,
                 year: String(rawPort.year || gameYear || ""),
                 project: String(rawPort.project || ""),
                 portId: String(rawPort.portId || ""),
@@ -185,6 +186,7 @@ export function hydrateCatalog(doc) {
             genre: gameGenre,
             description: gameDescription,
             platform,
+            platforms: platform ? [platform] : [],
             ports: hydratedPorts,
         });
     }
