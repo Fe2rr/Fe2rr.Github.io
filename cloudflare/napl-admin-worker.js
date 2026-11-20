@@ -514,7 +514,7 @@ function validateCatalog(input) {
       genre: String(g.genre || ""),
       description: String(g.description || ""),
       launchboxUrl: String(g.launchboxUrl || ""),
-      platforms: Array.from(new Set(ports.map((p) => p.platform).filter(Boolean))),
+      platform: g.platform || "",
       ports,
     };
   });
@@ -537,6 +537,7 @@ async function ensureSchema(env) {
     `CREATE TABLE IF NOT EXISTS games (
       slug TEXT PRIMARY KEY,
       name TEXT NOT NULL,
+      platform TEXT NOT NULL DEFAULT '',
       year TEXT NOT NULL DEFAULT '',
       cover_url TEXT NOT NULL DEFAULT '',
       genre TEXT NOT NULL DEFAULT '',
@@ -595,6 +596,7 @@ async function ensureSchema(env) {
 
   await env.DB.batch(statements.map((sql) => env.DB.prepare(sql)));
   const additions = [
+    ["platform", "TEXT NOT NULL DEFAULT ''"],
     ["slug", "TEXT"],
     ["launchbox_url", "TEXT"],
     ["launchbox_name", "TEXT"],
@@ -644,11 +646,12 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
   catalog.games.forEach((g, gIdx) => {
     stmts.push(
       env.DB.prepare(
-        `INSERT INTO games (slug, name, year, cover_url, genre, description, launchbox_url, sort_order, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO games (slug, name, platform, year, cover_url, genre, description, launchbox_url, sort_order, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         g.slug,
         g.name,
+        g.platform || "",
         g.year || "",
         g.coverUrl || "",
         g.genre || "",
@@ -775,14 +778,7 @@ async function readCatalogFromD1(env, options = {}) {
 
     const port = {
       portId: r.port_id,
-      slug: r.slug || (r.game_slug + "-" + slugify(r.platform || "sin-plataforma")),
-      launchboxUrl: r.launchbox_url || "",
-      launchboxName: r.launchbox_name || "",
-      coverUrl: r.cover_url || "",
-      genre: r.genre || "",
-      description: r.description || "",
       project: r.project,
-      platform: r.platform,
       developer: r.developer,
       year: r.year,
       version: r.version,
@@ -818,7 +814,7 @@ async function readCatalogFromD1(env, options = {}) {
       coverUrl: g.cover_url || "",
       genre: g.genre || "",
       description: g.description || "",
-      platforms: Array.from(new Set(ports.map((p) => p.platform).filter(Boolean))),
+      platform: g.platform || "",
       ports,
     };
     if (includeInternal || g.launchbox_url) {
@@ -877,9 +873,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
     throw new Error("El juego necesita un nombre.");
   }
 
-  const platform = String(
-    rawGame.platform || rawGame.ports?.[0]?.platform || rawGame.platforms?.[0] || "sin-plataforma"
-  ).trim();
+  const platform = String(rawGame.platform || "").trim();
   const baseSlug = `${slugify(rawGame.name)}-${slugify(platform)}`;
   if (!baseSlug || baseSlug === "-") throw new Error("No se pudo generar el slug.");
 
@@ -948,7 +942,6 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
       genre: String(p?.genre || rawGame.genre || ""),
       description: String(p?.description || rawGame.description || ""),
       project: String(p?.project || ""),
-      platform: String(p?.platform || ""),
       developer: String(p?.developer || ""),
       year: String(p?.year || rawGame.year || ""),
       version: String(p?.version || ""),
@@ -977,11 +970,12 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
 
   stmts.push(
     env.DB.prepare(
-      `INSERT OR REPLACE INTO games (slug, name, year, cover_url, genre, description, launchbox_url, sort_order, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO games (slug, name, platform, year, cover_url, genre, description, launchbox_url, sort_order, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).bind(
       nextSlug,
       rawGame.name.trim(),
+      String(rawGame.platform || ""),
       String(rawGame.year || ""),
       String(rawGame.coverUrl || ""),
       String(rawGame.genre || ""),
@@ -1006,7 +1000,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
         p.portId,
         nextSlug,
         p.project,
-        p.platform,
+        "",
         p.developer,
         p.year,
         p.version,
@@ -1037,16 +1031,14 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
   const platRows = await env.DB.prepare("SELECT platform, position FROM platform_order ORDER BY position ASC").all();
   const knownPlats = new Set((platRows.results || []).map((r) => norm(r.platform)));
   let nextPos = (platRows.results || []).reduce((m, r) => Math.max(m, Number(r.position) || 0), -1) + 1;
-  for (const p of normalizedPorts) {
-    if (p.platform && norm(p.platform) !== "multi game apps" && !knownPlats.has(norm(p.platform))) {
-      knownPlats.add(norm(p.platform));
+  if (platform && norm(platform) !== "multi game apps" && !knownPlats.has(norm(platform))) {
+      knownPlats.add(norm(platform));
       stmts.push(
         env.DB.prepare("INSERT OR IGNORE INTO platform_order (position, platform) VALUES (?, ?)").bind(
           nextPos++,
-          p.platform
+          platform
         )
       );
-    }
   }
 
   stmts.push(
