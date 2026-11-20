@@ -523,30 +523,34 @@ function renderEditor() {
     esc(game.coverUrl || "") +
     '" alt="Portada de ' +
     esc(game.name) +
-    '" onerror="this.hidden=true" onload="this.hidden=false"><span class="cover-placeholder">GAME COVER</span></div>' +
-    fieldHtml("URL de portada", game.coverUrl, 'data-game-field="coverUrl"', "url") +
-    '</div><div class="admin-game-content"><div class="admin-game-kicker">FICHA DEL JUEGO</div>' +
-    '<div class="autofill-box"><div class="autofill-row">' +
+    '" onerror="this.hidden=true" onload="this.hidden=false"><span class="cover-placeholder">GAME COVER</span></div></div>' +
+    '<div class="admin-game-content"><div class="admin-game-kicker">FICHA DEL JUEGO</div>' +
+    fieldHtml("Nombre del juego", game.name, 'data-game-field="name"', "text", "admin-game-title-input") +
+    '<p class="admin-game-helper">Primero identificá el juego. Después pegá la ficha de LaunchBox para completar los datos.</p>' +
+    '</div></section>' +
+    '<section class="game-launchbox-section"><div class="autofill-box"><div class="autofill-row">' +
     fieldHtml(
-      "LaunchBox GamesDB (pegar URL para autocompletar)",
+      "URL de LaunchBox GamesDB",
       game.launchboxUrl || "",
       'data-game-field="launchboxUrl"',
       "url",
       "",
       "https://gamesdb.launchbox-app.com/games/details/..."
     ) +
-    '<button type="button" class="button secondary small" id="fetch-launchbox-btn">Leer ficha</button></div>' +
+    '<button type="button" class="button secondary small" id="fetch-launchbox-btn">Obtener datos</button></div>' +
     lbStatusHtml +
     lbDiffHtml +
-    "</div>" +
-    fieldHtml("Nombre del juego", game.name, 'data-game-field="name"', "text", "admin-game-title-input") +
+    '</div></section>' +
+    '<details class="admin-game-data-tab"><summary><span><strong>Datos del juego</strong><small>Portada, año, género, plataforma y descripción obtenidos de LaunchBox</small></span><span class="data-tab-hint">Editar datos</span></summary>' +
+    '<div class="admin-game-data-panel">' +
+    fieldHtml("URL de portada", game.coverUrl, 'data-game-field="coverUrl"', "url") +
     '<div class="admin-game-meta-grid">' +
     fieldHtml("Año", game.year, 'data-game-field="year"') +
     fieldHtml("Género", game.genre, 'data-game-field="genre"') +
     fieldHtml("Slug / URL", game.slug, 'data-game-field="slug"') +
     "</div>" +
     fieldHtml("Descripción", game.description, 'data-game-field="description"', "textarea", "full-width") +
-    "</div></section>" +
+    "</div></details>" +
     '<section class="admin-ports-section"><div class="admin-ports-heading"><div><span class="editor-eyebrow">BUILDS NATIVAS</span><h2>Available Ports</h2><p>' +
     game.ports.length +
     ' ports asociados a este juego</p></div><button id="add-port" class="button primary" type="button">+ Agregar port</button></div><div id="ports-list" class="admin-port-grid">' +
