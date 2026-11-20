@@ -6,11 +6,14 @@
 - Worker `napl-admin-api` desplegado con binding `DB`.
 - Secretos `ADMIN_PASSWORD`, `GITHUB_TOKEN` y `SESSION_SECRET` conservados.
 - Cron Trigger activo cada 6 horas (`0 */6 * * *`).
-- El endpoint público usa caché en Cloudflare Edge durante 60 segundos para reducir lecturas de D1.
-- La primera solicitud al catálogo público o al panel Admin siembra D1 desde `public/assets/data/catalog.json` cuando la base está vacía.
+- D1 solo es accesible desde el Worker; los endpoints de datos requieren sesión de administrador.
+- El sitio público carga exclusivamente `public/assets/data/catalog.json` con caché local stale-while-revalidate.
+- El panel Admin publica la instantánea de D1 hacia ese JSON en GitHub Pages.
+- D1 se siembra desde el JSON estático solo cuando está vacía.
 
 Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudflare D1**, con:
-- Lectura pública en vivo (`GET /api/public/catalog`) con soporte `ETag` y CORS.
+- API de datos privada: todas las rutas de lectura/escritura de D1 requieren sesión de administrador.
+- El sitio público no llama al Worker ni a D1; consume exclusivamente el JSON estático.
 - Autenticación de administrador y operaciones CRUD directas sobre juegos y ports en D1.
 - Autocompletado server-side al pegar URLs de **GitHub** (`POST /api/lookup/github`) y **LaunchBox GamesDB** (`POST /api/lookup/launchbox`).
 - Sincronización automática programada (Cron Trigger cada 6 horas) y manual (`POST /api/sync-github`) de versiones, fechas, redirecciones y repositorios caídos en GitHub.
@@ -28,7 +31,7 @@ Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudfla
    ```bash
    npx wrangler d1 execute napl-catalog-db --remote --file=cloudflare/schema.sql
    ```
-   *(El Worker también inicializa las tablas automáticamente si no existen y siembra D1 desde `catalog.json` en la primera lectura si la base está vacía).*
+   *(El Worker inicializa las tablas si no existen y siembra D1 desde `catalog.json` cuando el administrador abre el panel y la base está vacía).*
 
 3. **Variables y Secretos requeridos** (*Settings → Variables and Secrets*):
    - `ADMIN_PASSWORD`: contraseña de acceso al panel Admin.
@@ -45,7 +48,6 @@ Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudfla
 ## Endpoints principales
 
 - `GET /api/health` — estado de D1 y secretos configurados.
-- `GET /api/public/catalog` — catálogo público en vivo desde D1 (`ETag` + caché corta).
 - `POST /api/login` / `POST /api/logout` — sesión de administrador (Bearer token de 8h).
 - `GET /api/catalog` — catálogo completo, estadísticas y últimos logs de sincronización.
 - `POST /api/games` / `PUT /api/games/:slug` / `DELETE /api/games/:slug` — CRUD directo en D1.
