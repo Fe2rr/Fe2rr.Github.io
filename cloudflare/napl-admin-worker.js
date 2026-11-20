@@ -418,8 +418,12 @@ async function ensureSchema(env) {
   ];
 
   await env.DB.batch(statements.map((sql) => env.DB.prepare(sql)));
+  try {
+    await env.DB.prepare("ALTER TABLE games ADD COLUMN platform TEXT NOT NULL DEFAULT ''").run();
+  } catch (error) {
+    if (!/duplicate column/i.test(String(error?.message || error))) throw error;
+  }
   const additions = [
-    ["platform", "TEXT NOT NULL DEFAULT ''"],
     ["slug", "TEXT"],
     ["launchbox_url", "TEXT"],
     ["launchbox_name", "TEXT"],
