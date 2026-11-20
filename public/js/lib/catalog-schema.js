@@ -152,7 +152,7 @@ export function hydrateCatalog(doc) {
             if (!rawPort) continue;
             const port = {
                 game: gameName,
-                platform,
+                platform: String(rawGame.platform || rawPort.platform || platform || ""),
                 year: String(rawPort.year || gameYear || ""),
                 project: String(rawPort.project || ""),
                 portId: String(rawPort.portId || ""),
@@ -186,7 +186,7 @@ export function hydrateCatalog(doc) {
             genre: gameGenre,
             description: gameDescription,
             platform,
-            platforms: platform ? [platform] : [],
+            platforms: Array.isArray(rawGame.platforms) ? rawGame.platforms.filter(Boolean) : (platform ? [platform] : []),
             ports: hydratedPorts,
         });
     }
