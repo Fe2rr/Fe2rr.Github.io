@@ -439,7 +439,7 @@ async function ensureSchema(env) {
       if (!/duplicate column/i.test(String(error?.message || error))) throw error;
     }
   }
-  await env.DB.prepare("CREATE UNIQUE INDEX IF NOT EXISTS idx_ports_slug ON ports(slug) WHERE slug IS NOT NULL AND length(slug) > 0").run();
+  await env.DB.prepare("DROP INDEX IF EXISTS idx_ports_slug").run();
   schemaBootstrapped = true;
 }
 
@@ -494,17 +494,15 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
       stmts.push(
         env.DB.prepare(
           `INSERT INTO ports (
-            port_id, game_slug, project, platform, developer, year, version,
+            port_id, game_slug, project, developer, year, version,
             controller, files, works, link, url, data_url,
             github_repo, github_status, github_etag, last_checked_at,
-            last_update, date_added, notes, sort_order,
-            slug, launchbox_url, launchbox_name, cover_url, genre, description
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+            last_update, date_added, notes, sort_order
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`
         ).bind(
           p.portId,
           g.slug,
           p.project || "",
-          p.platform || "",
           p.developer || "",
           p.year || g.year || "",
           p.version || "",
@@ -520,13 +518,7 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
           p.lastUpdate || "",
           p.dateAdded || "",
           p.notes || "",
-          pIdx,
-          p.slug || (g.slug + "-" + slugify(p.platform || "sin-plataforma")),
-          p.launchboxUrl || "",
-          p.launchboxName || "",
-          p.coverUrl || g.coverUrl || "",
-          p.genre || g.genre || "",
-          p.description || g.description || ""
+          pIdx
         )
       );
     });
@@ -818,17 +810,15 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
     stmts.push(
       env.DB.prepare(
         `INSERT OR REPLACE INTO ports (
-          port_id, game_slug, project, platform, developer, year, version,
+          port_id, game_slug, project, developer, year, version,
           controller, files, works, link, url, data_url,
           github_repo, github_status, github_etag, last_checked_at,
-          last_update, date_added, notes, sort_order,
-          slug, launchbox_url, launchbox_name, cover_url, genre, description
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          last_update, date_added, notes, sort_order
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`
       ).bind(
         p.portId,
         nextSlug,
         p.project,
-        "",
         p.developer,
         p.year,
         p.version,
@@ -844,13 +834,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
         p.lastUpdate,
         p.dateAdded,
         p.notes,
-        idx,
-        p.slug,
-        p.launchboxUrl,
-        p.launchboxName,
-        p.coverUrl,
-        p.genre,
-        p.description
+        idx
       )
     );
   });
