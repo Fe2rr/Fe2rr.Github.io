@@ -255,6 +255,13 @@ function gameButton(game, platform) {
   );
 }
 
+async function discardLocalChanges() {
+  const fresh = await api("/api/catalog");
+  hydrateServerState(fresh, false);
+  unsavedGame = false;
+  updateTopState();
+}
+
 function renderSidebar() {
   const query = $("game-search").value.trim().toLowerCase();
   const platforms = [...catalog.platformOrder];
@@ -342,9 +349,11 @@ function renderSidebar() {
 
   root.querySelectorAll("[data-game]").forEach((button) => {
     button.addEventListener("click", async () => {
-      if (unsavedGame && !confirm("Hay cambios sin guardar. ¿Descartarlos y cambiar de juego?")) return;
-      unsavedGame = false;
-      updateTopState();
+      if (unsavedGame) {
+        if (!confirm("Hay cambios sin guardar. ¿Descartarlos y cambiar de juego?")) return;
+        try { await discardLocalChanges(); }
+        catch (error) { setNotice("No se pudieron descartar los cambios: " + error.message, "error"); return; }
+      }
       selectedSlug = button.dataset.game;
       launchboxStatus = { state: "", text: "", diff: null, undo: null };
       portUiState.clear();
@@ -1214,9 +1223,12 @@ $("sidebar-filters").addEventListener("click", (e) => {
   renderSidebar();
 });
 
-$("new-game-button").addEventListener("click", () => {
-  if (unsavedGame && !confirm("Hay cambios sin guardar. ¿Descartarlos y crear otro juego?")) return;
-  unsavedGame = false;
+$("new-game-button").addEventListener("click", async () => {
+  if (unsavedGame) {
+    if (!confirm("Hay cambios sin guardar. ¿Descartarlos y crear otro juego?")) return;
+    try { await discardLocalChanges(); }
+    catch (error) { setNotice("No se pudieron descartar los cambios: " + error.message, "error"); return; }
+  }
   let base = "nuevo-juego";
   let slug = base;
   let n = 2;
