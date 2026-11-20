@@ -1451,27 +1451,52 @@ async function route(req, env) {
   }
 
   if (path === "/api/public/catalog" && req.method === "GET") {
+    // Cache the public snapshot at each Cloudflare edge location for 60 seconds.
+    // This prevents every public page view from running the D1 catalog queries.
+    const cacheUrl = new URL(req.url);
+    cacheUrl.search = "";
+    const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
+    const edgeCache = caches.default;
+    const cached = await edgeCache.match(cacheKey);
+
+    if (cached) {
+      const cachedEtag = cached.headers.get("ETag") || "";
+      if (cachedEtag && req.headers.get("If-None-Match") === cachedEtag) {
+        return new Response(null, {
+          status: 304,
+          headers: {
+            ...headers,
+            ETag: cachedEtag,
+            "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300",
+          },
+        });
+      }
+      return cached;
+    }
+
     const { catalog } = await readCatalogFromD1(env, { includeInternal: false });
     const etag = `"napl-${catalog.updatedAt}"`;
+    const cacheControl = "public, max-age=60, s-maxage=60, stale-while-revalidate=300";
+
     if (req.headers.get("If-None-Match") === etag) {
       return new Response(null, {
         status: 304,
-        headers: {
-          ...headers,
-          ETag: etag,
-          "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
-        },
+        headers: { ...headers, ETag: etag, "Cache-Control": cacheControl },
       });
     }
-    return new Response(JSON.stringify(catalog), {
+
+    const response = new Response(JSON.stringify(catalog), {
       status: 200,
       headers: {
         ...headers,
         "Content-Type": "application/json; charset=utf-8",
         ETag: etag,
-        "Cache-Control": "public, max-age=60, stale-while-revalidate=300",
+        "Cache-Control": cacheControl,
       },
     });
+
+    await edgeCache.put(cacheKey, response.clone());
+    return response;
   }
 
   if (path === "/api/health" && req.method === "GET") {
