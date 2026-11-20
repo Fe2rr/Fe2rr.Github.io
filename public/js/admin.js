@@ -175,14 +175,21 @@ function hydrateServerState(data, keepSelected = true, preserveGame = null) {
     if (preserveGame && data.saved?.slug) {
       const freshGame = nextCatalog.games.find((g) => g.slug === data.saved.slug);
       if (freshGame) {
-        const oldPorts = new Map((preserveGame.ports || []).map((p) => [p.portId, p]));
-        freshGame.ports = (freshGame.ports || []).map((freshPort) => {
-          const oldPort = oldPorts.get(freshPort.portId);
-          if (!oldPort) return freshPort;
-          Object.assign(oldPort, freshPort);
-          return oldPort;
-        });
-        Object.assign(preserveGame, freshGame);
+        // If another edit happened while this request was in flight, keep those
+        // newer local values for the queued save instead of overwriting them
+        // with this response's older snapshot.
+        if (saveQueued) {
+          preserveGame.slug = freshGame.slug;
+        } else {
+          const oldPorts = new Map((preserveGame.ports || []).map((p) => [p.portId, p]));
+          freshGame.ports = (freshGame.ports || []).map((freshPort) => {
+            const oldPort = oldPorts.get(freshPort.portId);
+            if (!oldPort) return freshPort;
+            Object.assign(oldPort, freshPort);
+            return oldPort;
+          });
+          Object.assign(preserveGame, freshGame);
+        }
         nextCatalog.games = nextCatalog.games.map((g) =>
           g.slug === data.saved.slug ? preserveGame : g
         );
