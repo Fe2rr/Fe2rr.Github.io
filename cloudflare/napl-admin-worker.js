@@ -1437,66 +1437,17 @@ async function runGithubSyncBatch(env, options = {}) {
 async function route(req, env) {
   const url = new URL(req.url);
   const path = url.pathname;
-  const isPublic = path === "/api/public/catalog";
-  const headers = cors(req, env, isPublic);
+  // D1 is private: every data endpoint requires a signed admin session.
+  const headers = cors(req, env);
   const origin = req.headers.get("Origin") || "";
 
   if (req.method === "OPTIONS") {
-    const okOrigin = isPublic || !origin || isAllowedOrigin(origin, env);
+    const okOrigin = !origin || isAllowedOrigin(origin, env);
     return new Response(null, { status: okOrigin ? 204 : 403, headers });
   }
 
-  if (!isPublic && origin && !isAllowedOrigin(origin, env)) {
+  if (origin && !isAllowedOrigin(origin, env)) {
     return json({ error: "Origen no autorizado." }, 403, headers);
-  }
-
-  if (path === "/api/public/catalog" && req.method === "GET") {
-    // Cache the public snapshot at each Cloudflare edge location for 60 seconds.
-    // This prevents every public page view from running the D1 catalog queries.
-    const cacheUrl = new URL(req.url);
-    cacheUrl.search = "";
-    const cacheKey = new Request(cacheUrl.toString(), { method: "GET" });
-    const edgeCache = caches.default;
-    const cached = await edgeCache.match(cacheKey);
-
-    if (cached) {
-      const cachedEtag = cached.headers.get("ETag") || "";
-      if (cachedEtag && req.headers.get("If-None-Match") === cachedEtag) {
-        return new Response(null, {
-          status: 304,
-          headers: {
-            ...headers,
-            ETag: cachedEtag,
-            "Cache-Control": "public, max-age=60, s-maxage=60, stale-while-revalidate=300",
-          },
-        });
-      }
-      return cached;
-    }
-
-    const { catalog } = await readCatalogFromD1(env, { includeInternal: false });
-    const etag = `"napl-${catalog.updatedAt}"`;
-    const cacheControl = "public, max-age=60, s-maxage=60, stale-while-revalidate=300";
-
-    if (req.headers.get("If-None-Match") === etag) {
-      return new Response(null, {
-        status: 304,
-        headers: { ...headers, ETag: etag, "Cache-Control": cacheControl },
-      });
-    }
-
-    const response = new Response(JSON.stringify(catalog), {
-      status: 200,
-      headers: {
-        ...headers,
-        "Content-Type": "application/json; charset=utf-8",
-        ETag: etag,
-        "Cache-Control": cacheControl,
-      },
-    });
-
-    await edgeCache.put(cacheKey, response.clone());
-    return response;
   }
 
   if (path === "/api/health" && req.method === "GET") {
@@ -1690,11 +1641,10 @@ export default {
     try {
       return await route(request, env);
     } catch (error) {
-      const isPublic = new URL(request.url).pathname === "/api/public/catalog";
       return json(
         { error: error?.message || "Error interno." },
         500,
-        cors(request, env, isPublic)
+        cors(request, env)
       );
     }
   },
