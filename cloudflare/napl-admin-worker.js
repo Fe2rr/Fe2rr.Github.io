@@ -1342,6 +1342,24 @@ async function runGithubSyncBatch(env, options = {}) {
   };
 }
 
+
+async function publishSavedCatalog(env) {
+  const now = new Date().toISOString();
+  try {
+    if (!env.GITHUB_TOKEN) throw new Error("Falta configurar GitHub Token en Cloudflare.");
+    const { catalog } = await readCatalogFromD1(env, { includeInternal: false });
+    const pub = await ghCommitCatalog(catalog, env, "NAPL: guardar ficha y publicar catálogo");
+    await env.DB.batch([
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", "0", now),
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_github_publish_at", now, now),
+    ]);
+    return { commit: pub.commit, publishError: "" };
+  } catch (error) {
+    await env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", "1", now).run();
+    return { commit: "", publishError: error?.message || "Error publicando en GitHub" };
+  }
+}
+
 async function route(req, env) {
   const url = new URL(req.url);
   const path = url.pathname;
@@ -1411,8 +1429,9 @@ async function route(req, env) {
   if (path === "/api/games" && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
     const saved = await saveSingleGameInD1(env, null, body.game || body, true);
+    const publication = await publishSavedCatalog(env);
     const state = await readCatalogFromD1(env, { includeInternal: true });
-    return json({ success: true, saved, ...state }, 200, headers);
+    return json({ success: true, saved, ...publication, ...state }, 200, headers);
   }
 
   const gameMatch = path.match(/^\/api\/games\/([^/]+)$/);
@@ -1421,8 +1440,9 @@ async function route(req, env) {
     if (req.method === "PUT") {
       const body = await req.json().catch(() => ({}));
       const saved = await saveSingleGameInD1(env, targetSlug, body.game || body, false);
+      const publication = await publishSavedCatalog(env);
       const state = await readCatalogFromD1(env, { includeInternal: true });
-      return json({ success: true, saved, ...state }, 200, headers);
+      return json({ success: true, saved, ...publication, ...state }, 200, headers);
     }
     if (req.method === "DELETE") {
       const removed = await deleteGameFromD1(env, targetSlug);
