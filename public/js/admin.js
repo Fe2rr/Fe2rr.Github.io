@@ -916,7 +916,8 @@ function bindEditorEvents(root, game) {
     });
 
     input.addEventListener("change", () => {
-      if (field === "platform") {
+      const p = game.ports[idx];
+      if (field === "platform" && p) {
         p.slug = slugify(game.name) + "-" + slugify(p.platform || "sin-plataforma");
         syncPlatforms(game);
         renderSidebar();
