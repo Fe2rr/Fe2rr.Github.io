@@ -6,7 +6,6 @@ const $ = (id) => document.getElementById(id);
 const fieldLabels = {
   portId: "ID único",
   project: "Proyecto",
-  platform: "Plataforma",
   developer: "Desarrollador",
   year: "Año",
   version: "Versión",
@@ -207,8 +206,7 @@ function portHasAlert(port) {
 }
 
 function gameButton(game, platform) {
-  const platformPorts = game.ports.filter((p) => !platform || p.platform === platform);
-  const hasAlert = platformPorts.some(portHasAlert);
+  const hasAlert = game.ports.some(portHasAlert);
   return (
     '<button type="button" class="game-item ' +
     (game.slug === selectedSlug ? "active" : "") +
@@ -228,20 +226,13 @@ function gameButton(game, platform) {
 function renderSidebar() {
   const query = $("game-search").value.trim().toLowerCase();
   const platforms = [...catalog.platformOrder];
-  for (const game of catalog.games) {
-    for (const port of game.ports) {
-      if (port.platform && !platforms.includes(port.platform)) {
-        platforms.push(port.platform);
-      }
-    }
-  }
 
   const root = $("platform-list");
   root.innerHTML = "";
 
   // Also show games with 0 ports (e.g. newly created games) under "Sin plataforma asignada"
   const unplacedGames = catalog.games.filter((g) => {
-    if (g.ports.some((p) => p.platform)) return false;
+    if (g.platform) return false;
     if (query && !(g.name + " " + g.slug).toLowerCase().includes(query)) return false;
     if (sidebarFilter === "github" || sidebarFilter === "alerts") return false;
     return true;
@@ -262,8 +253,8 @@ function renderSidebar() {
 
   for (const platform of platforms) {
     const games = catalog.games.filter((g) => {
-      const pList = g.ports.filter((p) => p.platform === platform);
-      if (!pList.length) return false;
+      const pList = g.ports;
+      if (g.platform !== platform) return false;
       if (sidebarFilter === "github" && !pList.some(portHasGithub)) return false;
       if (sidebarFilter === "no-github" && pList.some(portHasGithub)) return false;
       if (sidebarFilter === "alerts" && !pList.some(portHasAlert)) return false;
@@ -279,8 +270,8 @@ function renderSidebar() {
     });
     if (!games.length) continue;
 
-    const noGithub = games.filter((g) => !g.ports.some((p) => p.platform === platform && portHasGithub(p)));
-    const github = games.filter((g) => g.ports.some((p) => p.platform === platform && portHasGithub(p)));
+    const noGithub = games.filter((g) => !g.ports.some(portHasGithub));
+    const github = games.filter((g) => g.ports.some(portHasGithub));
     const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
     noGithub.sort(byName);
     github.sort(byName);
@@ -291,7 +282,7 @@ function renderSidebar() {
     details.open =
       Boolean(query) ||
       sidebarFilter === "alerts" ||
-      Boolean(activeGame && activeGame.ports.some((p) => p.platform === platform));
+      Boolean(activeGame && activeGame.platform === platform);
 
     details.innerHTML =
       "<summary><span>" +
@@ -417,7 +408,6 @@ function portHtml(port, index) {
     "</div>" +
     '<div class="admin-port-body">' +
     '<div class="admin-port-details">' +
-    fieldByKey("platform") +
     fieldHtml(
       "Nombre del proyecto",
       port.project,
@@ -445,16 +435,7 @@ function portHtml(port, index) {
     statusLine +
     diffBanner +
     "</div></details>" +
-    '<details class="admin-port-advanced"><summary>Datos de LaunchBox de esta plataforma</summary><div class="admin-port-details">' +
-    fieldHtml("Slug único de esta plataforma", port.slug || "", 'data-port-index="' + index + '" data-port-field="slug"') +
-    fieldHtml("URL de LaunchBox GamesDB", port.launchboxUrl || "", 'data-port-index="' + index + '" data-port-field="launchboxUrl"', "url", "", "https://gamesdb.launchbox-app.com/games/details/...") +
-    '<button type="button" class="button secondary small" data-lookup-launchbox-port="' + index + '">Obtener datos de LaunchBox</button>' +
-    fieldHtml("Título de LaunchBox", port.launchboxName || "", 'data-port-index="' + index + '" data-port-field="launchboxName"') +
-    fieldByKey("year") +
-    fieldHtml("Portada de esta plataforma", port.coverUrl || "", 'data-port-index="' + index + '" data-port-field="coverUrl"', "url") +
-    fieldHtml("Género", port.genre || "", 'data-port-index="' + index + '" data-port-field="genre"') +
-    fieldHtml("Descripción", port.description || "", 'data-port-index="' + index + '" data-port-field="description"', "textarea", "full-width") +
-    "</div></details>" +
+
     fieldByKey("controller") +
     fieldByKey("files") +
     fieldByKey("works") +
@@ -520,7 +501,10 @@ function renderEditor() {
     '" onerror="this.hidden=true" onload="this.hidden=false"><span class="cover-placeholder">GAME COVER</span></div></div>' +
     '<div class="admin-game-content"><div class="admin-game-kicker">FICHA DEL JUEGO</div>' +
     fieldHtml("Nombre del juego", game.name, 'data-game-field="name"', "text", "admin-game-title-input") +
-    '<p class="admin-game-helper">Primero identificá el juego. Después pegá la ficha de LaunchBox para completar los datos.</p>' +
+    '<div class="field"><label for="game-platform">Plataforma</label><select id="game-platform" data-game-platform><option value="">Seleccionar plataforma…</option>' +
+    catalog.platformOrder.map((p) => '<option value="' + esc(p) + '"' + (game.platform === p ? " selected" : "") + '>' + esc(p) + '</option>').join("") +
+    '<option value="__add_new__">Agregar nueva plataforma…</option></select></div>' +
+    '<p class="admin-game-helper">La plataforma pertenece a esta ficha. Los ports se guardan dentro de ella.</p>' +
     '</div></section>' +
     '<section class="game-launchbox-section"><div class="autofill-box"><div class="autofill-row">' +
     fieldHtml(
@@ -555,7 +539,7 @@ function renderEditor() {
 }
 
 function syncPlatforms(game) {
-  game.platforms = [...new Set(game.ports.map((p) => p.platform).filter(Boolean))];
+  game.platforms = game.platform ? [game.platform] : [];
 }
 
 function markUnsavedAndSchedule() {
@@ -682,35 +666,6 @@ async function runLaunchboxAutofill(game, urlValue) {
   }
 }
 
-async function runPortLaunchboxAutofill(game, index, urlValue) {
-  const port = game.ports[index];
-  const url = String(urlValue || "").trim();
-  if (!port || !looksLikeLaunchboxUrl(url)) {
-    portUiState.set(index, { state: "error", text: "Pegá una URL válida de LaunchBox GamesDB." });
-    renderEditor();
-    return;
-  }
-  portUiState.set(index, { state: "loading", text: "Consultando LaunchBox para esta plataforma…" });
-  renderEditor();
-  try {
-    const res = await api("/api/lookup/launchbox", { method: "POST", body: JSON.stringify({ url }) });
-    const lb = res.launchbox || {};
-    port.launchboxUrl = lb.launchboxUrl || url;
-    port.launchboxName = lb.name || game.name;
-    port.year = lb.year || port.year || game.year || "";
-    port.coverUrl = lb.coverUrl || port.coverUrl || "";
-    port.genre = lb.genre || port.genre || "";
-    port.description = lb.description || port.description || "";
-    const platformSlug = slugify(port.platform || "sin-plataforma");
-    port.slug = slugify(game.name) + "-" + platformSlug;
-    portUiState.set(index, { state: "ok", text: "LaunchBox cargado para " + (port.platform || "esta plataforma") + "." });
-    renderEditor();
-    await saveCurrentGame({ silent: true });
-  } catch (error) {
-    portUiState.set(index, { state: "error", text: error.message });
-    renderEditor();
-  }
-}
 
 async function runGithubAutofill(game, index, rawUrl) {
   const port = game.ports[index];
@@ -872,18 +827,7 @@ function bindEditorEvents(root, game) {
       const key = input.dataset.gameField;
       const old = game[key];
       game[key] = input.value;
-      if (key === "name") {
-        const previousBase = slugify(old);
-        const nextBase = slugify(input.value);
-        if (nextBase) {
-          game.ports.forEach((port) => {
-            const platformSlug = slugify(port.platform || "sin-plataforma");
-            if (port.slug === previousBase + "-" + platformSlug) {
-              port.slug = nextBase + "-" + platformSlug;
-            }
-          });
-        }
-      }
+
       if (key === "slug") selectedSlug = game.slug;
       if (key === "coverUrl") {
         const img = $("cover-preview");
@@ -897,6 +841,23 @@ function bindEditorEvents(root, game) {
       if (key === "name" || key === "slug") renderSidebar();
       markUnsavedAndSchedule();
     });
+  });
+
+  root.querySelector("[data-game-platform]")?.addEventListener("change", (event) => {
+    let value = event.target.value;
+    if (value === "__add_new__") {
+      const entered = prompt("Nombre de la nueva plataforma:");
+      value = String(entered || "").trim();
+      if (!value) { event.target.value = game.platform || ""; return; }
+      const existing = catalog.platformOrder.find((p) => p.toLowerCase() === value.toLowerCase());
+      if (existing) value = existing;
+      else catalog.platformOrder.push(value);
+    }
+    game.platform = value;
+    syncPlatforms(game);
+    renderSidebar();
+    markUnsavedAndSchedule();
+    renderEditor();
   });
 
   // Port fields & GitHub paste hooks
@@ -915,15 +876,6 @@ function bindEditorEvents(root, game) {
       markUnsavedAndSchedule();
     });
 
-    input.addEventListener("change", () => {
-      const p = game.ports[idx];
-      if (field === "platform" && p) {
-        p.slug = slugify(game.name) + "-" + slugify(p.platform || "sin-plataforma");
-        syncPlatforms(game);
-        renderSidebar();
-      }
-    });
-
     if (field === "url") {
       input.addEventListener("paste", (e) => {
         const pasted = e.clipboardData?.getData("text") || "";
@@ -935,28 +887,6 @@ function bindEditorEvents(root, game) {
         }, 0);
       });
     }
-  });
-
-  root.querySelectorAll("[data-lookup-launchbox-port]").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const idx = Number(btn.dataset.lookupLaunchboxPort);
-      const p = game.ports[idx];
-      if (p) runPortLaunchboxAutofill(game, idx, p.launchboxUrl);
-    });
-  });
-
-  root.querySelectorAll('[data-port-field="launchboxUrl"]').forEach((input) => {
-    input.addEventListener("paste", (e) => {
-      const pasted = e.clipboardData?.getData("text") || "";
-      setTimeout(() => {
-        const value = pasted.trim() || input.value.trim();
-        const p = game.ports[Number(input.dataset.portIndex)];
-        if (p) {
-          p.launchboxUrl = value;
-          if (looksLikeLaunchboxUrl(value)) runPortLaunchboxAutofill(game, Number(input.dataset.portIndex), value);
-        }
-      }, 0);
-    });
   });
 
   root.querySelectorAll("[data-lookup-port]").forEach((btn) => {
@@ -1040,7 +970,6 @@ function bindEditorEvents(root, game) {
       if (!confirm("¿Eliminar este port?")) return;
       game.ports.splice(idx, 1);
       portUiState.clear();
-      syncPlatforms(game);
       renderEditor();
       renderSidebar();
       await saveCurrentGame({ silent: true });
@@ -1049,17 +978,9 @@ function bindEditorEvents(root, game) {
 
   $("add-port")?.addEventListener("click", async () => {
     const i = game.ports.length + 1;
-    const platform = catalog.platformOrder[0] || "";
     game.ports.push({
       portId: `${game.slug}-port-${Date.now().toString(36)}-${i}`,
-      slug: slugify(game.name) + "-" + slugify(platform || "sin-plataforma"),
-      launchboxUrl: "",
-      launchboxName: "",
-      coverUrl: "",
-      genre: "",
-      description: "",
       project: "",
-      platform,
       developer: "",
       year: game.year || "",
       version: "",
@@ -1075,7 +996,6 @@ function bindEditorEvents(root, game) {
       dateAdded: new Date().toISOString().slice(0, 10),
       notes: "",
     });
-    syncPlatforms(game);
     renderEditor();
     renderSidebar();
     await saveCurrentGame({ silent: true });
@@ -1251,6 +1171,7 @@ $("new-game-button").addEventListener("click", async () => {
     genre: "",
     description: "",
     launchboxUrl: "",
+    platform: "",
     platforms: [],
     ports: [],
   };
