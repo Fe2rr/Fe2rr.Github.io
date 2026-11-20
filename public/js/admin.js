@@ -114,6 +114,7 @@ function setNotice(message, type = "") {
 function updateTopState() {
   const dot = $("state-dot");
   const label = $("save-state");
+  const publishBtn = $("publish-button");
 
   dot.classList.remove("pending", "saving");
   if (savingInFlight) {
@@ -129,6 +130,7 @@ function updateTopState() {
     label.textContent = "Sincronizado (D1 + GitHub)";
   }
 
+  publishBtn.disabled = savingInFlight || !stats.pendingGitHubSync;
   $("catalog-count").textContent = `${catalog.games.length} juegos · ${catalog.games.reduce(
     (n, g) => n + g.ports.length,
     0
@@ -1327,7 +1329,7 @@ $("publish-button").addEventListener("click", async () => {
   } catch (error) {
     setNotice(error.message, "error");
   } finally {
-    btn.textContent = "Publicar en GitHub";
+    btn.textContent = "Reintentar publicación";
     updateTopState();
   }
 });
