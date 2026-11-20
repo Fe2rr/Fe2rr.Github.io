@@ -448,9 +448,9 @@ function portHtml(port, index) {
     fieldHtml("Slug único de esta plataforma", port.slug || "", 'data-port-index="' + index + '" data-port-field="slug"') +
     fieldHtml("URL de LaunchBox GamesDB", port.launchboxUrl || "", 'data-port-index="' + index + '" data-port-field="launchboxUrl"', "url", "", "https://gamesdb.launchbox-app.com/games/details/...") +
     '<button type="button" class="button secondary small" data-lookup-launchbox-port="' + index + '">Obtener datos de LaunchBox</button>' +
-    fieldHtml("Título de LaunchBox", port.launchboxName || "", 'data-port-index="' + index + '" data-port-field="launchboxName") +
+    fieldHtml("Título de LaunchBox", port.launchboxName || "", 'data-port-index="' + index + '" data-port-field="launchboxName"') +
     fieldHtml("Portada de esta plataforma", port.coverUrl || "", 'data-port-index="' + index + '" data-port-field="coverUrl"', "url") +
-    fieldHtml("Género", port.genre || "", 'data-port-index="' + index + '" data-port-field="genre") +
+    fieldHtml("Género", port.genre || "", 'data-port-index="' + index + '" data-port-field="genre"') +
     fieldHtml("Descripción", port.description || "", 'data-port-index="' + index + '" data-port-field="description"', "textarea", "full-width") +
     mainFields.map(fieldByKey).join("") +
     fieldByKey("link") +
@@ -695,6 +695,36 @@ async function runLaunchboxAutofill(game, urlValue) {
   }
 }
 
+async function runPortLaunchboxAutofill(game, index, urlValue) {
+  const port = game.ports[index];
+  const url = String(urlValue || "").trim();
+  if (!port || !looksLikeLaunchboxUrl(url)) {
+    portUiState.set(index, { state: "error", text: "Pegá una URL válida de LaunchBox GamesDB." });
+    renderEditor();
+    return;
+  }
+  portUiState.set(index, { state: "loading", text: "Consultando LaunchBox para esta plataforma…" });
+  renderEditor();
+  try {
+    const res = await api("/api/lookup/launchbox", { method: "POST", body: JSON.stringify({ url }) });
+    const lb = res.launchbox || {};
+    port.launchboxUrl = lb.launchboxUrl || url;
+    port.launchboxName = lb.name || game.name;
+    port.year = lb.year || port.year || game.year || "";
+    port.coverUrl = lb.coverUrl || port.coverUrl || "";
+    port.genre = lb.genre || port.genre || "";
+    port.description = lb.description || port.description || "";
+    const platformSlug = slugify(port.platform || "sin-plataforma");
+    port.slug = slugify(game.name) + "-" + platformSlug;
+    portUiState.set(index, { state: "ok", text: "LaunchBox cargado para " + (port.platform || "esta plataforma") + "." });
+    renderEditor();
+    await saveCurrentGame({ silent: true });
+  } catch (error) {
+    portUiState.set(index, { state: "error", text: error.message });
+    renderEditor();
+  }
+}
+
 async function runGithubAutofill(game, index, rawUrl) {
   const port = game.ports[index];
   if (!port || !looksLikeGithubUrl(rawUrl)) {
@@ -913,6 +943,28 @@ function bindEditorEvents(root, game) {
         }, 0);
       });
     }
+  });
+
+  root.querySelectorAll("[data-lookup-launchbox-port]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.lookupLaunchboxPort);
+      const p = game.ports[idx];
+      if (p) runPortLaunchboxAutofill(game, idx, p.launchboxUrl);
+    });
+  });
+
+  root.querySelectorAll('[data-port-field="launchboxUrl"]').forEach((input) => {
+    input.addEventListener("paste", (e) => {
+      const pasted = e.clipboardData?.getData("text") || "";
+      setTimeout(() => {
+        const value = pasted.trim() || input.value.trim();
+        const p = game.ports[Number(input.dataset.portIndex)];
+        if (p) {
+          p.launchboxUrl = value;
+          if (looksLikeLaunchboxUrl(value)) runPortLaunchboxAutofill(game, Number(input.dataset.portIndex), value);
+        }
+      }, 0);
+    });
   });
 
   root.querySelectorAll("[data-lookup-port]").forEach((btn) => {
