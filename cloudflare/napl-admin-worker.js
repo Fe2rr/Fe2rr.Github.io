@@ -671,7 +671,13 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
           p.lastUpdate || "",
           p.dateAdded || "",
           p.notes || "",
-          pIdx
+          pIdx,
+          p.slug || (g.slug + "-" + slugify(p.platform || "sin-plataforma")),
+          p.launchboxUrl || "",
+          p.launchboxName || "",
+          p.coverUrl || g.coverUrl || "",
+          p.genre || g.genre || "",
+          p.description || g.description || ""
         )
       );
     });
@@ -976,7 +982,13 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
         p.lastUpdate,
         p.dateAdded,
         p.notes,
-        idx
+        idx,
+        p.slug,
+        p.launchboxUrl,
+        p.launchboxName,
+        p.coverUrl,
+        p.genre,
+        p.description
       )
     );
   });
