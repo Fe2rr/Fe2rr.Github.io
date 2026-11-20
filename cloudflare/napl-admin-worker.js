@@ -437,6 +437,7 @@ function validateCatalog(input) {
   }
   const slugs = new Set();
   const ids = new Set();
+  const portSlugs = new Set();
   const games = input.games.map((g) => {
     if (!g || typeof g.name !== "string" || !g.name.trim()) {
       throw new Error("Cada juego necesita nombre.");
@@ -482,6 +483,13 @@ function validateCatalog(input) {
       if (!o.portId) {
         o.portId = `${s}-port-${idx + 1}`;
       }
+      if (!o.slug) o.slug = `${s}-${slugify(o.platform || "sin-plataforma")}`;
+      const basePortSlug = o.slug;
+      let uniquePortSlug = basePortSlug;
+      let portSuffix = 2;
+      while (portSlugs.has(uniquePortSlug)) uniquePortSlug = basePortSlug + "-" + portSuffix++;
+      o.slug = uniquePortSlug;
+      portSlugs.add(o.slug);
       if (ids.has(o.portId)) {
         throw new Error(`ID de port duplicado: ${o.portId}`);
       }
