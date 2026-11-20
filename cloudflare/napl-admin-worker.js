@@ -697,7 +697,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
   }
 
   const platform = String(rawGame.platform || "").trim();
-  const baseSlug = `${slugify(rawGame.name)}-${slugify(platform)}`;
+  const baseSlug = `${slugify(rawGame.name)}-${slugify(platform) || "sin-plataforma"}`;
   if (!baseSlug || baseSlug === "-") throw new Error("No se pudo generar el slug.");
 
   // El slug identifica la combinación juego + plataforma y siempre termina en número.
