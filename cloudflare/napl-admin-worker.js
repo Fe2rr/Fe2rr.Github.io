@@ -345,6 +345,12 @@ function fromRows(rows) {
       lastUpdate: col(row, ["LAST UPDATE", "LAST UPDATED", "ÚLTIMA ACTUALIZACIÓN"]),
       dateAdded: col(row, ["DATE ADDED"]),
       notes: col(row, ["NOTES", "NOTE", "NOTAS"]),
+      slug: "",
+      launchboxUrl: col(row, ["LAUNCHBOX_URL", "LAUNCHBOX URL"]),
+      launchboxName: col(row, ["LAUNCHBOX_NAME", "LAUNCHBOX NAME"]),
+      coverUrl: col(row, ["COVER_URL", "COVER URL", "COVER", "COVER IMAGE", "IMAGE URL", "PORTADA"]),
+      genre: col(row, ["GENRE", "GÉNERO", "GENERO"]),
+      description: col(row, ["DESCRIPTION", "DESCRIPCIÓN", "DESCRIPCION"]),
     };
     const has = [
       port.project,
@@ -364,9 +370,9 @@ function fromRows(rows) {
     flat.push({
       game: currentGame,
       year: currentYear,
-      coverUrl: col(row, ["COVER_URL", "COVER URL", "COVER", "COVER IMAGE", "IMAGE URL", "PORTADA"]),
-      genre: col(row, ["GENRE", "GÉNERO", "GENERO"]),
-      description: col(row, ["DESCRIPTION", "DESCRIPCIÓN", "DESCRIPCION"]),
+      coverUrl: port.coverUrl,
+      genre: port.genre,
+      description: port.description,
       port,
     });
   }
@@ -396,6 +402,16 @@ function fromRows(rows) {
     if (x.port.platform && !g.platforms.includes(x.port.platform)) {
       g.platforms.push(x.port.platform);
     }
+    const basePortSlug = slugify(x.game) + "-" + slugify(x.port.platform || "sin-plataforma");
+    const used = new Set(g.ports.map((p) => p.slug));
+    let portSlug = basePortSlug;
+    if (used.has(portSlug)) {
+      const suffix = slugify(x.port.portId || x.port.project || "port");
+      portSlug = basePortSlug + "-" + (suffix || (g.ports.length + 1));
+      let n = 2;
+      while (used.has(portSlug)) portSlug = basePortSlug + "-" + (suffix || "port") + "-" + n++;
+    }
+    x.port.slug = portSlug;
     g.ports.push(x.port);
   }
 
