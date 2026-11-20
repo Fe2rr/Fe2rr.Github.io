@@ -1,6 +1,7 @@
 name = "napl-admin-api"
 main = "napl-admin-worker.js"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-11-20"
+compatibility_flags = ["nodejs_compat"]
 
 # 1. Crear base D1:
 #    npx wrangler d1 create napl-catalog-db
@@ -8,7 +9,7 @@ compatibility_date = "2025-01-01"
 [[d1_databases]]
 binding = "DB"
 database_name = "napl-catalog-db"
-database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"
+database_id = "9c988cf9-9b75-429c-b9de-bf328b472cb8"
 
 # Sincronización automática de repositorios de GitHub cada 6 horas
 [triggers]
