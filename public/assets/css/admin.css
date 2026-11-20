@@ -1122,3 +1122,110 @@ button {
     animation: none !important;
   }
 }
+
+
+/* Game editor: streamlined game-first layout */
+.admin-game-hero {
+  grid-template-columns: 176px minmax(0, 1fr);
+  align-items: center;
+  gap: 24px;
+  margin-bottom: 14px;
+}
+.admin-game-hero .admin-cover-frame {
+  margin: 0;
+  max-height: 236px;
+}
+.admin-game-title-input input {
+  min-height: 54px;
+  font-size: clamp(20px, 2.4vw, 28px);
+}
+.admin-game-helper {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.game-launchbox-section {
+  margin: 0 0 14px;
+}
+.game-launchbox-section .autofill-box {
+  margin: 0;
+  padding: 14px;
+}
+.admin-game-data-tab {
+  margin: 0 0 30px;
+  overflow: hidden;
+  border: 1px solid var(--admin-border);
+  border-radius: 10px;
+  background: #11211c;
+}
+.admin-game-data-tab > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  list-style: none;
+}
+.admin-game-data-tab > summary::-webkit-details-marker {
+  display: none;
+}
+.admin-game-data-tab > summary::after {
+  content: "+";
+  color: var(--accent);
+  font: 700 20px "JetBrains Mono", monospace;
+}
+.admin-game-data-tab[open] > summary::after {
+  content: "−";
+}
+.admin-game-data-tab > summary strong,
+.admin-game-data-tab > summary small {
+  display: block;
+}
+.admin-game-data-tab > summary strong {
+  font: 700 14px "Outfit", sans-serif;
+  color: var(--text);
+}
+.admin-game-data-tab > summary small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 10px;
+}
+.data-tab-hint {
+  margin-left: auto;
+  color: #8cc9a8;
+  font-size: 10px;
+  white-space: nowrap;
+}
+.admin-game-data-panel {
+  padding: 0 16px 16px;
+  border-top: 1px solid var(--admin-border);
+}
+.admin-game-data-panel .admin-game-meta-grid {
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .admin-game-hero {
+    grid-template-columns: 104px minmax(0, 1fr);
+    gap: 13px;
+    padding: 13px;
+  }
+  .admin-game-hero .admin-cover-frame {
+    max-height: 148px;
+  }
+  .admin-game-title-input input {
+    min-height: 44px;
+    padding: 9px;
+    font-size: 18px;
+  }
+  .admin-game-kicker {
+    font-size: 8px;
+  }
+  .admin-game-data-tab > summary {
+    padding: 12px;
+  }
+  .admin-game-data-panel {
+    padding: 0 12px 12px;
+  }
+}
