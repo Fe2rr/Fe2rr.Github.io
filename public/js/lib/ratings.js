@@ -6,9 +6,8 @@
 
 import {
     RATINGS_API_BASE,
-    RATINGS_API_URL,
     RATING_TOKEN_STORAGE_KEY,
-} from "../core/config.js";
+} from "./config.js";
 
 let ratingTokenMemory = "";
 let myVotesCache = null;
@@ -134,7 +133,7 @@ async function loadMyVotes(force = false) {
 
 export async function loadPortRatings() {
     try {
-        const response = await fetch(RATINGS_API_URL, {
+        const response = await fetch(RATINGS_API_BASE, {
             method: "GET",
             cache: "no-store",
         });

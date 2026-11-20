@@ -6,17 +6,7 @@
  * Google Sheets CSV fallback.
  */
 
-import {
-    parseCSV,
-    getColumn,
-    extractPlatformOrder,
-    processRows,
-    groupGames,
-    hydrateCatalog,
-    csvToCatalogDocument,
-} from "./catalog-schema.js?v=1";
-
-export { parseCSV, getColumn, extractPlatformOrder, processRows, groupGames };
+import { hydrateCatalog, csvToCatalogDocument } from "./catalog-schema.js";
 
 const CATALOG_JSON_URL = "assets/data/catalog.json";
 const SHEET_CSV_URL =

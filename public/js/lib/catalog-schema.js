@@ -9,9 +9,10 @@ import {
     normalizeText,
     normalizePlatformLabel,
     createSlug,
+    isMultiGameAppsPlatform,
 } from "./helpers.js";
 
-export const CATALOG_SCHEMA_VERSION = 1;
+const CATALOG_SCHEMA_VERSION = 1;
 
 const PORT_STRING_FIELDS = [
     "portId",
@@ -35,37 +36,7 @@ function cleanStr(value) {
     return String(value ?? "").trim();
 }
 
-export function isGithubUrl(url) {
-    const raw = cleanStr(url);
-    if (!raw) return false;
-    return /(?:^|\/\/|@)(?:www\.)?(?:github\.com|github\.io|raw\.githubusercontent\.com|gist\.github\.com)(?:[/:?#]|$)/i.test(
-        raw
-    );
-}
-
-export function isGithubPort(port) {
-    if (!port || typeof port !== "object") return false;
-    return (
-        isGithubUrl(port.link) ||
-        isGithubUrl(port.url) ||
-        isGithubUrl(port.dataUrl)
-    );
-}
-
-export function gameHasGithubOnPlatform(game, platform) {
-    if (!game || !Array.isArray(game.ports)) return false;
-    const targetKey = normalizeText(platform);
-    const relevantPorts = targetKey
-        ? game.ports.filter(
-              (port) =>
-                  port && normalizeText(normalizePlatformLabel(port.platform)) === targetKey
-          )
-        : game.ports;
-
-    return relevantPorts.some((port) => isGithubPort(port));
-}
-
-export function compactPort(port, fallbackYear = "") {
+function compactPort(port, fallbackYear = "") {
     const out = {};
     for (const field of PORT_STRING_FIELDS) {
         const val = cleanStr(port?.[field]);
@@ -79,11 +50,8 @@ export function compactPort(port, fallbackYear = "") {
     return out;
 }
 
-export function normalizeCatalogDocument(rawDoc, options = {}) {
-    const {
-        updatedAt = cleanStr(rawDoc?.updatedAt) || new Date().toISOString(),
-        compact = true,
-    } = options;
+function normalizeCatalogDocument(rawDoc, options = {}) {
+    const { updatedAt = cleanStr(rawDoc?.updatedAt) || new Date().toISOString() } = options;
 
     if (!rawDoc || typeof rawDoc !== "object" || !Array.isArray(rawDoc.games)) {
         throw new Error("Invalid catalog document: expected games array.");
@@ -93,9 +61,8 @@ export function normalizeCatalogDocument(rawDoc, options = {}) {
     if (Array.isArray(rawDoc.platformOrder)) {
         for (const rawPlat of rawDoc.platformOrder) {
             const label = normalizePlatformLabel(rawPlat);
-            if (!label) continue;
+            if (!label || isMultiGameAppsPlatform(label)) continue;
             const key = normalizeText(label);
-            if (key === "multi-game apps" || key === "multi game apps") continue;
             if (!platformOrderSet.has(key)) {
                 platformOrderSet.set(key, label);
             }
@@ -129,25 +96,7 @@ export function normalizeCatalogDocument(rawDoc, options = {}) {
 
         for (const rawPort of rawPorts) {
             if (!rawPort || typeof rawPort !== "object") continue;
-            const p = compact
-                ? compactPort(rawPort, year)
-                : {
-                      portId: cleanStr(rawPort.portId),
-                      project: cleanStr(rawPort.project),
-                      platform: cleanStr(rawPort.platform),
-                      developer: cleanStr(rawPort.developer),
-                      year: cleanStr(rawPort.year) || year,
-                      version: cleanStr(rawPort.version),
-                      controller: cleanStr(rawPort.controller),
-                      files: cleanStr(rawPort.files),
-                      works: cleanStr(rawPort.works),
-                      link: cleanStr(rawPort.link),
-                      url: cleanStr(rawPort.url),
-                      dataUrl: cleanStr(rawPort.dataUrl),
-                      lastUpdate: cleanStr(rawPort.lastUpdate),
-                      dateAdded: cleanStr(rawPort.dateAdded),
-                      notes: cleanStr(rawPort.notes),
-                  };
+            const p = compactPort(rawPort, year);
 
             if (p.platform) {
                 const platLabel = normalizePlatformLabel(p.platform);
@@ -156,8 +105,7 @@ export function normalizeCatalogDocument(rawDoc, options = {}) {
 
                 const platKey = normalizeText(platLabel);
                 if (
-                    platKey !== "multi-game apps" &&
-                    platKey !== "multi game apps" &&
+                    !isMultiGameAppsPlatform(platLabel) &&
                     !platformOrderSet.has(platKey)
                 ) {
                     platformOrderSet.set(platKey, platLabel);
@@ -271,7 +219,7 @@ export function hydrateCatalog(doc) {
     };
 }
 
-export function parseCSV(csv) {
+function parseCSV(csv) {
     const rows = [];
     let row = [];
     let field = "";
@@ -340,7 +288,7 @@ export function parseCSV(csv) {
     });
 }
 
-export function getColumn(row, possibleNames) {
+function getColumn(row, possibleNames) {
     for (const name of possibleNames) {
         const normalizedName = normalizeHeader(name);
         if (Object.prototype.hasOwnProperty.call(row, normalizedName)) {
@@ -350,20 +298,18 @@ export function getColumn(row, possibleNames) {
     return "";
 }
 
-export function extractPlatformOrder(rows) {
+function extractPlatformOrder(rows) {
     const uniquePlatforms = new Map();
 
     for (const row of rows) {
         const platform = normalizePlatformLabel(
             getColumn(row, ["PLATFORM", "PLATAFORM", "PLATAFORMA"])
         );
-        if (!platform) continue;
-
-        const key = normalizeText(platform);
-        if (key === "multi-game apps" || key === "multi game apps") {
+        if (!platform || isMultiGameAppsPlatform(platform)) {
             continue;
         }
 
+        const key = normalizeText(platform);
         if (!uniquePlatforms.has(key)) {
             uniquePlatforms.set(key, platform);
         }
@@ -372,7 +318,7 @@ export function extractPlatformOrder(rows) {
     return Array.from(uniquePlatforms.values());
 }
 
-export function processRows(rows) {
+function processRows(rows) {
     let currentGame = "";
     let currentYear = "";
     const result = [];
@@ -482,7 +428,7 @@ export function processRows(rows) {
     return result;
 }
 
-export function groupGames(rows) {
+function groupGames(rows) {
     const grouped = new Map();
     if (!Array.isArray(rows)) return [];
 
@@ -547,6 +493,6 @@ export function csvToCatalogDocument(csvText, updatedAt = new Date().toISOString
             platformOrder,
             games,
         },
-        { updatedAt, compact: true }
+        { updatedAt }
     );
 }

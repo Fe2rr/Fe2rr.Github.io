@@ -8,8 +8,9 @@ import {
     normalizeText,
     createSlug,
     parseLastUpdate,
-} from "../core/helpers.js";
-import { getAllTimeVisits } from "../services/popularity.js";
+    isMultiGameAppsPlatform,
+} from "../lib/helpers.js";
+import { getAllTimeVisits } from "../lib/popularity.js";
 
 export function isDualScreen(game) {
     if (!game || !Array.isArray(game.ports)) {
@@ -28,26 +29,7 @@ export function isMultiGameApp(game) {
         return false;
     }
 
-    return game.ports.some(
-        (port) => normalizeText(port?.platform) === "multi-game apps"
-    );
-}
-
-export function isMultiGameAppPort(port, allRows) {
-    if (!port || !port.project || !Array.isArray(allRows)) {
-        return false;
-    }
-
-    const projectName = normalizeText(port.project);
-
-    return allRows.some((row) => {
-        if (!row) return false;
-
-        return (
-            normalizeText(row.platform) === "multi-game apps" &&
-            normalizeText(row.game) === projectName
-        );
-    });
+    return game.ports.some((port) => isMultiGameAppsPlatform(port?.platform));
 }
 
 const NON_UNIQUE_PROJECT_NAMES = new Set([
@@ -119,10 +101,7 @@ export function getMultiGameApps(games) {
 
             const projectName = String(port.project ?? "").trim();
 
-            const isMarkedAsApp = [
-                "multi-game apps",
-                "multi game apps",
-            ].includes(normalizeText(port.platform));
+            const isMarkedAsApp = isMultiGameAppsPlatform(port.platform);
 
             if (isNonUniqueProjectName(projectName)) {
                 continue;
@@ -326,7 +305,7 @@ export function createGamesUsingAppSection(
     for (const game of items) {
         const link = document.createElement("a");
         link.className = "games-using-app-item";
-        link.href = `game.html?game=${encodeURIComponent(
+        link.href = `./?game=${encodeURIComponent(
             createSlug(game.name)
         )}`;
 

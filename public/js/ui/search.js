@@ -1,13 +1,13 @@
 /*
  * NAPL — GLOBAL SEARCH COMPONENT
  *
- * Shared between index.html and game.html.
+ * Shared across NAPL SPA views.
  */
 
-import { normalizeText } from "../core/helpers.js";
+import { normalizeText, clearHeroViewTransitions } from "../lib/helpers.js";
 
 export function initSearch(options = {}) {
-    const { onCloseFallback = null } = options;
+    const { onCloseFallback = null, onQueryChange = null } = options;
 
     let games = [];
 
@@ -24,6 +24,7 @@ export function initSearch(options = {}) {
         }
         searchContainer?.setAttribute("hidden", "");
         searchButton?.setAttribute("aria-expanded", "false");
+        onQueryChange?.(false);
     }
 
     function closeSearch(triggerCallback = true) {
@@ -59,6 +60,7 @@ export function initSearch(options = {}) {
 
         const query = normalizeText(searchInput.value);
         searchResults.replaceChildren();
+        onQueryChange?.(Boolean(query));
 
         if (!query) {
             searchResults.hidden = true;
@@ -89,7 +91,7 @@ export function initSearch(options = {}) {
             link.className = "search-result is-entering";
             link.style.setProperty("--enter-index", String(idx));
             link.setAttribute("role", "listitem");
-            link.href = `game.html?game=${encodeURIComponent(game.slug)}`;
+            link.href = `./?game=${encodeURIComponent(game.slug)}`;
             link.textContent = game.name;
             link.addEventListener(
                 "animationend",
@@ -106,18 +108,7 @@ export function initSearch(options = {}) {
                 ) {
                     return;
                 }
-                document
-                    .querySelectorAll(
-                        ".home-game-cover-container, .home-game-name, .search-result"
-                    )
-                    .forEach((el) => {
-                        if (
-                            el.style.viewTransitionName === "napl-hero-cover" ||
-                            el.style.viewTransitionName === "napl-hero-title"
-                        ) {
-                            el.style.viewTransitionName = "";
-                        }
-                    });
+                clearHeroViewTransitions();
                 link.style.viewTransitionName = "napl-hero-title";
             });
             fragment.appendChild(link);

@@ -2,7 +2,7 @@
   "name": "NAPL — Native Android Port List",
   "short_name": "NAPL",
   "description": "Discover, explore and track native Android game ports.",
-  "start_url": "index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#11221b",
   "theme_color": "#11221b",

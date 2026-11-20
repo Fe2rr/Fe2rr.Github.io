@@ -3,7 +3,7 @@
    ========================================================= */
 
 #status,
-.home-loading,
+#game-status,
 .no-results {
   margin: 12px 0;
   font-size: 14px;

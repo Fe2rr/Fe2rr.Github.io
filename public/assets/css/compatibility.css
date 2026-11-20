@@ -6,27 +6,6 @@
   margin-bottom: 18px;
 }
 
-.back-button {
-  min-height: 38px;
-  padding: 6px 14px;
-  background: var(--surface-1);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-main);
-  font-size: 13px;
-  font-weight: 600;
-  transition:
-    background-color var(--duration-fast) var(--ease-out),
-    border-color var(--duration-fast) var(--ease-out),
-    color var(--duration-fast) var(--ease-out);
-}
-
-.back-button:hover {
-  background: var(--surface-2);
-  border-color: var(--border-strong);
-  color: var(--accent);
-}
-
 /* Hero & Community Notice */
 .compat-hero {
   margin-bottom: 24px;

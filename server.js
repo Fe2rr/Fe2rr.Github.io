@@ -633,6 +633,42 @@ app.get('/api/steam-cover/:appid', async (req, res) => {
   return res.status(404).end();
 });
 
+function resolveLegacyRedirect(rawPath, search) {
+  const isPublicPrefixed = rawPath === '/public' || rawPath.startsWith('/public/');
+  const cleanPath = isPublicPrefixed ? rawPath.replace(/^\/public/, '') || '/' : rawPath;
+
+  if (cleanPath === '/compatibility' || cleanPath === '/compatibility.html') {
+    const params = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search);
+    if (!params.has('page')) params.set('page', 'compatibility');
+    const qs = params.toString();
+    return qs ? `/?${qs}` : '/?page=compatibility';
+  }
+
+  if (
+    cleanPath === '/index.html' ||
+    cleanPath === '/game' ||
+    cleanPath === '/game.html' ||
+    cleanPath === '/all-games' ||
+    cleanPath === '/all-games.html'
+  ) {
+    return '/' + search;
+  }
+
+  return isPublicPrefixed ? cleanPath + search : null;
+}
+
+app.use((req, res, next) => {
+  const queryIndex = req.originalUrl.indexOf('?');
+  const search = queryIndex >= 0 ? req.originalUrl.slice(queryIndex) : '';
+  const redirectTarget = resolveLegacyRedirect(req.path, search);
+
+  if (redirectTarget) {
+    return res.redirect(301, redirectTarget);
+  }
+
+  next();
+});
+
 app.use(
   express.static(path.join(__dirname, 'public'), {
     etag: true,

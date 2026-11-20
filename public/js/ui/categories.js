@@ -14,25 +14,29 @@ import {
     parseDateAdded,
     getLatestUpdate,
     getDateAdded,
-} from "../core/helpers.js?v=15";
+} from "../lib/helpers.js";
 import {
     ensurePopularPeriod,
     getPopularVisits,
     ensureAllTimePopular,
-} from "../services/popularity.js?v=14";
+} from "../lib/popularity.js";
 import {
     createHomeGameCard,
     getRepresentativePort,
-} from "../components/game-card.js?v=18";
+} from "./game-card.js";
 import {
     isDualScreen,
     getMultiGameApps,
     sortMultiGameApps,
     createGamesUsingAppSection,
-} from "../components/multi-game-apps.js?v=15";
+} from "./multi-game-apps.js";
 
 export function createCategoryController(state, options = {}) {
-    const { onFiltersChange = null, onClearFilters = null } = options;
+    const {
+        onFiltersChange = null,
+        onClearFilters = null,
+        onViewStateChange = null,
+    } = options;
     const gameList = document.getElementById("game-list");
     const statusElement = document.getElementById("status");
     const categoryControls = document.getElementById("category-controls");
@@ -867,13 +871,6 @@ export function createCategoryController(state, options = {}) {
 
         if (state.selectedCategory && state.selectedCategory !== "all-games") {
             returnParams.set("category", state.selectedCategory);
-        } else if (
-            state.selectedPlatform ||
-            state.selectedGenre ||
-            state.selectedYear ||
-            state.selectedDeveloper
-        ) {
-            returnParams.set("view", "all-games");
         }
 
         if (state.selectedPlatform) {
@@ -890,7 +887,7 @@ export function createCategoryController(state, options = {}) {
         }
 
         const qs = returnParams.toString();
-        return qs ? `index.html?${qs}` : "index.html";
+        return qs ? `./?${qs}` : "./";
     }
 
     function buildGameCardElement(game, returnUrl) {
@@ -1088,6 +1085,7 @@ export function createCategoryController(state, options = {}) {
     function displayFilteredGames() {
         visibleLimit = PAGE_SIZE;
         syncFilterControls();
+        onViewStateChange?.();
         const query = normalizeText(categorySearchInput?.value || "");
         const hasAnyFilter = Boolean(
             state.selectedPlatform ||

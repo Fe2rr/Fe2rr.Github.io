@@ -9,7 +9,7 @@ import {
     COMPATIBILITY_API_URL,
     REPORT_LINK_API_URL,
     USER_DEVICE_STORAGE_KEY,
-} from "../core/config.js";
+} from "./config.js";
 import { getRatingToken } from "./ratings.js";
 
 let devicesCache = null;
@@ -49,11 +49,11 @@ export const COMPAT_STATUSES = [
     },
 ];
 
-export const COMPAT_STATUS_MAP = Object.fromEntries(
+const COMPAT_STATUS_MAP = Object.fromEntries(
     COMPAT_STATUSES.map((item) => [item.id, item])
 );
 
-export function normalizeCompatStatus(rawStatus, fallbackWorks = null) {
+function normalizeCompatStatus(rawStatus, fallbackWorks = null) {
     const clean = String(rawStatus || "").trim();
     if (COMPAT_STATUS_MAP[clean]) return clean;
     if (fallbackWorks === true) return "playable_30";
@@ -68,13 +68,8 @@ export function getCompatStatusMeta(rawStatus, fallbackWorks = null) {
 export function normalizeCompatSummary(summary) {
     const reports = Array.isArray(summary?.reports)
         ? summary.reports.map((report) => {
-              const status = normalizeCompatStatus(
-                  report?.status,
-                  report?.works
-              );
-              const works =
-                  status === "playable_30" || status === "playable_60";
-              return { ...report, status, works };
+              const meta = getCompatStatusMeta(report?.status, report?.works);
+              return { ...report, status: meta.id, works: meta.works };
           })
         : [];
 
@@ -454,15 +449,15 @@ export async function searchCompatibilityByHardware({
     }
 
     return payload.reports.map((report) => {
-        const status = normalizeCompatStatus(report?.status, report?.works);
+        const meta = getCompatStatusMeta(report?.status, report?.works);
         return {
             portId: String(report?.portId || "").trim(),
             deviceId: String(report?.deviceId || "").trim(),
             deviceName: String(report?.deviceName || report?.deviceId || "").trim(),
             deviceSoc: String(report?.deviceSoc || "").trim(),
             deviceType: String(report?.deviceType || "phone").trim() || "phone",
-            status,
-            works: status === "playable_30" || status === "playable_60",
+            status: meta.id,
+            works: meta.works,
             updatedAt: String(report?.updatedAt || ""),
         };
     });
@@ -584,10 +579,7 @@ export function createCompatibilityActions() {
 
         async submitReport({ portId, deviceId, status, works }) {
             const token = await getRatingToken();
-            const resolvedStatus = normalizeCompatStatus(status, works);
-            const resolvedWorks =
-                resolvedStatus === "playable_30" ||
-                resolvedStatus === "playable_60";
+            const meta = getCompatStatusMeta(status, works);
 
             const response = await fetch(COMPATIBILITY_API_URL, {
                 method: "POST",
@@ -598,8 +590,8 @@ export function createCompatibilityActions() {
                     token,
                     port_id: portId,
                     device_id: deviceId,
-                    status: resolvedStatus,
-                    works: resolvedWorks,
+                    status: meta.id,
+                    works: meta.works,
                 }),
                 cache: "no-store",
             });

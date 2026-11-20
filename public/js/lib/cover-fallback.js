@@ -15,9 +15,9 @@ import {
     getMemoryCachedImageSrc,
     supportsBrowserImageCache,
     getCachedOrFetchImageSrc,
-} from "./image-cache.js?v=1";
+} from "./image-cache.js";
 
-export function extractSteamAppId(coverUrl) {
+function extractSteamAppId(coverUrl) {
     const raw = String(coverUrl || "").trim();
     if (!raw) return "";
 
@@ -69,7 +69,7 @@ function buildCoverCandidates(rawUrl, effectiveUrl) {
     return ordered;
 }
 
-export function attachCoverFallback(
+function attachCoverFallback(
     imgElement,
     coverUrl,
     onUnavailable,

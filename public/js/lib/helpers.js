@@ -53,17 +53,25 @@ export function normalizeDeveloperName(value) {
     return normalized;
 }
 
-export function getDeveloperPortCounts(rows) {
-    const counts = new Map();
-    if (!Array.isArray(rows)) return counts;
+export function isMultiGameAppsPlatform(platform) {
+    const key = normalizeText(platform);
+    return key === "multi-game apps" || key === "multi game apps";
+}
 
-    for (const row of rows) {
-        const key = normalizeDeveloperName(row?.developer);
-        if (!key) continue;
-        counts.set(key, (counts.get(key) || 0) + 1);
-    }
-
-    return counts;
+export function clearHeroViewTransitions() {
+    if (typeof document === "undefined") return;
+    document
+        .querySelectorAll(
+            ".home-game-cover-container, .home-game-name, .search-result, .spotlight-cover-frame, .spotlight-title"
+        )
+        .forEach((el) => {
+            if (
+                el.style.viewTransitionName === "napl-hero-cover" ||
+                el.style.viewTransitionName === "napl-hero-title"
+            ) {
+                el.style.viewTransitionName = "";
+            }
+        });
 }
 
 export function getDeveloperGameCounts(rows) {
@@ -90,6 +98,29 @@ export function getDeveloperGameCounts(rows) {
     return counts;
 }
 
+function pickLatestMatchingPort(ports) {
+    if (!Array.isArray(ports) || ports.length === 0) return null;
+
+    const namedPorts = ports.filter(
+        (port) => String(port.project || "").trim() !== ""
+    );
+    const pool = namedPorts.length > 0 ? namedPorts : ports;
+
+    let bestPort = pool[0];
+    let bestDate = parseLastUpdate(bestPort.lastUpdate);
+
+    for (let i = 1; i < pool.length; i++) {
+        const candidate = pool[i];
+        const candidateDate = parseLastUpdate(candidate.lastUpdate);
+        if (candidateDate && (!bestDate || candidateDate > bestDate)) {
+            bestPort = candidate;
+            bestDate = candidateDate;
+        }
+    }
+
+    return bestPort;
+}
+
 export function getMatchingDeveloperPort(game, developer, preferredPlatform = "") {
     const targetKey = normalizeDeveloperName(developer);
     if (!targetKey || !game || !Array.isArray(game.ports)) {
@@ -107,26 +138,10 @@ export function getMatchingDeveloperPort(game, developer, preferredPlatform = ""
               (port) => normalizeText(port.platform) === platformKey
           )
         : [];
-    const candidates = platformMatched.length > 0 ? platformMatched : matchingPorts;
 
-    const namedPorts = candidates.filter(
-        (port) => String(port.project || "").trim() !== ""
+    return pickLatestMatchingPort(
+        platformMatched.length > 0 ? platformMatched : matchingPorts
     );
-    const pool = namedPorts.length > 0 ? namedPorts : candidates;
-
-    let bestPort = pool[0];
-    let bestDate = parseLastUpdate(bestPort.lastUpdate);
-
-    for (let i = 1; i < pool.length; i++) {
-        const candidate = pool[i];
-        const candidateDate = parseLastUpdate(candidate.lastUpdate);
-        if (candidateDate && (!bestDate || candidateDate > bestDate)) {
-            bestPort = candidate;
-            bestDate = candidateDate;
-        }
-    }
-
-    return bestPort;
 }
 
 export function getMatchingPlatformPort(game, platform) {
@@ -138,26 +153,7 @@ export function getMatchingPlatformPort(game, platform) {
     const matchingPorts = game.ports.filter(
         (port) => port && normalizeText(port.platform) === platformKey
     );
-    if (matchingPorts.length === 0) return null;
-
-    const namedPorts = matchingPorts.filter(
-        (port) => String(port.project || "").trim() !== ""
-    );
-    const pool = namedPorts.length > 0 ? namedPorts : matchingPorts;
-
-    let bestPort = pool[0];
-    let bestDate = parseLastUpdate(bestPort.lastUpdate);
-
-    for (let i = 1; i < pool.length; i++) {
-        const candidate = pool[i];
-        const candidateDate = parseLastUpdate(candidate.lastUpdate);
-        if (candidateDate && (!bestDate || candidateDate > bestDate)) {
-            bestPort = candidate;
-            bestDate = candidateDate;
-        }
-    }
-
-    return bestPort;
+    return pickLatestMatchingPort(matchingPorts);
 }
 
 const UNKNOWN_YEAR_VALUES = new Set([
@@ -339,27 +335,4 @@ export function getDateAdded(game) {
     return dates.reduce((latest, current) =>
         current > latest ? current : latest
     );
-}
-
-export function getPortForDate(game, field, parser) {
-    if (!game || !Array.isArray(game.ports)) {
-        return null;
-    }
-
-    let selectedPort = null;
-    let selectedDate = null;
-
-    for (const port of game.ports) {
-        if (!port) continue;
-
-        const date = parser(port[field]);
-        if (!date) continue;
-
-        if (!selectedDate || date > selectedDate) {
-            selectedDate = date;
-            selectedPort = port;
-        }
-    }
-
-    return selectedPort;
 }

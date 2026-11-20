@@ -1,7 +1,37 @@
 /* =========================================================
    NAPL — SHARED UI COMPONENTS
-   Search, Game Cards, Multi-Game Apps, Category Controls
+   Back Button, Search, Game Cards, Multi-Game Apps
    ========================================================= */
+
+/* Shared Sub-View Back Button */
+.back-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 38px;
+  padding: 6px 14px;
+  background: var(--surface-1);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.back-button:hover {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
+  color: var(--accent);
+}
+
+.back-button:active {
+  transform: scale(0.97);
+}
 
 /* Global Search */
 .search-container {
@@ -214,6 +244,7 @@
     animation: none !important;
   }
 
+  .back-button:active,
   .home-game:hover .home-game-cover,
   .home-game:focus-visible .home-game-cover,
   .home-game:active {
@@ -349,12 +380,6 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-}
-
-.game-info {
-  font-size: 13px;
-  color: var(--text-secondary);
-  font-variant-numeric: tabular-nums;
 }
 
 .games-using-app {

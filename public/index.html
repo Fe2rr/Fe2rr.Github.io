@@ -86,18 +86,45 @@
             } catch (e) {
                 // Ignore storage errors before paint
             }
+            try {
+                var initialParams = new URLSearchParams(window.location.search);
+                if (initialParams.get("game")) {
+                    root.setAttribute("data-initial-view", "game");
+                } else if (
+                    initialParams.get("page") === "compatibility" ||
+                    initialParams.get("device") ||
+                    initialParams.get("soc")
+                ) {
+                    root.setAttribute("data-initial-view", "compatibility");
+                }
+                var hasFilteredLanding = Boolean(
+                    initialParams.get("platform") ||
+                        initialParams.get("genre") ||
+                        initialParams.get("year") ||
+                        initialParams.get("dev") ||
+                        (initialParams.get("category") &&
+                            initialParams.get("category") !== "all-games")
+                );
+                if (hasFilteredLanding) {
+                    root.setAttribute("data-spotlight", "hidden");
+                }
+            } catch (e) {
+                // Ignore URL parsing errors before paint
+            }
         })();
     </script>
 
     <link rel="preload" href="assets/data/catalog.json" as="fetch" crossorigin="anonymous">
-    <link rel="modulepreload" href="js/core/catalog-schema.js?v=1">
-    <link rel="modulepreload" href="js/core/data.js?v=15">
+    <link rel="modulepreload" href="js/lib/catalog-schema.js">
+    <link rel="modulepreload" href="js/lib/data.js">
 
     <link rel="stylesheet" href="assets/css/main.css?v=14">
     <link rel="stylesheet" href="assets/css/components.css?v=15">
     <link rel="stylesheet" href="assets/css/loading.css?v=7">
-    <link rel="stylesheet" href="assets/css/home.css?v=21">
-    <link rel="stylesheet" href="assets/css/skeleton.css?v=7">
+    <link rel="stylesheet" href="assets/css/home.css?v=22">
+    <link rel="stylesheet" href="assets/css/game.css?v=25">
+    <link rel="stylesheet" href="assets/css/compatibility.css?v=6">
+    <link rel="stylesheet" href="assets/css/skeleton.css?v=10">
     <!-- Google Tag Manager -->
     <script>
         (function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':
@@ -186,7 +213,7 @@
     <div class="side-menu-body">
         <a
             id="check-compatibility-link"
-            href="compatibility.html"
+            href="./?page=compatibility"
             class="platform-button"
         >
             Check Compatibility
@@ -228,10 +255,93 @@
         <div id="search-results" class="search-results" hidden></div>
     </div>
 
+    <section id="home-view" class="spa-view">
     <div class="home-hero">
         <h2 class="home-hero-title">Native Android Port List</h2>
         <p class="home-hero-subtitle">Discover, compare, and track native game ports for Android.</p>
     </div>
+
+    <section
+        id="game-spotlight"
+        class="game-spotlight"
+        aria-label="Game Spotlight"
+    >
+        <div id="spotlight-skeleton" class="spotlight-skeleton" aria-hidden="true">
+            <div class="skeleton spotlight-skeleton-cover"></div>
+            <div class="spotlight-skeleton-body">
+                <div class="skeleton spotlight-skeleton-kicker"></div>
+                <div class="skeleton spotlight-skeleton-title"></div>
+                <div class="skeleton spotlight-skeleton-meta"></div>
+                <div class="skeleton spotlight-skeleton-desc"></div>
+                <div class="skeleton spotlight-skeleton-actions">
+                    <div class="skeleton spotlight-skeleton-btn"></div>
+                    <div class="skeleton spotlight-skeleton-nav"></div>
+                </div>
+            </div>
+        </div>
+
+        <article id="spotlight-card" class="spotlight-card" hidden>
+            <a
+                id="spotlight-cover-link"
+                class="spotlight-cover-frame"
+                href="./"
+                aria-label="View featured game"
+            >
+                <img
+                    id="spotlight-cover"
+                    class="spotlight-cover"
+                    alt=""
+                    loading="eager"
+                    decoding="async"
+                    referrerpolicy="no-referrer"
+                >
+            </a>
+
+            <div class="spotlight-body">
+                <div class="spotlight-top-row">
+                    <span class="spotlight-kicker">Trending Spotlight</span>
+                    <span id="spotlight-meta" class="spotlight-meta"></span>
+                </div>
+
+                <h3 class="spotlight-title">
+                    <a id="spotlight-title-link" href="./"></a>
+                </h3>
+
+                <p id="spotlight-port-line" class="spotlight-port-line"></p>
+                <p id="spotlight-description" class="spotlight-description"></p>
+
+                <div class="spotlight-actions">
+                    <a id="spotlight-cta" class="spotlight-cta" href="./">
+                        View Port <span aria-hidden="true">→</span>
+                    </a>
+                    <div class="spotlight-nav" role="group" aria-label="Spotlight navigation">
+                        <button
+                            type="button"
+                            id="spotlight-prev"
+                            class="spotlight-nav-btn"
+                            aria-label="Previous featured game"
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m15 18-6-6 6-6"/>
+                            </svg>
+                            <span>Previous</span>
+                        </button>
+                        <button
+                            type="button"
+                            id="spotlight-next"
+                            class="spotlight-nav-btn"
+                            aria-label="Next featured game"
+                        >
+                            <span>Next</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="m9 18 6-6-6-6"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </article>
+    </section>
 
     <div id="home-banners" class="home-banners">
         <aside id="home-feature-banner" class="home-feature-banner" aria-label="New compatibility feature announcement">
@@ -244,7 +354,7 @@
             </div>
             <div class="home-feature-actions">
                 <a
-                    href="compatibility.html"
+                    href="./?page=compatibility"
                     class="home-feature-cta"
                 >
                     Check Compatibility <span aria-hidden="true">↗</span>
@@ -656,7 +766,152 @@
             Show more
         </button>
     </div>
+    </section>
 
+    <section id="game-view" class="spa-view" hidden>
+        <div class="game-top-bar">
+            <button id="game-back-button" type="button" class="back-button">
+                ← Back
+            </button>
+        </div>
+
+        <div id="game-header"></div>
+        <div id="ports-header" class="ports-section-bar" hidden></div>
+        <div id="game-status" role="status" aria-live="polite"></div>
+        <div id="port-list" class="port-list"></div>
+    </section>
+
+    <section id="compat-view" class="spa-view" hidden>
+        <div class="compat-top-bar">
+            <button id="compat-back-button" type="button" class="back-button">
+                ← Back to Catalog
+            </button>
+        </div>
+
+        <section class="compat-hero">
+            <h2 class="compat-hero-title">Check Device &amp; SoC Compatibility</h2>
+            <p class="compat-hero-subtitle">
+                Search your Android phone, tablet, handheld, or chipset to inspect which game ports people have tested.
+            </p>
+
+            <div class="compat-advisory" role="note">
+                <p class="compat-advisory-title">Community-submitted reports</p>
+                <p class="compat-advisory-text">
+                    Compatibility statuses are submitted by NAPL community members and reflect their tested device, port version, GPU drivers, and Android build. Use them as a practical reference rather than a guarantee.
+                </p>
+            </div>
+        </section>
+
+        <section class="compat-hardware-panel" aria-label="Device or SoC search">
+            <label for="hardware-search-input" class="compat-panel-label">
+                Search by Android device model or commercial SoC
+            </label>
+
+            <form id="hardware-search-form" class="compat-hardware-form" autocomplete="off">
+                <div class="compat-hardware-input-wrap">
+                    <input
+                        type="search"
+                        id="hardware-search-input"
+                        class="compat-hardware-input"
+                        placeholder="Type device or SoC (e.g. Poco F5, Odin 2, Snapdragon 8 Gen 2, Helio G99)"
+                        aria-label="Search device model or SoC"
+                        autocomplete="off"
+                    >
+                    <div
+                        id="hardware-suggestions"
+                        class="compat-hardware-suggestions"
+                        hidden
+                    ></div>
+                </div>
+                <button type="submit" id="hardware-search-submit" class="compat-hardware-submit">
+                    Search
+                </button>
+            </form>
+
+            <div id="hardware-active-bar" class="compat-active-bar" hidden>
+                <div class="compat-active-info">
+                    <span id="hardware-active-label" class="compat-active-label"></span>
+                    <span id="hardware-active-meta" class="compat-active-meta"></span>
+                </div>
+                <div class="compat-active-actions">
+                    <button
+                        type="button"
+                        id="hardware-clear-button"
+                        class="compat-clear-button"
+                    >
+                        Clear
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <section id="results-toolbar" class="compat-results-toolbar" hidden>
+            <div class="compat-filter-row">
+                <input
+                    type="search"
+                    id="results-filter-input"
+                    class="compat-filter-input"
+                    placeholder="Filter tested games, port projects, developers, or platforms..."
+                    aria-label="Filter compatibility results"
+                    autocomplete="off"
+                >
+                <div class="compat-sort-controls">
+                    <div class="compat-sort-group" role="group" aria-label="Sort results">
+                        <button type="button" class="compat-sort-option active" data-sort="best">
+                            Best Playability
+                        </button>
+                        <button type="button" class="compat-sort-option" data-sort="reports">
+                            Most Reports
+                        </button>
+                        <button type="button" class="compat-sort-option" data-sort="recent">
+                            Recently Tested
+                        </button>
+                        <button type="button" class="compat-sort-option" data-sort="name">
+                            A–Z
+                        </button>
+                    </div>
+                    <button
+                        type="button"
+                        id="compat-sort-direction"
+                        class="compat-sort-direction"
+                        aria-label="Toggle sort direction"
+                    >
+                        ↓
+                    </button>
+                </div>
+            </div>
+
+            <div class="compat-status-filters" role="group" aria-label="Filter by performance status">
+                <button type="button" class="compat-status-filter active" data-status="all">
+                    All tiers
+                </button>
+                <button type="button" class="compat-status-filter" data-status="playable_60">
+                    Playable (60fps)
+                </button>
+                <button type="button" class="compat-status-filter" data-status="playable_30">
+                    Playable (30fps)
+                </button>
+                <button type="button" class="compat-status-filter" data-status="low_fps">
+                    Boots (low FPS)
+                </button>
+                <button type="button" class="compat-status-filter" data-status="crash">
+                    Doesn't boot / Crash
+                </button>
+            </div>
+        </section>
+
+        <div id="compat-status" class="compat-status-line" role="status" aria-live="polite"></div>
+
+        <section id="compat-empty-prompt" class="compat-empty-prompt">
+            <p class="compat-empty-title">Select a chipset or device to start</p>
+            <p class="compat-empty-description">
+                Jump in with a common processor or handheld below, or type any Android phone, tablet, or SoC above.
+            </p>
+            <div id="compat-quick-presets" class="compat-quick-presets"></div>
+        </section>
+
+        <div id="compat-results" class="compat-results" hidden></div>
+    </section>
 
 </main>
 
@@ -679,7 +934,7 @@
     </svg>
 </button>
 
-<script type="module" src="js/pages/home.js?v=31"></script>
+<script type="module" src="js/home.js"></script>
 
 
 </body>

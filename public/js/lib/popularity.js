@@ -6,7 +6,7 @@
  * through the Apps Script endpoint.
  */
 
-import { createSlug } from "../core/helpers.js";
+import { createSlug } from "./helpers.js";
 
 const POPULAR_URL =
     "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
@@ -78,7 +78,7 @@ function requestPopular(period) {
     });
 }
 
-export async function fetchPopularPeriod(period = "week") {
+async function fetchPopularPeriod(period = "week") {
     return requestPopular(period);
 }
 
@@ -135,3 +135,24 @@ export async function ensureAllTimePopular() {
 export function getAllTimeVisits(slug) {
     return getPopularVisits(slug, "alltime");
 }
+
+export function registerGameVisit(gameName) {
+    if (!gameName) return;
+
+    const slug = createSlug(gameName);
+    if (!slug) return;
+
+    const url = new URL(POPULAR_URL);
+    url.searchParams.set("game", slug);
+    url.searchParams.set("_", String(Date.now()));
+
+    fetch(url.toString(), {
+        method: "GET",
+        mode: "no-cors",
+        cache: "no-store",
+        keepalive: true,
+    }).catch((error) => {
+        console.warn("NAPL: could not send the game visit.", error);
+    });
+}
+

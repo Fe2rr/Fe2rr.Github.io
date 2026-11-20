@@ -1,12 +1,16 @@
 /*
  * NAPL — SIDE MENU & PAGE NAVIGATION COMPONENT
  *
- * Shared between index.html and game.html.
+ * Shared across NAPL SPA views.
  */
 
-import { normalizeText, normalizePlatformLabel } from "../core/helpers.js";
+import {
+    normalizeText,
+    normalizePlatformLabel,
+    isMultiGameAppsPlatform,
+} from "../lib/helpers.js";
 
-export function getPlatformGroup(platform) {
+function getPlatformGroup(platform) {
     const normalized = normalizeText(platform);
 
     if (normalized === "others" || normalized === "other") {
@@ -52,7 +56,7 @@ function getUniquePlatforms(platformOrder, games) {
         if (!platform) continue;
 
         const key = normalizeText(platform);
-        if (key === "multi-game apps" || key === "multi game apps") continue;
+        if (isMultiGameAppsPlatform(platform)) continue;
 
         if (!unique.has(key)) {
             unique.set(key, platform);
@@ -64,11 +68,11 @@ function getUniquePlatforms(platformOrder, games) {
 
 export function initNavigation(options = {}) {
     const {
-        mode = "home",
         onGoHome = null,
         onSelectAllGames = null,
         onSelectCategory = null,
         onSelectPlatform = null,
+        onOpenCompatibility = null,
         onBeforeOpenMenu = null,
         onActionResetSearch = null,
     } = options;
@@ -80,14 +84,25 @@ export function initNavigation(options = {}) {
     const platformList = document.getElementById("platform-list");
     const allGamesButton = document.getElementById("all-games-button");
     const checkCompatibilityLink = document.getElementById("check-compatibility-link");
-    const isSubPage = mode !== "home";
-
     const homeButton = document.getElementById("home-button");
-    const backButton = document.getElementById("back-button");
 
     let openGroups = new Set();
 
-    checkCompatibilityLink?.addEventListener("click", closeMenu);
+    checkCompatibilityLink?.addEventListener("click", (event) => {
+        if (
+            onOpenCompatibility &&
+            event.button === 0 &&
+            !event.metaKey &&
+            !event.ctrlKey &&
+            !event.shiftKey &&
+            !event.altKey
+        ) {
+            event.preventDefault();
+            onActionResetSearch?.();
+            onOpenCompatibility();
+        }
+        closeMenu();
+    });
 
     function openMenu() {
         onBeforeOpenMenu?.();
@@ -107,16 +122,7 @@ export function initNavigation(options = {}) {
         menuButton?.setAttribute("aria-expanded", "false");
     }
 
-    function createPlatformMenuItem(label, href, onClick) {
-        if (isSubPage) {
-            const link = document.createElement("a");
-            link.className = "platform-button platform-sub-button";
-            link.href = href;
-            link.textContent = label;
-            link.addEventListener("click", closeMenu);
-            return link;
-        }
-
+    function createPlatformMenuItem(label, onClick) {
         const button = document.createElement("button");
         button.type = "button";
         button.className = "platform-button platform-sub-button";
@@ -204,10 +210,8 @@ export function initNavigation(options = {}) {
 
             for (const platform of entries) {
                 panel.appendChild(
-                    createPlatformMenuItem(
-                        platform,
-                        `index.html?platform=${encodeURIComponent(platform)}`,
-                        () => onSelectPlatform?.(platform)
+                    createPlatformMenuItem(platform, () =>
+                        onSelectPlatform?.(platform)
                     )
                 );
             }
@@ -251,13 +255,9 @@ export function initNavigation(options = {}) {
 
     if (homeButton) {
         const triggerHome = () => {
-            if (isSubPage) {
-                window.location.href = "index.html";
-            } else {
-                onActionResetSearch?.();
-                onGoHome?.();
-                closeMenu();
-            }
+            onActionResetSearch?.();
+            onGoHome?.();
+            closeMenu();
         };
 
         homeButton.addEventListener("click", triggerHome);
@@ -269,80 +269,25 @@ export function initNavigation(options = {}) {
         });
     }
 
-    if (backButton) {
-        backButton.addEventListener("click", () => {
-            if (isSubPage) {
-                const params = new URLSearchParams(window.location.search);
-                const returnPath = params.get("return");
-
-                if (returnPath) {
-                    try {
-                        const target = new URL(returnPath, window.location.href);
-                        if (
-                            target.origin === window.location.origin &&
-                            target.pathname.endsWith("/index.html")
-                        ) {
-                            window.location.href = target.href;
-                            return;
-                        }
-                    } catch {
-                        // Use the safe fallback below.
-                    }
-                }
-
-                if (
-                    document.referrer &&
-                    new URL(document.referrer).origin === window.location.origin &&
-                    window.history.length > 1
-                ) {
-                    window.history.back();
-                    return;
-                }
-
-                window.location.href = "index.html";
-            }
-        });
-    }
-
-    if (allGamesButton && !isSubPage) {
-        allGamesButton.addEventListener("click", () => {
-            onActionResetSearch?.();
-            onSelectAllGames?.();
-            closeMenu();
-        });
-    } else if (allGamesButton && isSubPage) {
-        allGamesButton.addEventListener("click", () => {
-            closeMenu();
-            window.location.href = "index.html";
-        });
-    }
+    allGamesButton?.addEventListener("click", () => {
+        onActionResetSearch?.();
+        onSelectAllGames?.();
+        closeMenu();
+    });
 
     document.querySelectorAll("#side-menu [data-category]").forEach((button) => {
         const category = button.dataset.category;
         if (!category) return;
 
         button.addEventListener("click", () => {
-            if (isSubPage) {
-                closeMenu();
-                window.location.href = `index.html?category=${encodeURIComponent(category)}`;
-            } else {
-                onActionResetSearch?.();
-                onSelectCategory?.(category);
-                closeMenu();
-            }
+            onActionResetSearch?.();
+            onSelectCategory?.(category);
+            closeMenu();
         });
     });
 
     return {
         renderPlatforms,
         closeMenu,
-        setPlatformError(message) {
-            if (!platformList) return;
-            platformList.replaceChildren();
-            const el = document.createElement("div");
-            el.className = "menu-separator";
-            el.textContent = message;
-            platformList.appendChild(el);
-        },
     };
 }

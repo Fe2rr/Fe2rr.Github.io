@@ -2,30 +2,8 @@
  * NAPL — GAME CARD COMPONENT
  */
 
-import { loadCoverImage } from "../core/cover-fallback.js?v=2";
-
-let pageShowCleanupRegistered = false;
-
-function clearActiveCardTransitions() {
-    document
-        .querySelectorAll(
-            ".home-game-cover-container, .home-game-name, .search-result"
-        )
-        .forEach((el) => {
-            if (
-                el.style.viewTransitionName === "napl-hero-cover" ||
-                el.style.viewTransitionName === "napl-hero-title"
-            ) {
-                el.style.viewTransitionName = "";
-            }
-        });
-}
-
-function ensurePageShowCleanup() {
-    if (pageShowCleanupRegistered || typeof window === "undefined") return;
-    pageShowCleanupRegistered = true;
-    window.addEventListener("pageshow", clearActiveCardTransitions);
-}
+import { loadCoverImage } from "../lib/cover-fallback.js";
+import { clearHeroViewTransitions } from "../lib/helpers.js";
 
 export function getRepresentativePort(game) {
     if (!game || !Array.isArray(game.ports)) {
@@ -89,9 +67,11 @@ export function getGamePlatformLabel(game, port) {
 export function createHomeGameCard(game, port, options = {}) {
     const element = document.createElement("a");
     element.className = "home-game";
-    const gameUrl = new URL("game.html", window.location.href);
+    const gameUrl = new URL("./", window.location.href);
     gameUrl.searchParams.set("game", game.slug);
-    gameUrl.searchParams.set("return", options.returnUrl || "index.html");
+    if (options.returnUrl && options.returnUrl !== "./") {
+        gameUrl.searchParams.set("return", options.returnUrl);
+    }
     element.href = gameUrl.href;
 
     const coverContainer = document.createElement("div");
@@ -169,7 +149,6 @@ export function createHomeGameCard(game, port, options = {}) {
 
     element.append(coverContainer, content);
 
-    ensurePageShowCleanup();
     element.addEventListener("click", (event) => {
         if (
             event.button !== 0 ||
@@ -180,7 +159,7 @@ export function createHomeGameCard(game, port, options = {}) {
         ) {
             return;
         }
-        clearActiveCardTransitions();
+        clearHeroViewTransitions();
         coverContainer.style.viewTransitionName = "napl-hero-cover";
         name.style.viewTransitionName = "napl-hero-title";
     });

@@ -13,14 +13,14 @@ import {
     normalizeYearValue,
     extractGameGenres,
     getDeveloperGameCounts,
-} from "../core/helpers.js?v=15";
-import { loadCoverImage } from "../core/cover-fallback.js?v=2";
+} from "../lib/helpers.js";
+import { loadCoverImage } from "../lib/cover-fallback.js";
 import {
     isMultiGameApp,
     isNonUniqueProjectName,
     findGamesUsingApp,
     createGamesUsingAppSection,
-} from "../components/multi-game-apps.js?v=15";
+} from "./multi-game-apps.js";
 import {
     COMPAT_STATUSES,
     getCompatStatusMeta,
@@ -31,7 +31,7 @@ import {
     setStoredUserDevice,
     parseDeviceDisplayParts,
     groupIdenticalCompatReports,
-} from "../services/compatibility.js?v=19";
+} from "../lib/compatibility-api.js";
 
 
 let ratingPopoverEventsInitialized = false;
@@ -52,50 +52,58 @@ function parseLastUpdate(value) {
     return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function closeRatingPopover(container) {
-    if (!container) return;
+const POPOVER_GROUPS = [
+    {
+        container: ".port-rating",
+        popover: ".port-rating-popover",
+        button: ".port-rating-button",
+        trigger: ".port-rating-trigger",
+    },
+    {
+        container: ".port-compat",
+        popover: ".port-compat-popover",
+        button: ".port-compat-button",
+        trigger: ".port-compat-trigger",
+    },
+    {
+        container: ".port-report-link-trigger",
+        popover: ".port-report-link-popover",
+        button: ".port-report-link-button",
+    },
+    {
+        container: ".game-share-trigger",
+        popover: ".game-share-popover",
+        button: ".game-share-button",
+    },
+];
 
-    const popover = container.querySelector(".port-rating-popover");
-    const button = container.querySelector(".port-rating-button");
-    const trigger = container.querySelector(".port-rating-trigger");
+function closePopoverGroup(container, group = null) {
+    if (!container) return;
+    const def =
+        group ||
+        POPOVER_GROUPS.find((entry) => container.matches?.(entry.container));
+    if (!def) return;
+
+    const popover = container.querySelector(def.popover);
+    const button = container.querySelector(def.button);
+    const trigger = def.trigger ? container.querySelector(def.trigger) : container;
 
     if (popover) popover.hidden = true;
     if (button) button.setAttribute("aria-expanded", "false");
     if (trigger) trigger.classList.remove("is-open");
 }
 
-function closeCompatibilityPopover(container) {
-    if (!container) return;
-
-    const popover = container.querySelector(".port-compat-popover");
-    const button = container.querySelector(".port-compat-button");
-    const trigger = container.querySelector(".port-compat-trigger");
-
-    if (popover) popover.hidden = true;
-    if (button) button.setAttribute("aria-expanded", "false");
-    if (trigger) trigger.classList.remove("is-open");
-}
-
-function closeReportLinkPopover(container) {
-    if (!container) return;
-
-    const popover = container.querySelector(".port-report-link-popover");
-    const button = container.querySelector(".port-report-link-button");
-
-    if (popover) popover.hidden = true;
-    if (button) button.setAttribute("aria-expanded", "false");
-    container.classList.remove("is-open");
-}
-
-function closeSharePopover(container) {
-    if (!container) return;
-
-    const popover = container.querySelector(".game-share-popover");
-    const button = container.querySelector(".game-share-button");
-
-    if (popover) popover.hidden = true;
-    if (button) button.setAttribute("aria-expanded", "false");
-    container.classList.remove("is-open");
+function closeAllPopovers(exceptTarget = null) {
+    for (const group of POPOVER_GROUPS) {
+        const keep = exceptTarget?.closest
+            ? exceptTarget.closest(group.container)
+            : exceptTarget;
+        document.querySelectorAll(group.container).forEach((container) => {
+            if (container !== keep) {
+                closePopoverGroup(container, group);
+            }
+        });
+    }
 }
 
 function initializeRatingPopoverEvents() {
@@ -103,55 +111,13 @@ function initializeRatingPopoverEvents() {
     ratingPopoverEventsInitialized = true;
 
     document.addEventListener("click", (event) => {
-        const clickedRating = event.target.closest(".port-rating");
-        document.querySelectorAll(".port-rating").forEach((container) => {
-            if (container !== clickedRating) {
-                closeRatingPopover(container);
-            }
-        });
-
-        const clickedCompat = event.target.closest(".port-compat");
-        document.querySelectorAll(".port-compat").forEach((container) => {
-            if (container !== clickedCompat) {
-                closeCompatibilityPopover(container);
-            }
-        });
-
-        const clickedReportLink = event.target.closest(
-            ".port-report-link-trigger"
-        );
-        document
-            .querySelectorAll(".port-report-link-trigger")
-            .forEach((container) => {
-                if (container !== clickedReportLink) {
-                    closeReportLinkPopover(container);
-                }
-            });
-
-        const clickedShare = event.target.closest(".game-share-trigger");
-        document.querySelectorAll(".game-share-trigger").forEach((container) => {
-            if (container !== clickedShare) {
-                closeSharePopover(container);
-            }
-        });
+        closeAllPopovers(event.target);
     });
 
     document.addEventListener("keydown", (event) => {
-        if (event.key !== "Escape") return;
-        document.querySelectorAll(".port-rating").forEach((container) => {
-            closeRatingPopover(container);
-        });
-        document.querySelectorAll(".port-compat").forEach((container) => {
-            closeCompatibilityPopover(container);
-        });
-        document
-            .querySelectorAll(".port-report-link-trigger")
-            .forEach((container) => {
-                closeReportLinkPopover(container);
-            });
-        document.querySelectorAll(".game-share-trigger").forEach((container) => {
-            closeSharePopover(container);
-        });
+        if (event.key === "Escape") {
+            closeAllPopovers();
+        }
     });
 }
 
@@ -421,7 +387,7 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
             submit.textContent = "Saved";
 
             setTimeout(() => {
-                closeRatingPopover(container);
+                closePopoverGroup(container);
                 rateButton.textContent = "Rate";
             }, 900);
         } catch (error) {
@@ -449,15 +415,11 @@ function createPortRating(port, ratings, ratingActions, onRatingUpdated = null) 
         event.stopPropagation();
 
         if (!popover.hidden) {
-            closeRatingPopover(container);
+            closePopoverGroup(container);
             return;
         }
 
-        document.querySelectorAll(".port-rating").forEach((other) => {
-            if (other !== container) {
-                closeRatingPopover(other);
-            }
-        });
+        closeAllPopovers(container);
 
         popover.hidden = false;
         trigger.classList.add("is-open");
@@ -877,7 +839,7 @@ function createPortCompatibility(
 
             setCompatFeedback("Report saved!", "success");
             setTimeout(() => {
-                closeCompatibilityPopover(container);
+                closePopoverGroup(container);
             }, 800);
         } catch (error) {
             setCompatFeedback(
@@ -898,16 +860,11 @@ function createPortCompatibility(
         event.stopPropagation();
 
         if (!popover.hidden) {
-            closeCompatibilityPopover(container);
+            closePopoverGroup(container);
             return;
         }
 
-        document.querySelectorAll(".port-compat").forEach((other) => {
-            if (other !== container) closeCompatibilityPopover(other);
-        });
-        document.querySelectorAll(".port-rating").forEach((other) => {
-            closeRatingPopover(other);
-        });
+        closeAllPopovers(container);
 
         popover.hidden = false;
         trigger.classList.add("is-open");
@@ -1386,7 +1343,7 @@ function showShareToast(message) {
 function createGameShareControl(game) {
     initializeRatingPopoverEvents();
 
-    const shareUrl = new URL("game.html", window.location.href);
+    const shareUrl = new URL("./", window.location.href);
     if (game?.slug) {
         shareUrl.searchParams.set("game", game.slug);
     } else {
@@ -1430,7 +1387,7 @@ function createGameShareControl(game) {
     closeButton.appendChild(createShareSvg("close"));
     closeButton.addEventListener("click", (event) => {
         event.stopPropagation();
-        closeSharePopover(trigger);
+        closePopoverGroup(trigger);
         shareButton.focus();
     });
 
@@ -1532,21 +1489,11 @@ function createGameShareControl(game) {
         event.stopPropagation();
 
         if (!popover.hidden) {
-            closeSharePopover(trigger);
+            closePopoverGroup(trigger);
             return;
         }
 
-        document.querySelectorAll(".port-rating").forEach((other) => {
-            closeRatingPopover(other);
-        });
-        document.querySelectorAll(".port-compat").forEach((other) => {
-            closeCompatibilityPopover(other);
-        });
-        document
-            .querySelectorAll(".port-report-link-trigger")
-            .forEach((other) => {
-                closeReportLinkPopover(other);
-            });
+        closeAllPopovers(trigger);
 
         popover.hidden = false;
         trigger.classList.add("is-open");
@@ -1610,7 +1557,7 @@ function displayGameSummary(game, parentElement) {
         if (cleanYear) {
             const yearLink = document.createElement("a");
             yearLink.className = "game-summary-year game-summary-meta-link";
-            yearLink.href = `index.html?year=${encodeURIComponent(cleanYear)}`;
+            yearLink.href = `./?year=${encodeURIComponent(cleanYear)}`;
             yearLink.textContent = cleanYear;
             yearLink.title = `View all games from ${cleanYear}`;
             yearLink.setAttribute(
@@ -1638,7 +1585,7 @@ function displayGameSummary(game, parentElement) {
                 }
                 const genreLink = document.createElement("a");
                 genreLink.className = "game-summary-meta-link";
-                genreLink.href = `index.html?genre=${encodeURIComponent(
+                genreLink.href = `./?genre=${encodeURIComponent(
                     genreLabel
                 )}`;
                 genreLink.textContent = genreLabel;
@@ -1760,7 +1707,7 @@ function displayPortCard(
         devKey && developerCounts ? developerCounts.get(devKey) || 0 : 0;
     const devUrl =
         devGameCount > 1
-            ? `index.html?dev=${encodeURIComponent(devDisplay)}`
+            ? `./?dev=${encodeURIComponent(devDisplay)}`
             : "";
     const devLinkOptions =
         devGameCount > 1
@@ -2024,7 +1971,7 @@ function displayPortCard(
                 reportFeedback.textContent = "Link reported, thanks!";
                 reportBtn.textContent = "Reported";
                 setTimeout(() => {
-                    closeReportLinkPopover(reportTrigger);
+                    closePopoverGroup(reportTrigger);
                 }, 900);
             } catch (err) {
                 reportFeedback.className = "port-rating-feedback error";
@@ -2044,17 +1991,7 @@ function displayPortCard(
         reportBtn.addEventListener("click", (event) => {
             event.stopPropagation();
             const willOpen = reportPopover.hidden;
-            document
-                .querySelectorAll(".port-report-link-trigger")
-                .forEach((other) => {
-                    if (other !== reportTrigger) closeReportLinkPopover(other);
-                });
-            document.querySelectorAll(".port-rating").forEach((other) => {
-                closeRatingPopover(other);
-            });
-            document.querySelectorAll(".port-compat").forEach((other) => {
-                closeCompatibilityPopover(other);
-            });
+            closeAllPopovers(reportTrigger);
 
             reportPopover.hidden = !willOpen;
             reportTrigger.classList.toggle("is-open", willOpen);
@@ -2095,7 +2032,7 @@ export function displayGame(
     const gameHeader = document.getElementById("game-header");
     const portsHeader = document.getElementById("ports-header");
     const portList = document.getElementById("port-list");
-    const statusElement = document.getElementById("status");
+    const statusElement = document.getElementById("game-status");
 
     if (!gameHeader || !portList || !statusElement) {
         console.error("Game page is missing a required element.");

@@ -720,6 +720,23 @@ main {
   padding: 32px 24px 72px;
 }
 
+.spa-view[hidden] {
+  display: none !important;
+}
+
+html[data-initial-view="game"] #home-view,
+html[data-initial-view="compatibility"] #home-view {
+  display: none;
+}
+
+html[data-initial-view="game"] #game-view {
+  display: block;
+}
+
+html[data-initial-view="compatibility"] #compat-view {
+  display: block;
+}
+
 /* Footer */
 footer {
   margin-top: auto;
@@ -766,57 +783,5 @@ footer p {
   #home-button:active,
   .platform-button:active {
     transform: none;
-  }
-}
-
-
-/* =========================================================
-   AADS — LABELED RESPONSIVE AD UNIT
-   ========================================================= */
-
-.napl-ad {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  margin: 30px auto 12px;
-  padding: 16px 12px;
-  border-top: 1px solid var(--border-subtle);
-}
-
-.napl-ad-label {
-  margin: 0 0 10px;
-  color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  line-height: 1.4;
-  text-align: center;
-  text-transform: uppercase;
-}
-
-.napl-ad-frame {
-  display: flex;
-  justify-content: center;
-  width: 300px;
-  max-width: 100%;
-  min-height: 250px;
-  margin: 0 auto;
-  overflow: hidden;
-}
-
-.napl-ad-frame iframe {
-  display: block;
-  width: 300px;
-  max-width: 100%;
-  height: 250px;
-  border: 0;
-}
-
-@media (max-width: 340px) {
-  .napl-ad {
-    padding-right: 0;
-    padding-left: 0;
   }
 }
