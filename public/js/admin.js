@@ -343,6 +343,8 @@ function renderSidebar() {
   root.querySelectorAll("[data-game]").forEach((button) => {
     button.addEventListener("click", async () => {
       if (unsavedGame && !confirm("Hay cambios sin guardar. ¿Descartarlos y cambiar de juego?")) return;
+      unsavedGame = false;
+      updateTopState();
       selectedSlug = button.dataset.game;
       launchboxStatus = { state: "", text: "", diff: null, undo: null };
       portUiState.clear();
@@ -1212,8 +1214,9 @@ $("sidebar-filters").addEventListener("click", (e) => {
   renderSidebar();
 });
 
-$("new-game-button").addEventListener("click", async () => {
-  if (unsavedGame) markUnsavedAndSchedule();
+$("new-game-button").addEventListener("click", () => {
+  if (unsavedGame && !confirm("Hay cambios sin guardar. ¿Descartarlos y crear otro juego?")) return;
+  unsavedGame = false;
   let base = "nuevo-juego";
   let slug = base;
   let n = 2;
@@ -1232,21 +1235,14 @@ $("new-game-button").addEventListener("click", async () => {
     ports: [],
   };
 
-  try {
-    const res = await api("/api/games", {
-      method: "POST",
-      body: JSON.stringify({ game: newGame }),
-    });
-    selectedSlug = res.saved?.slug || slug;
-    hydrateServerState(res, true);
-    launchboxStatus = { state: "", text: "", diff: null, undo: null };
-    portUiState.clear();
-    renderSidebar();
-    renderEditor();
-    setNotice("Nuevo juego creado en D1. Pegá una URL de LaunchBox para autocompletarlo.", "success");
-  } catch (error) {
-    setNotice("No se pudo crear el juego: " + error.message, "error");
-  }
+  catalog.games.unshift(newGame);
+  selectedSlug = slug;
+  launchboxStatus = { state: "", text: "", diff: null, undo: null };
+  portUiState.clear();
+  markUnsavedAndSchedule();
+  renderSidebar();
+  renderEditor();
+  setNotice("Nuevo juego creado localmente. Completá los datos y pulsá «Guardar cambios».", "success");
 });
 
 $("sync-github-button").addEventListener("click", () => {
