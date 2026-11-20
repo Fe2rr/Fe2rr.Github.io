@@ -663,7 +663,7 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
             github_repo, github_status, github_etag, last_checked_at,
             last_update, date_added, notes, sort_order,
             slug, launchbox_url, launchbox_name, cover_url, genre, description
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           p.portId,
           g.slug,
@@ -984,7 +984,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
           github_repo, github_status, github_etag, last_checked_at,
           last_update, date_added, notes, sort_order,
           slug, launchbox_url, launchbox_name, cover_url, genre, description
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         p.portId,
         nextSlug,
