@@ -585,6 +585,33 @@ function portHtml(port, index) {
     "</h3></div>" +
     "</div>" +
     '<div class="admin-port-body">' +
+    '<section class="game-launchbox-section port-source-section"><div class="autofill-box"><div class="autofill-row">' +
+    fieldHtml(
+      syncInfo.provider === "playstore"
+        ? "URL / ID de Play Store"
+        : syncInfo.provider === "gitlab"
+        ? "URL de GitLab"
+        : "URL de GitHub",
+      detectedTarget,
+      'data-port-index="' + index + '" data-port-field="syncTarget"',
+      "text",
+      "",
+      "https://github.com/usuario/repositorio"
+    ) +
+    '<button type="button" class="button secondary small" data-lookup-port="' + index + '">Obtener datos</button></div>' +
+    statusLine +
+    diffBanner +
+    '</div></section>' +
+    '<details class="admin-game-data-tab port-source-data-tab"><summary><span><strong>' +
+    (syncInfo.provider === "gitlab" ? "Datos de GitLab" : syncInfo.provider === "playstore" ? "Datos de Play Store" : "Datos de GitHub") +
+    '</strong><small>Repositorio, desarrollador, versión y última actualización detectados</small></span><span class="data-tab-hint">Editar datos</span></summary>' +
+    '<div class="admin-game-data-panel">' +
+    (syncInfo.provider === "github" || port.githubRepo ? fieldByKey("githubRepo") : "") +
+    '<div class="admin-game-meta-grid">' +
+    fieldByKey("developer") +
+    fieldByKey("version") +
+    fieldByKey("lastUpdate") +
+    '</div></div></details>' +
     '<div class="admin-port-details">' +
     fieldHtml(
       "Nombre del proyecto",
@@ -592,35 +619,8 @@ function portHtml(port, index) {
       'data-port-index="' + index + '" data-port-field="project"'
     ) +
     fieldByKey("link") +
-    fieldHtml(
-      "URL",
-      port.url,
-      'data-port-index="' + index + '" data-port-field="url"',
-      "url",
-      "",
-      "https://github.com/..., gitlab.com/... o play.google.com/..."
-    ) +
-    '<details class="admin-port-advanced"><summary>Datos detectados (GitHub / GitLab / Play Store)</summary><div class="admin-port-details">' +
-    fieldHtml(
-      syncInfo.provider === "playstore"
-        ? "ID de Play Store"
-        : syncInfo.provider === "gitlab"
-        ? "Proyecto GitLab"
-        : "Repositorio / ID detectado",
-      detectedTarget,
-      'data-port-index="' + index + '" data-port-field="syncTarget"'
-    ) +
-    '<div class="autofill-row"><button type="button" class="button secondary small" data-lookup-port="' + index + '">Leer / actualizar fuente</button>' +
-    (port.portId && detectedTarget
-      ? '<button type="button" class="button secondary small" data-sync-port="' + index + '">Sync</button>'
-      : "") +
-    "</div>" +
-    fieldByKey("developer") +
-    fieldByKey("version") +
-    fieldByKey("lastUpdate") +
-    statusLine +
-    diffBanner +
-    "</div></details>" +
+    fieldByKey("url") +
+    '</div>' +
 
     fieldByKey("controller") +
     fieldByKey("files") +
@@ -1111,7 +1111,7 @@ function bindEditorEvents(root, game) {
       markUnsavedAndSchedule();
     });
 
-    if (field === "url") {
+    if (field === "syncTarget") {
       input.addEventListener("paste", (e) => {
         const pasted = e.clipboardData?.getData("text") || "";
         setTimeout(() => {
@@ -1130,7 +1130,7 @@ function bindEditorEvents(root, game) {
       const p = game.ports[idx];
       if (!p) return;
       const syncInfo = detectPortSyncInfo(p);
-      runSourceAutofill(game, idx, p.url || syncInfo.target || p.syncTarget || p.githubRepo);
+      runSourceAutofill(game, idx, p.syncTarget || syncInfo.target || p.githubRepo || p.url);
     });
   });
 
