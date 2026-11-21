@@ -8,10 +8,10 @@
 
 import { hydrateCatalog } from "./catalog-schema.js";
 
-const CATALOG_JSON_URL = "assets/data/catalog.json";
-const CATALOG_CACHE_NAME = "napl-catalog-v3";
+const CATALOG_JSON_URL = "https://raw.githubusercontent.com/Fe2rr/Napl-prueba/main/public/assets/data/catalog.json";
+const CATALOG_CACHE_NAME = "napl-catalog-v4";
 const CATALOG_CACHE_KEY = "/__napl_static_catalog__.json";
-const CATALOG_META_STORAGE_KEY = "napl_catalog_cache_meta_v3";
+const CATALOG_META_STORAGE_KEY = "napl_catalog_cache_meta_v4";
 const CATALOG_SOFT_TTL_MS = 30 * 1000;
 
 let catalogPromise = null;
