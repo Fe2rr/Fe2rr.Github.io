@@ -634,60 +634,39 @@ export function createCompatibilityActions() {
                 clientId = crypto.randomUUID();
             }
 
-            const baseReason = String(reason || "").trim();
+            const baseReason = String(reason || "").trim().slice(0, 120);
             const cleanNote = String(note || "")
                 .replace(/\s+/g, " ")
                 .trim()
                 .slice(0, 80);
 
-            const combinedReason = cleanNote
-                ? (baseReason
-                      ? `${baseReason} — ${cleanNote}`.slice(0, 120)
-                      : cleanNote.slice(0, 120))
-                : baseReason.slice(0, 120);
-
-            const sendRequest = async (payloadReason) => {
-                const payload = {
-                    client_id: clientId,
-                    port_id: portId,
-                    reason: payloadReason,
-                    url,
-                };
-                if (cleanNote) {
-                    payload.note = cleanNote;
-                }
-
-                const response = await fetch(REPORT_LINK_API_URL, {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify(payload),
-                    cache: "no-store",
-                });
-
-                const raw = await response.text();
-                let data = {};
-                try {
-                    data = raw ? JSON.parse(raw) : {};
-                } catch {
-                    throw new Error(
-                        "The report server returned an invalid response."
-                    );
-                }
-
-                return { response, data };
+            const payload = {
+                client_id: clientId,
+                port_id: portId,
+                reason: baseReason,
+                url,
             };
+            if (cleanNote) {
+                payload.note = cleanNote;
+            }
 
-            let { response, data } = await sendRequest(combinedReason);
+            const response = await fetch(REPORT_LINK_API_URL, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(payload),
+                cache: "no-store",
+            });
 
-            if (
-                (!response.ok || !data.success) &&
-                response.status === 400 &&
-                baseReason &&
-                combinedReason !== baseReason
-            ) {
-                ({ response, data } = await sendRequest(baseReason));
+            const raw = await response.text();
+            let data = {};
+            try {
+                data = raw ? JSON.parse(raw) : {};
+            } catch {
+                throw new Error(
+                    "The report server returned an invalid response."
+                );
             }
 
             if (!response.ok || !data.success) {

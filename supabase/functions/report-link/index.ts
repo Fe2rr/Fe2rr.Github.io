@@ -100,9 +100,10 @@ Deno.serve(async (request: Request) => {
       );
     }
 
+    const safePortId = portId.replace(/`/g, "");
     const displayReason = reason || "Custom note";
     const fields: Array<{ name: string; value: string; inline?: boolean }> = [
-      { name: "Port", value: `\`${portId}\``, inline: true },
+      { name: "Port", value: `\`${safePortId}\``, inline: true },
       { name: "Reason", value: displayReason, inline: true },
     ];
 
@@ -116,6 +117,7 @@ Deno.serve(async (request: Request) => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        allowed_mentions: { parse: [] },
         embeds: [
           {
             title: "Broken Link Report",
