@@ -598,7 +598,11 @@ function portHtml(port, index) {
       "",
       "https://github.com/usuario/repositorio"
     ) +
-    '<button type="button" class="button secondary small" data-lookup-port="' + index + '">Obtener datos</button></div>' +
+    '<button type="button" class="button secondary small" data-lookup-port="' + index + '">Obtener datos</button>' +
+    (port.portId && detectedTarget
+      ? '<button type="button" class="button secondary small" data-sync-port="' + index + '">Sync</button>'
+      : "") +
+    "</div>" +
     statusLine +
     diffBanner +
     '</div></section>' +
