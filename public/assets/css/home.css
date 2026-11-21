@@ -1426,6 +1426,52 @@ html[data-theme="light"] .spotlight-nav-btn {
   cursor: not-allowed;
 }
 
+.spotlight-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3;
+  height: 2px;
+  pointer-events: none;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.1);
+  transition: opacity var(--duration-fast) var(--ease-out);
+}
+
+.spotlight-progress[hidden] {
+  display: none;
+}
+
+.spotlight-progress.is-paused {
+  opacity: 0.55;
+}
+
+html[data-theme="light"] .spotlight-progress {
+  background: rgba(11, 31, 28, 0.1);
+}
+
+.spotlight-progress-bar {
+  width: 100%;
+  height: 100%;
+  transform-origin: left center;
+  transform: scaleX(0);
+  will-change: transform;
+  background: linear-gradient(
+    90deg,
+    rgba(110, 231, 160, 0.55) 0%,
+    var(--accent) 100%
+  );
+}
+
+html[data-theme="light"] .spotlight-progress-bar {
+  background: linear-gradient(
+    90deg,
+    rgba(15, 138, 107, 0.45) 0%,
+    var(--accent) 100%
+  );
+}
+
 /* Spotlight Skeleton */
 .spotlight-skeleton-content {
   display: grid;

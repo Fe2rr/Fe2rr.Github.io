@@ -197,6 +197,119 @@ function normalizeGithubSlug(raw) {
   return parsed ? `${parsed.owner}/${parsed.repo}` : "";
 }
 
+const GITLAB_STOP_SEGMENTS = new Set([
+  "-",
+  "blob",
+  "tree",
+  "raw",
+  "commits",
+  "commit",
+  "releases",
+  "tags",
+  "issues",
+  "merge_requests",
+  "wikis",
+  "snippets",
+  "packages",
+  "jobs",
+  "pipelines",
+  "activity",
+]);
+
+function parseGitlabProject(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return null;
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    const host = url.hostname.toLowerCase();
+    if (host !== "gitlab.com" && host !== "www.gitlab.com") return null;
+    const rawParts = url.pathname.split("/").filter(Boolean);
+    const parts = [];
+    for (const seg of rawParts) {
+      if (GITLAB_STOP_SEGMENTS.has(seg.toLowerCase())) break;
+      parts.push(seg);
+    }
+    if (parts.length < 2) return null;
+    if (["explore", "users", "dashboard", "admin", "help", "api"].includes(parts[0].toLowerCase())) {
+      return null;
+    }
+    parts[parts.length - 1] = parts[parts.length - 1].replace(/\.git$/i, "");
+    if (parts.some((p) => !p || p === "." || p === "..")) return null;
+    const projectPath = parts.join("/");
+    return {
+      namespace: parts.slice(0, -1).join("/"),
+      project: parts[parts.length - 1],
+      projectPath,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function normalizeGitlabPath(raw) {
+  const parsed = parseGitlabProject(raw);
+  return parsed ? parsed.projectPath : "";
+}
+
+const ANDROID_PKG_RE = /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/;
+
+function parsePlayStorePackage(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (!value) return null;
+  if (ANDROID_PKG_RE.test(value) && !value.includes("/")) {
+    return { packageId: value };
+  }
+  try {
+    const url = new URL(/^https?:\/\//i.test(value) ? value : `https://${value}`);
+    const host = url.hostname.toLowerCase();
+    if (host !== "play.google.com") return null;
+    if (!url.pathname.toLowerCase().startsWith("/store/apps/details")) return null;
+    const pkg = String(url.searchParams.get("id") || "").trim();
+    if (!ANDROID_PKG_RE.test(pkg)) return null;
+    return { packageId: pkg };
+  } catch {
+    return null;
+  }
+}
+
+function normalizePlayStoreId(raw) {
+  const parsed = parsePlayStorePackage(raw);
+  return parsed ? parsed.packageId : "";
+}
+
+function resolvePortSyncTarget(port) {
+  if (!port) return { provider: "", target: "", githubRepo: "" };
+  const url = String(port.url || "").trim();
+  const link = String(port.link || "").trim();
+  const dataUrl = String(port.dataUrl ?? port.data_url ?? "").trim();
+  const rawProvider = String(port.syncProvider ?? port.sync_provider ?? "").trim().toLowerCase();
+  const rawTarget = String(port.syncTarget ?? port.sync_target ?? "").trim();
+  const rawGithub = String(port.githubRepo ?? port.github_repo ?? "").trim();
+
+  for (const candidate of [url, link, dataUrl]) {
+    const ps = normalizePlayStoreId(candidate);
+    if (ps) return { provider: "playstore", target: ps, githubRepo: "" };
+    const gl = normalizeGitlabPath(candidate);
+    if (gl) return { provider: "gitlab", target: gl, githubRepo: "" };
+  }
+
+  const gh = normalizeGithubSlug(rawGithub) || normalizeGithubSlug(url) || normalizeGithubSlug(link);
+  if (gh) return { provider: "github", target: gh, githubRepo: gh };
+
+  if (rawProvider === "playstore" && ANDROID_PKG_RE.test(rawTarget)) {
+    return { provider: "playstore", target: rawTarget, githubRepo: "" };
+  }
+  if (rawProvider === "gitlab" && rawTarget.includes("/")) {
+    return { provider: "gitlab", target: rawTarget, githubRepo: "" };
+  }
+  if (rawProvider === "github" && normalizeGithubSlug(rawTarget)) {
+    const slug = normalizeGithubSlug(rawTarget);
+    return { provider: "github", target: slug, githubRepo: slug };
+  }
+
+  return { provider: "", target: "", githubRepo: "" };
+}
+
 async function ghFetch(path, env, options = {}) {
   const headers = {
     Accept: "application/vnd.github+json",
@@ -319,12 +432,13 @@ function fromRows(rows) {
     if(!g.launchboxUrl&&lb)g.launchboxUrl=lb;
     for(const [field,names] of [["coverUrl",["COVER_URL","COVER URL","COVER","COVER IMAGE","IMAGE URL","PORTADA"]],["genre",["GENRE","GÉNERO","GENERO"]],["description",["DESCRIPTION","DESCRIPCIÓN","DESCRIPCION"]]]){const v=col(row,names);if(!g[field]&&v)g[field]=v;}
     const url=col(row,["URL","PORT URL","PORT LINK"]),link=col(row,["LINK","PROJECT LINK","ENLACE"]);
+    const syncInfo=resolvePortSyncTarget({url,link});
     const p={portId:col(row,["PORTS_ID","PORT ID","PORT_ID"]),project:col(row,["PROJECT","PROYECTO"]),
       developer:col(row,["DEVELOPER","DEVELOPER/PUBLISHER","DESARROLLADOR"]),year:currentYear,
       version:col(row,["VERSION","VERSIÓN"]),controller:col(row,["CONTROLLER SUPPORT","CONTROLLER","GAMEPAD","MANDO"]),
       files:col(row,["NEEDS GAME FILES?","NEEDS GAME FILES","GAME FILES","NECESITA ARCHIVOS"]),
       works:col(row,["WORKS?","WORKS","FUNCIONA"]),link,url,dataUrl:col(row,["DATA URL","DATA LINK","GAME FILES URL"]),
-      githubRepo:normalizeGithubSlug(url)||normalizeGithubSlug(link),lastUpdate:col(row,["LAST UPDATE","LAST UPDATED","ÚLTIMA ACTUALIZACIÓN"]),
+      githubRepo:syncInfo.githubRepo,syncProvider:syncInfo.provider,syncTarget:syncInfo.target,lastUpdate:col(row,["LAST UPDATE","LAST UPDATED","ÚLTIMA ACTUALIZACIÓN"]),
       dateAdded:col(row,["DATE ADDED"]),notes:col(row,["NOTES","NOTE","NOTAS"])};
     if(/^unofficial-port(?:-\d+)?$/i.test(p.portId))p.portId=slugify(currentGame)+"-"+p.portId.toLowerCase();
     if(Object.entries(p).some(([k,v])=>k!=="year"&&String(v||"").trim()))g.ports.push(p);
@@ -343,9 +457,9 @@ function validateCatalog(input) {
     let slug=String(g.slug||"").trim();if(!slug||!slug.startsWith(base+"-")){let n=1;slug=base+"-"+n;while(slugs.has(slug))slug=base+"-"+(++n);}
     if(slugs.has(slug))throw new Error("Slug duplicado: "+slug);slugs.add(slug);
     if(!Array.isArray(g.ports))throw new Error("Ports inválidos en "+g.name);
-    const ports=g.ports.map((p,i)=>{const o={};for(const k of ["portId","project","developer","year","version","controller","files","works","link","url","dataUrl","githubRepo","githubStatus","lastCheckedAt","lastUpdate","dateAdded","notes"])o[k]=String(p?.[k]??"");
+    const ports=g.ports.map((p,i)=>{const o={};for(const k of ["portId","project","developer","year","version","controller","files","works","link","url","dataUrl","githubRepo","githubStatus","syncProvider","syncTarget","lastCheckedAt","lastUpdate","dateAdded","notes"])o[k]=String(p?.[k]??"");
       if(!o.portId)o.portId=slug+"-port-"+(i+1);if(ids.has(o.portId))throw new Error("ID de port duplicado: "+o.portId);ids.add(o.portId);
-      o.githubRepo=normalizeGithubSlug(o.githubRepo)||normalizeGithubSlug(o.url)||normalizeGithubSlug(o.link);return o;});
+      const syncInfo=resolvePortSyncTarget(o);o.githubRepo=syncInfo.githubRepo;o.syncProvider=syncInfo.provider;o.syncTarget=syncInfo.target;return o;});
     return {name:g.name.trim(),platform,slug,year:String(g.year||""),coverUrl:String(g.coverUrl||""),genre:String(g.genre||""),description:String(g.description||""),launchboxUrl:String(g.launchboxUrl||""),ports};
   });
   return {version:1,updatedAt:new Date().toISOString(),platformOrder:[...new Set(input.platformOrder.map(x=>String(x).trim()).filter(Boolean))],games};
@@ -387,6 +501,8 @@ async function ensureSchema(env) {
       github_repo TEXT NOT NULL DEFAULT '',
       github_status TEXT NOT NULL DEFAULT '',
       github_etag TEXT NOT NULL DEFAULT '',
+      sync_provider TEXT NOT NULL DEFAULT '',
+      sync_target TEXT NOT NULL DEFAULT '',
       last_checked_at TEXT NOT NULL DEFAULT '',
       last_update TEXT NOT NULL DEFAULT '',
       date_added TEXT NOT NULL DEFAULT '',
@@ -431,6 +547,8 @@ async function ensureSchema(env) {
     ["cover_url", "TEXT"],
     ["genre", "TEXT"],
     ["description", "TEXT"],
+    ["sync_provider", "TEXT NOT NULL DEFAULT ''"],
+    ["sync_target", "TEXT NOT NULL DEFAULT ''"],
   ];
   for (const [column, type] of additions) {
     try {
@@ -439,6 +557,7 @@ async function ensureSchema(env) {
       if (!/duplicate column/i.test(String(error?.message || error))) throw error;
     }
   }
+  await env.DB.prepare("CREATE INDEX IF NOT EXISTS idx_ports_sync ON ports(sync_provider, sync_target, last_checked_at)").run();
   await env.DB.prepare("DROP INDEX IF EXISTS idx_ports_slug").run();
   schemaBootstrapped = true;
 }
@@ -491,14 +610,15 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
     );
 
     g.ports.forEach((p, pIdx) => {
+      const syncInfo = resolvePortSyncTarget(p);
       stmts.push(
         env.DB.prepare(
           `INSERT INTO ports (
             port_id, game_slug, project, developer, year, version,
             controller, files, works, link, url, data_url,
-            github_repo, github_status, github_etag, last_checked_at,
+            github_repo, github_status, github_etag, sync_provider, sync_target, last_checked_at,
             last_update, date_added, notes, sort_order
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`
         ).bind(
           p.portId,
           g.slug,
@@ -512,8 +632,10 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
           p.link || "",
           p.url || "",
           p.dataUrl || "",
-          p.githubRepo || "",
-          p.githubStatus || (p.githubRepo ? "unknown" : ""),
+          syncInfo.githubRepo,
+          p.githubStatus || (syncInfo.provider ? "unknown" : ""),
+          syncInfo.provider,
+          syncInfo.target,
           p.lastCheckedAt || "",
           p.lastUpdate || "",
           p.dateAdded || "",
@@ -590,10 +712,15 @@ async function readCatalogFromD1(env, options = {}) {
 
   const portsByGame = new Map();
   let githubCount = 0;
+  let gitlabCount = 0;
+  let playstoreCount = 0;
   let downCount = 0;
 
   for (const r of portsRes.results || []) {
-    if (r.github_repo) githubCount += 1;
+    const syncInfo = resolvePortSyncTarget(r);
+    if (syncInfo.provider === "github") githubCount += 1;
+    else if (syncInfo.provider === "gitlab") gitlabCount += 1;
+    else if (syncInfo.provider === "playstore") playstoreCount += 1;
     if (r.github_status === "down") downCount += 1;
 
     const port = {
@@ -614,11 +741,13 @@ async function readCatalogFromD1(env, options = {}) {
     };
 
     if (includeInternal) {
-      port.githubRepo = r.github_repo || "";
+      port.githubRepo = syncInfo.githubRepo || "";
+      port.syncProvider = syncInfo.provider || "";
+      port.syncTarget = syncInfo.target || "";
       port.githubStatus = r.github_status || "";
       port.lastCheckedAt = r.last_checked_at || "";
-    } else if (r.github_repo) {
-      port.githubRepo = r.github_repo;
+    } else if (syncInfo.githubRepo) {
+      port.githubRepo = syncInfo.githubRepo;
     }
 
     if (!portsByGame.has(r.game_slug)) portsByGame.set(r.game_slug, []);
@@ -663,6 +792,9 @@ async function readCatalogFromD1(env, options = {}) {
       gamesCount: games.length,
       portsCount: (portsRes.results || []).length,
       githubCount,
+      gitlabCount,
+      playstoreCount,
+      syncableCount: githubCount + gitlabCount + playstoreCount,
       downCount,
       lastSyncAt: meta.last_sync_at || "",
       lastGitHubPublishAt: meta.last_github_publish_at || "",
@@ -748,10 +880,7 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
     seenPortSlugs.add(portSlug);
     const url = String(p?.url || "").trim();
     const link = String(p?.link || "").trim();
-    const githubRepo =
-      normalizeGithubSlug(p?.githubRepo) ||
-      normalizeGithubSlug(url) ||
-      normalizeGithubSlug(link);
+    const syncInfo = resolvePortSyncTarget(p);
 
     return {
       portId,
@@ -771,8 +900,10 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
       link,
       url,
       dataUrl: String(p?.dataUrl || ""),
-      githubRepo,
-      githubStatus: String(p?.githubStatus || (githubRepo ? "unknown" : "")),
+      githubRepo: syncInfo.githubRepo,
+      syncProvider: syncInfo.provider,
+      syncTarget: syncInfo.target,
+      githubStatus: String(p?.githubStatus || (syncInfo.provider ? "unknown" : "")),
       lastCheckedAt: String(p?.lastCheckedAt || ""),
       lastUpdate: String(p?.lastUpdate || ""),
       dateAdded: String(p?.dateAdded || now.slice(0, 10)),
@@ -812,9 +943,9 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
         `INSERT OR REPLACE INTO ports (
           port_id, game_slug, project, developer, year, version,
           controller, files, works, link, url, data_url,
-          github_repo, github_status, github_etag, last_checked_at,
+          github_repo, github_status, github_etag, sync_provider, sync_target, last_checked_at,
           last_update, date_added, notes, sort_order
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?)`
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', ?, ?, ?, ?, ?, ?, ?)`
       ).bind(
         p.portId,
         nextSlug,
@@ -830,6 +961,8 @@ async function saveSingleGameInD1(env, targetSlug, rawGame, isCreate = false) {
         p.dataUrl,
         p.githubRepo,
         p.githubStatus,
+        p.syncProvider,
+        p.syncTarget,
         p.lastCheckedAt,
         p.lastUpdate,
         p.dateAdded,
@@ -907,7 +1040,9 @@ async function inspectGithubRepo(repoSlug, env) {
 
   if (repoRes.status === 404 || repoRes.status === 410) {
     return {
+      provider: "github",
       status: "down",
+      syncTarget: `${parsed.owner}/${parsed.repo}`,
       githubRepo: `${parsed.owner}/${parsed.repo}`,
       repoUrl: `https://github.com/${parsed.owner}/${parsed.repo}`,
       error: `Repositorio no disponible (HTTP ${repoRes.status}).`,
@@ -954,6 +1089,8 @@ async function inspectGithubRepo(repoSlug, env) {
   const recommendedUrl = apkUrl || releaseUrl || repoUrl;
 
   return {
+    provider: "github",
+    syncTarget: canonicalRepo,
     status: moved ? "moved" : "ok",
     moved,
     archived: Boolean(repoData.archived),
@@ -970,6 +1107,225 @@ async function inspectGithubRepo(repoSlug, env) {
     description: String(repoData.description || ""),
     checkedAt: new Date().toISOString(),
   };
+}
+
+async function glFetch(apiPath, env) {
+  const headers = {
+    Accept: "application/json",
+    "User-Agent": "NAPL-Catalog-Sync/2.0",
+  };
+  if (env?.GITLAB_TOKEN) {
+    headers["PRIVATE-TOKEN"] = env.GITLAB_TOKEN;
+  }
+  const res = await fetch(`https://gitlab.com/api/v4${apiPath}`, { headers });
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+  return { res, data };
+}
+
+async function inspectGitlabProject(projectInput, env) {
+  const parsed = parseGitlabProject(projectInput);
+  if (!parsed) throw new Error("URL de GitLab inválida.");
+
+  const encoded = encodeURIComponent(parsed.projectPath);
+  const { res: projRes, data: projData } = await glFetch(`/projects/${encoded}`, env);
+  if (projRes.status === 404 || projRes.status === 410) {
+    return {
+      provider: "gitlab",
+      status: "down",
+      syncTarget: parsed.projectPath,
+      githubRepo: "",
+      repoUrl: `https://gitlab.com/${parsed.projectPath}`,
+      error: `Repositorio de GitLab no disponible (HTTP ${projRes.status}).`,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (!projRes.ok) {
+    throw new Error(projData?.message || `GitLab HTTP ${projRes.status}`);
+  }
+
+  const canonicalPath = String(projData.path_with_namespace || parsed.projectPath);
+  const canonicalEncoded = encodeURIComponent(canonicalPath);
+  const repoUrl = String(projData.web_url || `https://gitlab.com/${canonicalPath}`);
+  const moved = canonicalPath.toLowerCase() !== parsed.projectPath.toLowerCase();
+
+  let release = null;
+  const rels = await glFetch(`/projects/${canonicalEncoded}/releases?per_page=1`, env);
+  if (rels.res.ok && Array.isArray(rels.data) && rels.data.length > 0) {
+    release = rels.data[0];
+  }
+
+  let tagFallback = null;
+  if (!release) {
+    const tags = await glFetch(`/projects/${canonicalEncoded}/repository/tags?per_page=1`, env);
+    if (tags.res.ok && Array.isArray(tags.data) && tags.data.length > 0) {
+      tagFallback = tags.data[0];
+    }
+  }
+
+  let commitFallback = null;
+  if (!release && !tagFallback) {
+    const commits = await glFetch(`/projects/${canonicalEncoded}/repository/commits?per_page=1`, env);
+    if (commits.res.ok && Array.isArray(commits.data) && commits.data.length > 0) {
+      commitFallback = commits.data[0];
+    }
+  }
+
+  const assetLinks = Array.isArray(release?.assets?.links) ? release.assets.links : [];
+  const apkAsset =
+    assetLinks.find((l) => /\.apk(?:$|[?#])/i.test(String(l?.name || l?.direct_asset_url || l?.url || "")) && !/debug/i.test(String(l?.name || ""))) ||
+    assetLinks.find((l) => /\.apk(?:$|[?#])/i.test(String(l?.name || l?.direct_asset_url || l?.url || "")));
+  let apkUrl = String(apkAsset?.direct_asset_url || apkAsset?.url || "").trim();
+  if (!apkUrl && release?.description) {
+    const mdApk = String(release.description).match(/https?:\/\/[^\s)"']+\.apk/i);
+    if (mdApk) apkUrl = mdApk[0];
+  }
+
+  const version = String(release?.tag_name || tagFallback?.name || "").trim();
+  const updatedIso =
+    release?.released_at ||
+    release?.created_at ||
+    tagFallback?.commit?.committed_date ||
+    commitFallback?.committed_date ||
+    projData.last_activity_at ||
+    "";
+  const lastUpdate = formatNaplDate(updatedIso);
+  const releaseUrl = release?.tag_name
+    ? `${repoUrl}/-/releases/${encodeURIComponent(release.tag_name)}`
+    : repoUrl;
+
+  return {
+    provider: "gitlab",
+    syncTarget: canonicalPath,
+    status: moved ? "moved" : "ok",
+    moved,
+    archived: Boolean(projData.archived),
+    githubRepo: "",
+    repoUrl,
+    releaseUrl,
+    apkUrl,
+    recommendedUrl: apkUrl || releaseUrl || repoUrl,
+    project: String(projData.name || parsed.project),
+    developer: String(projData.namespace?.name || projData.namespace?.full_path || parsed.namespace),
+    version,
+    lastUpdate,
+    link: projData.archived ? "Free (Gitlab - Archived)" : "Free (Gitlab)",
+    description: String(projData.description || ""),
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+async function inspectPlayStoreApp(appInput) {
+  const parsed = parsePlayStorePackage(appInput);
+  if (!parsed) throw new Error("URL o ID de Google Play Store inválido.");
+
+  const packageId = parsed.packageId;
+  const storeUrl = `https://play.google.com/store/apps/details?id=${encodeURIComponent(packageId)}`;
+  const fetchUrl = `${storeUrl}&hl=en&gl=US`;
+  const res = await fetch(fetchUrl, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+
+  if (res.status === 404 || res.status === 410) {
+    return {
+      provider: "playstore",
+      status: "down",
+      syncTarget: packageId,
+      githubRepo: "",
+      repoUrl: storeUrl,
+      storeUrl,
+      error: `App no disponible en Play Store (HTTP ${res.status}).`,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (!res.ok) {
+    throw new Error(`Play Store HTTP ${res.status}`);
+  }
+
+  const html = await res.text();
+  let appInfo = null;
+  const cbRegex = /AF_initDataCallback\(\{key:\s*['"](ds:\d+)['"][\s\S]*?data:([\s\S]*?),\s*sideChannel:/g;
+  for (const m of html.matchAll(cbRegex)) {
+    try {
+      const parsedJson = JSON.parse(m[2]);
+      const candidate = parsedJson?.[1]?.[2];
+      if (Array.isArray(candidate) && (candidate?.[77]?.[0] === packageId || (m[1] === "ds:5" && candidate?.[0]?.[0]))) {
+        appInfo = candidate;
+        if (candidate?.[77]?.[0] === packageId) break;
+      }
+    } catch {
+      // Continue scanning callbacks
+    }
+  }
+
+  if (!appInfo) {
+    throw new Error("No se pudieron leer los datos de la ficha en Google Play Store.");
+  }
+
+  const title = decodeHtmlEntities(String(appInfo?.[0]?.[0] || "").trim());
+  const developer = decodeHtmlEntities(String(appInfo?.[37]?.[0] || appInfo?.[68]?.[0] || "").trim());
+
+  const priceMicros = Number(appInfo?.[57]?.[0]?.[0]?.[0]?.[0]?.[1]?.[0]?.[0] || 0);
+  const priceFormatted = String(appInfo?.[57]?.[0]?.[0]?.[0]?.[0]?.[1]?.[0]?.[2] || "").trim();
+  const isPaid = priceMicros > 0 || Boolean(priceFormatted && !/^(\$?0(\.0+)?|free)$/i.test(priceFormatted));
+
+  const rawVersion = String(appInfo?.[140]?.[0]?.[0]?.[0] || "").trim();
+  const version = /^varies with device$/i.test(rawVersion) ? "" : rawVersion;
+
+  const updatedTs = Number(appInfo?.[145]?.[0]?.[1]?.[0] || 0);
+  const updatedText = String(appInfo?.[145]?.[0]?.[0] || "").trim();
+  let lastUpdate = "";
+  if (Number.isFinite(updatedTs) && updatedTs > 0) {
+    lastUpdate = formatNaplDate(new Date(updatedTs * 1000).toISOString());
+  } else if (updatedText) {
+    const parsedDate = Date.parse(updatedText);
+    if (!Number.isNaN(parsedDate)) {
+      lastUpdate = formatNaplDate(new Date(parsedDate).toISOString());
+    }
+  }
+
+  return {
+    provider: "playstore",
+    syncTarget: packageId,
+    status: "ok",
+    moved: false,
+    archived: false,
+    githubRepo: "",
+    repoUrl: storeUrl,
+    storeUrl,
+    recommendedUrl: storeUrl,
+    project: title || packageId,
+    developer,
+    version,
+    lastUpdate,
+    link: isPaid ? "Paid (Playstore)" : "Free (Playstore)",
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+async function inspectPortSource(rawInput, env) {
+  const value = String(rawInput || "").trim();
+  if (!value) throw new Error("Ingresá una URL de GitHub, GitLab o Play Store.");
+  if (parsePlayStorePackage(value)) {
+    return inspectPlayStoreApp(value);
+  }
+  if (parseGitlabProject(value)) {
+    return inspectGitlabProject(value, env);
+  }
+  if (parseGithubRepo(value)) {
+    return inspectGithubRepo(value, env);
+  }
+  throw new Error("URL no reconocida. Usá enlaces de GitHub, GitLab o Google Play Store.");
 }
 
 function decodeHtmlEntities(str) {
@@ -1127,30 +1483,46 @@ async function inspectLaunchboxUrl(rawUrl) {
   };
 }
 
-async function syncSinglePortWithGithub(env, portRow) {
-  const repoSlug =
-    normalizeGithubSlug(portRow.github_repo) ||
-    normalizeGithubSlug(portRow.url) ||
-    normalizeGithubSlug(portRow.link);
-  if (!repoSlug) {
-    return { portId: portRow.port_id, status: "skipped", reason: "Sin repositorio GitHub" };
+async function syncSinglePortWithSource(env, portRow) {
+  const syncInfo = resolvePortSyncTarget(portRow);
+  if (!syncInfo.provider || !syncInfo.target) {
+    return { portId: portRow.port_id, status: "skipped", reason: "Sin fuente sincronizable" };
   }
 
   const now = new Date().toISOString();
-  const info = await inspectGithubRepo(repoSlug, env);
+  let info;
+  if (syncInfo.provider === "playstore") {
+    info = await inspectPlayStoreApp(syncInfo.target);
+  } else if (syncInfo.provider === "gitlab") {
+    const glTarget = /^https?:\/\//i.test(syncInfo.target)
+      ? syncInfo.target
+      : `https://gitlab.com/${syncInfo.target.replace(/^\/+/, "")}`;
+    info = await inspectGitlabProject(glTarget, env);
+  } else {
+    info = await inspectGithubRepo(syncInfo.target, env);
+  }
 
   if (info.status === "down") {
-    const changed = portRow.github_status !== "down" || portRow.link !== "Repo Down";
+    const downLabel = syncInfo.provider === "playstore" ? "App Down" : "Repo Down";
+    const changed =
+      portRow.github_status !== "down" ||
+      portRow.link !== downLabel ||
+      portRow.sync_provider !== syncInfo.provider ||
+      portRow.sync_target !== syncInfo.target;
     await env.DB.prepare(
-      `UPDATE ports SET github_repo = ?, github_status = 'down', link = ?, last_checked_at = ? WHERE port_id = ?`
+      `UPDATE ports
+       SET github_repo = ?, sync_provider = ?, sync_target = ?, github_status = 'down', link = ?, last_checked_at = ?
+       WHERE port_id = ?`
     )
-      .bind(repoSlug, "Repo Down", now, portRow.port_id)
+      .bind(syncInfo.githubRepo, syncInfo.provider, syncInfo.target, downLabel, now, portRow.port_id)
       .run();
     return {
       portId: portRow.port_id,
       gameSlug: portRow.game_slug,
       project: portRow.project,
-      githubRepo: repoSlug,
+      provider: syncInfo.provider,
+      syncTarget: syncInfo.target,
+      githubRepo: syncInfo.githubRepo,
       status: "down",
       changed,
       message: info.error,
@@ -1160,32 +1532,52 @@ async function syncSinglePortWithGithub(env, portRow) {
   const nextVersion = info.version || portRow.version;
   const nextLastUpdate = info.lastUpdate || portRow.last_update;
   const nextLink =
-    portRow.link === "Repo Down" || !portRow.link || /github/i.test(portRow.link)
+    portRow.link === "Repo Down" ||
+    portRow.link === "App Down" ||
+    !portRow.link ||
+    /github|gitlab|play\s*store|playstore/i.test(portRow.link)
       ? info.link
       : portRow.link;
 
-  // Keep user's explicit custom url unless it was pointing to old repo/release or empty
   let nextUrl = portRow.url;
-  const curParsed = parseGithubRepo(portRow.url);
-  if (!nextUrl || info.moved || (curParsed && info.apkUrl && /\/releases\/|github\.com/i.test(nextUrl))) {
-    nextUrl = info.apkUrl || info.repoUrl;
+  if (syncInfo.provider === "github") {
+    const curParsed = parseGithubRepo(portRow.url);
+    if (!nextUrl || info.moved || (curParsed && info.apkUrl && /\/releases\/|github\.com/i.test(nextUrl))) {
+      nextUrl = info.apkUrl || info.repoUrl;
+    }
+  } else if (syncInfo.provider === "gitlab") {
+    const curParsed = parseGitlabProject(portRow.url);
+    if (!nextUrl || info.moved || (curParsed && info.apkUrl && /\/releases\/|gitlab\.com/i.test(nextUrl))) {
+      nextUrl = info.apkUrl || info.repoUrl;
+    }
+  } else if (syncInfo.provider === "playstore") {
+    if (!nextUrl) {
+      nextUrl = info.storeUrl;
+    }
   }
+
+  const nextGithubRepo = syncInfo.provider === "github" ? info.githubRepo : "";
+  const nextSyncTarget = info.syncTarget || syncInfo.target;
 
   const changed =
     nextVersion !== portRow.version ||
     nextLastUpdate !== portRow.last_update ||
-    info.githubRepo !== portRow.github_repo ||
+    nextGithubRepo !== portRow.github_repo ||
+    syncInfo.provider !== (portRow.sync_provider || "") ||
+    nextSyncTarget !== (portRow.sync_target || "") ||
     nextUrl !== portRow.url ||
     nextLink !== portRow.link ||
     portRow.github_status !== info.status;
 
   await env.DB.prepare(
     `UPDATE ports
-     SET github_repo = ?, github_status = ?, version = ?, last_update = ?, url = ?, link = ?, last_checked_at = ?
+     SET github_repo = ?, sync_provider = ?, sync_target = ?, github_status = ?, version = ?, last_update = ?, url = ?, link = ?, last_checked_at = ?
      WHERE port_id = ?`
   )
     .bind(
-      info.githubRepo,
+      nextGithubRepo,
+      syncInfo.provider,
+      nextSyncTarget,
       info.status,
       nextVersion,
       nextLastUpdate,
@@ -1200,7 +1592,9 @@ async function syncSinglePortWithGithub(env, portRow) {
     portId: portRow.port_id,
     gameSlug: portRow.game_slug,
     project: portRow.project || info.project,
-    githubRepo: info.githubRepo,
+    provider: syncInfo.provider,
+    syncTarget: nextSyncTarget,
+    githubRepo: nextGithubRepo,
     status: info.status,
     changed,
     oldVersion: portRow.version,
@@ -1210,25 +1604,31 @@ async function syncSinglePortWithGithub(env, portRow) {
   };
 }
 
-async function runGithubSyncBatch(env, options = {}) {
+const SYNC_PORT_FILTER = `
+  sync_provider != '' OR github_repo != ''
+  OR url LIKE '%github.com/%' OR link LIKE '%github.com/%'
+  OR url LIKE '%gitlab.com/%' OR link LIKE '%gitlab.com/%'
+  OR url LIKE '%play.google.com/store/apps/details%' OR link LIKE '%play.google.com/store/apps/details%'
+`;
+
+async function runSyncBatch(env, options = {}) {
   await ensureSeeded(env);
   const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_CRON_BATCH, 1), 22);
   const offset = Math.max(Number(options.offset) || 0, 0);
   const source = options.source || "manual";
 
   const totalRow = await env.DB.prepare(
-    `SELECT COUNT(*) AS count FROM ports
-     WHERE github_repo != '' OR url LIKE '%github.com/%' OR link LIKE '%github.com/%'`
+    `SELECT COUNT(*) AS count FROM ports WHERE ${SYNC_PORT_FILTER}`
   ).first();
-  const totalGithubPorts = Number(totalRow?.count || 0);
+  const totalSyncPorts = Number(totalRow?.count || 0);
 
   const query = options.useOffset
     ? `SELECT * FROM ports
-       WHERE github_repo != '' OR url LIKE '%github.com/%' OR link LIKE '%github.com/%'
+       WHERE ${SYNC_PORT_FILTER}
        ORDER BY port_id ASC
        LIMIT ? OFFSET ?`
     : `SELECT * FROM ports
-       WHERE github_repo != '' OR url LIKE '%github.com/%' OR link LIKE '%github.com/%'
+       WHERE ${SYNC_PORT_FILTER}
        ORDER BY last_checked_at ASC, port_id ASC
        LIMIT ?`;
 
@@ -1245,8 +1645,9 @@ async function runGithubSyncBatch(env, options = {}) {
 
   for (const row of ports || []) {
     checkedCount += 1;
+    const syncInfo = resolvePortSyncTarget(row);
     try {
-      const outcome = await syncSinglePortWithGithub(env, row);
+      const outcome = await syncSinglePortWithSource(env, row);
       if (outcome.status === "down") downCount += 1;
       if (outcome.changed) {
         updatedCount += 1;
@@ -1258,9 +1659,11 @@ async function runGithubSyncBatch(env, options = {}) {
         portId: row.port_id,
         gameSlug: row.game_slug,
         project: row.project,
+        provider: syncInfo.provider,
+        syncTarget: syncInfo.target,
         githubRepo: row.github_repo,
         status: "error",
-        error: err?.message || "Error consultando GitHub",
+        error: err?.message || "Error consultando fuente externa",
       });
     }
   }
@@ -1307,7 +1710,7 @@ async function runGithubSyncBatch(env, options = {}) {
       const pub = await ghCommitCatalog(
         catalog,
         env,
-        `NAPL: sincronización automática de GitHub (${updatedCount} ports actualizados)`
+        `NAPL: sincronización automática (${updatedCount} ports actualizados)`
       );
       autoPublishedCommit = pub.commit;
       await env.DB.batch([
@@ -1329,13 +1732,14 @@ async function runGithubSyncBatch(env, options = {}) {
 
   return {
     source,
-    totalGithubPorts,
+    totalSyncPorts,
+    totalGithubPorts: totalSyncPorts,
     checkedCount,
     updatedCount,
     downCount,
     errorCount,
     nextOffset: offset + checkedCount,
-    hasMore: options.useOffset ? offset + checkedCount < totalGithubPorts : false,
+    hasMore: options.useOffset ? offset + checkedCount < totalSyncPorts : false,
     autoPublishedCommit,
     details,
     syncedAt: now,
@@ -1457,6 +1861,12 @@ async function route(req, env) {
     return json({ success: true, github: data }, 200, headers);
   }
 
+  if (path === "/api/lookup/source" && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
+    const data = await inspectPortSource(body.url || body.repo || body.target, env);
+    return json({ success: true, source: data }, 200, headers);
+  }
+
   if (path === "/api/lookup/launchbox" && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
     const data = await inspectLaunchboxUrl(body.url);
@@ -1470,7 +1880,7 @@ async function route(req, env) {
     if (!portId) return json({ error: "portId requerido." }, 400, headers);
     const row = await env.DB.prepare("SELECT * FROM ports WHERE port_id = ?").bind(portId).first();
     if (!row) return json({ error: "Port no encontrado en D1." }, 404, headers);
-    const result = await syncSinglePortWithGithub(env, row);
+    const result = await syncSinglePortWithSource(env, row);
     if (result.changed) {
       const now = new Date().toISOString();
       await env.DB.batch([
@@ -1490,9 +1900,9 @@ async function route(req, env) {
     return json({ success: true, result, ...state }, 200, headers);
   }
 
-  if (path === "/api/sync-github" && req.method === "POST") {
+  if ((path === "/api/sync-github" || path === "/api/sync-sources") && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
-    const result = await runGithubSyncBatch(env, {
+    const result = await runSyncBatch(env, {
       source: "manual",
       limit: body.limit || 20,
       offset: body.offset || 0,
@@ -1580,7 +1990,7 @@ export default {
   async scheduled(event, env, ctx) {
     const batchSize = Number(env.CRON_BATCH_SIZE) || DEFAULT_CRON_BATCH;
     ctx.waitUntil(
-      runGithubSyncBatch(env, {
+      runSyncBatch(env, {
         source: "cron",
         limit: batchSize,
         useOffset: false,

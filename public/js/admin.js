@@ -16,6 +16,7 @@ const fieldLabels = {
   url: "Enlace del port / descarga",
   dataUrl: "Enlace de archivos del juego",
   githubRepo: "Repositorio GitHub",
+  syncTarget: "Repositorio / ID de fuente",
   lastUpdate: "Última actualización",
   dateAdded: "Fecha de alta",
   notes: "Notas",
@@ -27,6 +28,9 @@ let stats = {
   gamesCount: 0,
   portsCount: 0,
   githubCount: 0,
+  gitlabCount: 0,
+  playstoreCount: 0,
+  syncableCount: 0,
   downCount: 0,
   lastSyncAt: "",
   lastGitHubPublishAt: "",
@@ -85,6 +89,94 @@ function looksLikeGithubUrl(value) {
   return /github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/i.test(text);
 }
 
+function looksLikeGitlabUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  return /gitlab\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/i.test(text);
+}
+
+function looksLikePlayStoreUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return false;
+  if (/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(text) && !text.includes("/")) return true;
+  return /play\.google\.com\/store\/apps\/details.*[?&]id=[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+/i.test(text);
+}
+
+function looksLikeSyncSourceUrl(value) {
+  return looksLikePlayStoreUrl(value) || looksLikeGitlabUrl(value) || looksLikeGithubUrl(value);
+}
+
+function parsePlayStoreIdClient(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(text) && !text.includes("/")) return text;
+  try {
+    const u = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+    if (u.hostname.toLowerCase() !== "play.google.com") return "";
+    if (!u.pathname.toLowerCase().startsWith("/store/apps/details")) return "";
+    const id = String(u.searchParams.get("id") || "").trim();
+    return /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(id) ? id : "";
+  } catch {
+    return "";
+  }
+}
+
+function parseGitlabPathClient(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  try {
+    const u = new URL(/^https?:\/\//i.test(text) ? text : `https://${text}`);
+    const host = u.hostname.toLowerCase();
+    if (host !== "gitlab.com" && host !== "www.gitlab.com") return "";
+    const stops = new Set(["-", "blob", "tree", "raw", "commits", "commit", "releases", "tags", "issues", "merge_requests", "wikis", "snippets", "packages"]);
+    const parts = [];
+    for (const seg of u.pathname.split("/").filter(Boolean)) {
+      if (stops.has(seg.toLowerCase())) break;
+      parts.push(seg);
+    }
+    if (parts.length < 2) return "";
+    parts[parts.length - 1] = parts[parts.length - 1].replace(/\.git$/i, "");
+    return parts.join("/");
+  } catch {
+    return "";
+  }
+}
+
+function detectPortSyncInfo(port) {
+  if (!port) return { provider: "", target: "" };
+  for (const val of [port.url, port.link, port.dataUrl]) {
+    const ps = parsePlayStoreIdClient(val);
+    if (ps) return { provider: "playstore", target: ps };
+    const gl = parseGitlabPathClient(val);
+    if (gl) return { provider: "gitlab", target: gl };
+  }
+  if (port.githubRepo) return { provider: "github", target: port.githubRepo };
+  for (const val of [port.url, port.link]) {
+    if (/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+/i.test(String(val || ""))) {
+      try {
+        const u = new URL(/^https?:\/\//i.test(val) ? val : `https://${val}`);
+        const parts = u.pathname.split("/").filter(Boolean);
+        if (parts.length >= 2) {
+          return { provider: "github", target: `${parts[0]}/${parts[1].replace(/\.git$/i, "")}` };
+        }
+      } catch {
+        // ignore
+      }
+    }
+  }
+  if (port.syncProvider && port.syncTarget) {
+    return { provider: port.syncProvider, target: port.syncTarget };
+  }
+  return { provider: "", target: "" };
+}
+
+function providerLabel(provider) {
+  if (provider === "playstore") return "Play Store";
+  if (provider === "gitlab") return "GitLab";
+  if (provider === "github") return "GitHub";
+  return "Fuente";
+}
+
 function looksLikeLaunchboxUrl(value) {
   return /gamesdb\.launchbox-app\.com\//i.test(String(value || "").trim());
 }
@@ -131,10 +223,11 @@ function updateTopState() {
   }
 
   publishBtn.disabled = savingInFlight || !stats.pendingGitHubSync;
+  const syncTotal = stats.syncableCount ?? stats.githubCount ?? 0;
   $("catalog-count").textContent = `${catalog.games.length} juegos · ${catalog.games.reduce(
     (n, g) => n + g.ports.length,
     0
-  )} ports · ${stats.githubCount || 0} GH`;
+  )} ports · ${syncTotal} sync`;
 }
 
 async function api(path, options = {}) {
@@ -224,17 +317,23 @@ async function loadCatalog() {
   }
 }
 
-function portHasGithub(port) {
+function portHasSyncSource(port) {
+  const info = detectPortSyncInfo(port);
   return Boolean(
-    port.githubRepo ||
-      /github\.com|github\.io|raw\.githubusercontent\.com/i.test(
+    info.provider ||
+      /github\.com|github\.io|raw\.githubusercontent\.com|gitlab\.com|play\.google\.com\/store\/apps\/details/i.test(
         [port.link, port.url, port.dataUrl].join(" ")
       )
   );
 }
 
 function portHasAlert(port) {
-  return port.githubStatus === "down" || port.githubStatus === "moved" || port.link === "Repo Down";
+  return (
+    port.githubStatus === "down" ||
+    port.githubStatus === "moved" ||
+    port.link === "Repo Down" ||
+    port.link === "App Down"
+  );
 }
 
 function gameButton(game, platform) {
@@ -273,7 +372,7 @@ function renderSidebar() {
   const unplacedGames = catalog.games.filter((g) => {
     if (g.platform) return false;
     if (query && !(g.name + " " + g.slug).toLowerCase().includes(query)) return false;
-    if (sidebarFilter === "github" || sidebarFilter === "alerts") return false;
+    if (sidebarFilter === "synced" || sidebarFilter === "alerts") return false;
     return true;
   });
 
@@ -294,14 +393,14 @@ function renderSidebar() {
     const games = catalog.games.filter((g) => {
       const pList = g.ports;
       if (g.platform !== platform) return false;
-      if (sidebarFilter === "github" && !pList.some(portHasGithub)) return false;
-      if (sidebarFilter === "no-github" && pList.some(portHasGithub)) return false;
+      if (sidebarFilter === "synced" && !pList.some(portHasSyncSource)) return false;
+      if (sidebarFilter === "unsynced" && pList.some(portHasSyncSource)) return false;
       if (sidebarFilter === "alerts" && !pList.some(portHasAlert)) return false;
       if (query) {
         const hay = (
           g.name +
           " " +
-          pList.map((p) => `${p.project} ${p.githubRepo} ${p.developer}`).join(" ")
+          pList.map((p) => `${p.project} ${p.githubRepo} ${p.syncTarget || ""} ${p.developer}`).join(" ")
         ).toLowerCase();
         if (!hay.includes(query)) return false;
       }
@@ -309,11 +408,11 @@ function renderSidebar() {
     });
     if (!games.length) continue;
 
-    const noGithub = games.filter((g) => !g.ports.some(portHasGithub));
-    const github = games.filter((g) => g.ports.some(portHasGithub));
+    const unsynced = games.filter((g) => !g.ports.some(portHasSyncSource));
+    const synced = games.filter((g) => g.ports.some(portHasSyncSource));
     const byName = (a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" });
-    noGithub.sort(byName);
-    github.sort(byName);
+    unsynced.sort(byName);
+    synced.sort(byName);
 
     const activeGame = gameBySlug(selectedSlug);
     const details = document.createElement("details");
@@ -327,7 +426,7 @@ function renderSidebar() {
       "<summary><span class='platform-name'>" +
       esc(platform) +
       "</span><span class='platform-count'>" +
-      noGithub.length +
+      unsynced.length +
       "/" +
       games.length +
       "</span><button type='button' class='platform-add-btn' data-add-platform='" +
@@ -335,17 +434,17 @@ function renderSidebar() {
       "' title='Agregar juego en " +
       esc(platform) +
       "'>+ Juego</button></summary><div class='platform-section'>" +
-      (noGithub.length
-        ? "<div class='section-label'>Sin enlaces GitHub · " +
-          noGithub.length +
+      (unsynced.length
+        ? "<div class='section-label'>Sin sincronización · " +
+          unsynced.length +
           "</div>" +
-          noGithub.map((g) => gameButton(g, platform)).join("")
+          unsynced.map((g) => gameButton(g, platform)).join("")
         : "") +
-      (github.length
-        ? "<div class='section-label'>En GitHub · " +
-          github.length +
+      (synced.length
+        ? "<div class='section-label'>Sincronizados · " +
+          synced.length +
           "</div>" +
-          github.map((g) => gameButton(g, platform)).join("")
+          synced.map((g) => gameButton(g, platform)).join("")
         : "") +
       "</div>";
     root.append(details);
@@ -390,14 +489,25 @@ function fieldHtml(label, value, attr, type = "text", extraClass = "", placehold
   );
 }
 
-function githubBadgeHtml(port) {
-  if (port.githubStatus === "down" || port.link === "Repo Down") {
-    return '<span class="gh-badge down">REPO CAÍDO</span>';
+function sourceBadgeHtml(port) {
+  const info = detectPortSyncInfo(port);
+  if (port.githubStatus === "down" || port.link === "Repo Down" || port.link === "App Down") {
+    return (
+      '<span class="gh-badge down">' +
+      (info.provider === "playstore" ? "APP CAÍDA" : "REPO CAÍDO") +
+      "</span>"
+    );
   }
   if (port.githubStatus === "moved") {
     return '<span class="gh-badge moved">MOVIDO</span>';
   }
-  if (port.githubRepo) {
+  if (info.provider === "playstore") {
+    return '<span class="gh-badge playstore">PLAY STORE</span>';
+  }
+  if (info.provider === "gitlab") {
+    return '<span class="gh-badge gitlab">GITLAB</span>';
+  }
+  if (info.provider === "github" || port.githubRepo) {
     return '<span class="gh-badge ok">GH ACTIVO</span>';
   }
   return '<span class="gh-badge">SIN SEGUIMIENTO</span>';
@@ -405,8 +515,21 @@ function githubBadgeHtml(port) {
 
 function portHtml(port, index) {
   const ui = portUiState.get(index) || {};
+  const syncInfo = detectPortSyncInfo(port);
+  const detectedTarget = port.syncTarget || syncInfo.target || port.githubRepo || "";
   const linkButtons = [
-    ["Proyecto", safeUrl(port.link) ? port.link : port.githubRepo ? "https://github.com/" + port.githubRepo : ""],
+    [
+      "Proyecto",
+      safeUrl(port.link)
+        ? port.link
+        : syncInfo.provider === "playstore"
+        ? "https://play.google.com/store/apps/details?id=" + encodeURIComponent(syncInfo.target)
+        : syncInfo.provider === "gitlab"
+        ? "https://gitlab.com/" + syncInfo.target
+        : port.githubRepo
+        ? "https://github.com/" + port.githubRepo
+        : "",
+    ],
     ["Descarga / Port", port.url],
     ["Archivos", port.dataUrl],
   ]
@@ -436,7 +559,9 @@ function portHtml(port, index) {
     : "";
 
   const diffBanner = ui.diff
-    ? '<div class="autofill-diff-banner"><span>GitHub trae nuevos datos (' +
+    ? '<div class="autofill-diff-banner"><span>' +
+      esc(providerLabel(ui.diff.provider || syncInfo.provider)) +
+      " trae nuevos datos (" +
       esc(ui.diff.summary) +
       ')</span><div class="autofill-diff-actions"><button type="button" class="inline-link-btn accent" data-apply-port-diff="' +
       index +
@@ -453,7 +578,7 @@ function portHtml(port, index) {
     '<div class="admin-port-meta-row"><span class="admin-port-number">PORT ' +
     String(index + 1).padStart(2, "0") +
     "</span>" +
-    githubBadgeHtml(port) +
+    sourceBadgeHtml(port) +
     "</div>" +
     '<div class="admin-port-heading"><h3 class="admin-port-title">' +
     esc(port.project || "Untitled port") +
@@ -473,12 +598,20 @@ function portHtml(port, index) {
       'data-port-index="' + index + '" data-port-field="url"',
       "url",
       "",
-      "https://github.com/... o enlace directo de descarga"
+      "https://github.com/..., gitlab.com/... o play.google.com/..."
     ) +
-    '<details class="admin-port-advanced"><summary>Datos detectados de GitHub</summary><div class="admin-port-details">' +
-    fieldHtml("Repositorio detectado", port.githubRepo || "", 'data-port-index="' + index + '" data-port-field="githubRepo"') +
-    '<div class="autofill-row"><button type="button" class="button secondary small" data-lookup-port="' + index + '">Leer / actualizar GitHub</button>' +
-    (port.portId && port.githubRepo
+    '<details class="admin-port-advanced"><summary>Datos detectados (GitHub / GitLab / Play Store)</summary><div class="admin-port-details">' +
+    fieldHtml(
+      syncInfo.provider === "playstore"
+        ? "ID de Play Store"
+        : syncInfo.provider === "gitlab"
+        ? "Proyecto GitLab"
+        : "Repositorio / ID detectado",
+      detectedTarget,
+      'data-port-index="' + index + '" data-port-field="syncTarget"'
+    ) +
+    '<div class="autofill-row"><button type="button" class="button secondary small" data-lookup-port="' + index + '">Leer / actualizar fuente</button>' +
+    (port.portId && detectedTarget
       ? '<button type="button" class="button secondary small" data-sync-port="' + index + '">Sync</button>'
       : "") +
     "</div>" +
@@ -734,35 +867,41 @@ async function runLaunchboxAutofill(game, urlValue) {
 }
 
 
-async function runGithubAutofill(game, index, rawUrl) {
+async function runSourceAutofill(game, index, rawUrl) {
   const port = game.ports[index];
-  if (!port || !looksLikeGithubUrl(rawUrl)) {
+  if (!port || !looksLikeSyncSourceUrl(rawUrl)) {
     portUiState.set(index, {
       state: "error",
-      text: "Ingresá una URL de github.com/usuario/repo válida.",
+      text: "Ingresá una URL válida de GitHub, GitLab o Google Play Store.",
     });
     renderEditor();
     return;
   }
 
-  portUiState.set(index, { state: "loading", text: "Consultando GitHub…" });
+  portUiState.set(index, { state: "loading", text: "Consultando fuente…" });
   renderEditor();
 
   try {
-    const res = await api("/api/lookup/github", {
+    const res = await api("/api/lookup/source", {
       method: "POST",
       body: JSON.stringify({ url: rawUrl }),
     });
-    const gh = res.github;
+    const src = res.source;
+    const label = providerLabel(src.provider);
     const snapshot = { ...port };
 
-    if (gh.status === "down") {
-      port.githubRepo = gh.githubRepo;
+    if (src.status === "down") {
+      port.syncProvider = src.provider;
+      port.syncTarget = src.syncTarget || "";
+      port.githubRepo = src.provider === "github" ? src.syncTarget || "" : "";
       port.githubStatus = "down";
-      port.link = "Repo Down";
+      port.link = src.provider === "playstore" ? "App Down" : "Repo Down";
       portUiState.set(index, {
         state: "error",
-        text: "El repositorio devolvió 404 (Repo Down).",
+        text:
+          src.provider === "playstore"
+            ? "La app en Play Store devolvió 404 (App Down)."
+            : "El repositorio devolvió 404 (Repo Down).",
         undo: snapshot,
       });
       renderEditor();
@@ -770,23 +909,29 @@ async function runGithubAutofill(game, index, rawUrl) {
       return;
     }
 
-    port.githubRepo = gh.githubRepo;
-    port.githubStatus = gh.status;
-    port.lastCheckedAt = gh.checkedAt || new Date().toISOString();
-    if (!port.link || port.link === "Repo Down" || /github/i.test(port.link)) {
-      port.link = gh.link;
+    port.syncProvider = src.provider;
+    port.syncTarget = src.syncTarget || "";
+    port.githubRepo = src.provider === "github" ? src.githubRepo || src.syncTarget || "" : "";
+    port.githubStatus = src.status;
+    port.lastCheckedAt = src.checkedAt || new Date().toISOString();
+    if (
+      !port.link ||
+      port.link === "Repo Down" ||
+      port.link === "App Down" ||
+      /github|gitlab|play\s*store|playstore/i.test(port.link)
+    ) {
+      port.link = src.link;
     }
 
-    // If URL was empty or was the exact repo URL just pasted, upgrade to best download/release link
     const curUrlNorm = String(port.url || "").trim().replace(/\/+$/, "");
     const rawNorm = String(rawUrl || "").trim().replace(/\/+$/, "");
-    if (!curUrlNorm || curUrlNorm === rawNorm || curUrlNorm === gh.repoUrl) {
-      port.url = gh.recommendedUrl;
+    if (!curUrlNorm || curUrlNorm === rawNorm || curUrlNorm === src.repoUrl) {
+      port.url = src.recommendedUrl;
     }
 
     const diffValues = {};
     const diffLabels = [];
-    const fillOrDiff = (key, label, nextVal) => {
+    const fillOrDiff = (key, fieldLabel, nextVal) => {
       const val = String(nextVal || "").trim();
       if (!val) return;
       const cur = String(port[key] || "").trim();
@@ -794,24 +939,24 @@ async function runGithubAutofill(game, index, rawUrl) {
         port[key] = val;
       } else if (cur !== val) {
         diffValues[key] = val;
-        diffLabels.push(label);
+        diffLabels.push(fieldLabel);
       }
     };
 
-    fillOrDiff("project", "Proyecto", gh.project);
-    fillOrDiff("developer", "Desarrollador", gh.developer);
-    fillOrDiff("version", "Versión", gh.version);
-    fillOrDiff("lastUpdate", "Última actualización", gh.lastUpdate);
+    fillOrDiff("project", "Proyecto", src.project);
+    fillOrDiff("developer", "Desarrollador", src.developer);
+    fillOrDiff("version", "Versión", src.version);
+    fillOrDiff("lastUpdate", "Última actualización", src.lastUpdate);
 
     portUiState.set(index, {
       state: "ok",
       text:
-        "GitHub listo: " +
-        gh.githubRepo +
-        (gh.version ? " · " + gh.version : "") +
-        (gh.apkUrl ? " (APK detectado)" : ""),
+        `${label} listo: ` +
+        (src.syncTarget || src.project) +
+        (src.version ? " · " + src.version : "") +
+        (src.apkUrl ? " (APK detectado)" : ""),
       diff: diffLabels.length
-        ? { summary: diffLabels.join(", "), values: diffValues }
+        ? { provider: src.provider, summary: diffLabels.join(", "), values: diffValues }
         : null,
       undo: snapshot,
     });
@@ -937,7 +1082,7 @@ function bindEditorEvents(root, game) {
     renderEditor();
   });
 
-  // Port fields & GitHub paste hooks
+  // Port fields & source paste hooks (GitHub / GitLab / Play Store)
   root.querySelectorAll("[data-port-field]").forEach((input) => {
     const idx = Number(input.dataset.portIndex);
     const field = input.dataset.portField;
@@ -946,6 +1091,19 @@ function bindEditorEvents(root, game) {
       const p = game.ports[idx];
       if (!p) return;
       p[field] = input.value;
+      if (field === "syncTarget") {
+        const val = String(input.value || "").trim();
+        if (looksLikePlayStoreUrl(val) || /^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$/.test(val)) {
+          p.syncProvider = "playstore";
+          p.githubRepo = "";
+        } else if (looksLikeGitlabUrl(val)) {
+          p.syncProvider = "gitlab";
+          p.githubRepo = "";
+        } else if (looksLikeGithubUrl(val)) {
+          p.syncProvider = "github";
+          p.githubRepo = val;
+        }
+      }
       if (field === "project") {
         const title = input.closest(".admin-port-card")?.querySelector(".admin-port-title");
         if (title) title.textContent = input.value || "Untitled port";
@@ -958,8 +1116,8 @@ function bindEditorEvents(root, game) {
         const pasted = e.clipboardData?.getData("text") || "";
         setTimeout(() => {
           const val = pasted.trim() || input.value.trim();
-          if (looksLikeGithubUrl(val)) {
-            runGithubAutofill(game, idx, val);
+          if (looksLikeSyncSourceUrl(val)) {
+            runSourceAutofill(game, idx, val);
           }
         }, 0);
       });
@@ -971,7 +1129,8 @@ function bindEditorEvents(root, game) {
       const idx = Number(btn.dataset.lookupPort);
       const p = game.ports[idx];
       if (!p) return;
-      runGithubAutofill(game, idx, p.githubRepo || p.url);
+      const syncInfo = detectPortSyncInfo(p);
+      runSourceAutofill(game, idx, p.url || syncInfo.target || p.syncTarget || p.githubRepo);
     });
   });
 
@@ -984,7 +1143,11 @@ function bindEditorEvents(root, game) {
         setNotice("Guardá los cambios antes de sincronizar este port.", "error");
         return;
       }
-      portUiState.set(idx, { state: "loading", text: "Sincronizando port desde GitHub…" });
+      const syncInfo = detectPortSyncInfo(p);
+      portUiState.set(idx, {
+        state: "loading",
+        text: `Sincronizando port desde ${providerLabel(syncInfo.provider)}…`,
+      });
       renderEditor();
       try {
         const res = await api("/api/ports/sync", {
@@ -997,7 +1160,7 @@ function bindEditorEvents(root, game) {
           state: r.status === "down" ? "error" : "ok",
           text: r.changed
             ? `Actualizado: ${r.newVersion || r.status}`
-            : "Sin cambios nuevos en GitHub.",
+            : `Sin cambios nuevos en ${providerLabel(r.provider || syncInfo.provider)}.`,
         });
         renderSidebar();
         renderEditor();
@@ -1080,6 +1243,8 @@ function bindEditorEvents(root, game) {
       url: "",
       dataUrl: "",
       githubRepo: "",
+      syncProvider: "",
+      syncTarget: "",
       githubStatus: "",
       lastUpdate: "",
       dateAdded: new Date().toISOString().slice(0, 10),
@@ -1094,7 +1259,12 @@ function bindEditorEvents(root, game) {
 
 // Sync Modal Logic
 function renderSyncModal() {
-  $("stat-gh-total").textContent = String(stats.githubCount || 0);
+  const totalSync = stats.syncableCount ?? stats.githubCount ?? 0;
+  $("stat-gh-total").textContent = String(totalSync);
+  const breakdown = $("stat-sources-breakdown");
+  if (breakdown) {
+    breakdown.textContent = `${stats.githubCount || 0} GH · ${stats.gitlabCount || 0} GL · ${stats.playstoreCount || 0} PS`;
+  }
   $("stat-gh-down").textContent = String(stats.downCount || 0);
   $("stat-last-sync").textContent = formatShortDate(stats.lastSyncAt);
   $("stat-last-publish").textContent = formatShortDate(stats.lastGitHubPublishAt);
@@ -1129,6 +1299,14 @@ function appendSyncResults(items) {
   for (const item of items) {
     const row = document.createElement("div");
     row.className = "sync-result-row";
+    const provTag =
+      item.provider === "playstore"
+        ? "[PS] "
+        : item.provider === "gitlab"
+        ? "[GL] "
+        : item.provider === "github"
+        ? "[GH] "
+        : "";
     const statusLabel =
       item.status === "down"
         ? "CAÍDO (404)"
@@ -1139,7 +1317,7 @@ function appendSyncResults(items) {
         : item.status;
     row.innerHTML =
       "<span>" +
-      esc(item.project || item.githubRepo || item.portId) +
+      esc(provTag + (item.project || item.syncTarget || item.githubRepo || item.portId)) +
       '</span><span class="tabular">' +
       esc(statusLabel) +
       "</span>";
@@ -1170,9 +1348,9 @@ async function runBatchSync(allBatches = false) {
   try {
     do {
       progressText.textContent = allBatches
-        ? `Revisando repositorios desde #${offset + 1}…`
-        : "Revisando lote de 20 repositorios más antiguos…";
-      const res = await api("/api/sync-github", {
+        ? `Revisando fuentes (GitHub, GitLab y Play Store) desde #${offset + 1}…`
+        : "Revisando lote de 20 fuentes más antiguas…";
+      const res = await api("/api/sync-sources", {
         method: "POST",
         body: JSON.stringify({
           limit: 20,
@@ -1187,8 +1365,9 @@ async function runBatchSync(allBatches = false) {
       totalDown += s.downCount;
       offset = s.nextOffset;
 
-      const pct = s.totalGithubPorts
-        ? Math.min(100, Math.round(((allBatches ? offset : s.checkedCount) / (allBatches ? s.totalGithubPorts : s.checkedCount || 1)) * 100))
+      const totalPorts = s.totalSyncPorts ?? s.totalGithubPorts;
+      const pct = totalPorts
+        ? Math.min(100, Math.round(((allBatches ? offset : s.checkedCount) / (allBatches ? totalPorts : s.checkedCount || 1)) * 100))
         : 100;
       progressBar.style.width = pct + "%";
       progressPct.textContent = pct + "%";
@@ -1253,7 +1432,7 @@ async function createNewGame(presetPlatform = "") {
     catch (error) { setNotice("No se pudieron descartar los cambios: " + error.message, "error"); return; }
   }
   const cleanPlatform = String(presetPlatform || "").trim();
-  if (sidebarFilter === "github" || sidebarFilter === "alerts") {
+  if (sidebarFilter === "synced" || sidebarFilter === "alerts") {
     sidebarFilter = "all";
     $("sidebar-filters")?.querySelectorAll(".filter-tab").forEach((b) => {
       b.classList.toggle("active", b.dataset.filter === "all");

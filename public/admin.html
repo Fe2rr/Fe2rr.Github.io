@@ -9,15 +9,15 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="assets/css/admin.css?v=5">
-  <script type="module" src="js/admin.js?v=9"></script>
+  <link rel="stylesheet" href="assets/css/admin.css?v=6">
+  <script type="module" src="js/admin.js?v=10"></script>
 </head>
 <body>
   <section id="login-view" class="login-shell">
     <form id="login-form" class="login-card">
       <div class="brand-mark">NAPL <span>ADMIN · D1</span></div>
       <h1>Panel de catálogo</h1>
-      <p>Gestioná juegos, ports y sincronización automática con GitHub y LaunchBox sobre Cloudflare D1.</p>
+      <p>Gestioná juegos, ports y sincronización automática con GitHub, GitLab, Play Store y LaunchBox sobre Cloudflare D1.</p>
       <label for="admin-password">Contraseña</label>
       <input id="admin-password" type="password" autocomplete="current-password" required>
       <button class="button primary full" type="submit">Ingresar</button>
@@ -34,7 +34,7 @@
         <span id="save-state">Cargando base de datos…</span>
       </div>
       <div class="topbar-actions">
-        <button id="sync-github-button" class="button secondary" type="button">Sincronizar GitHub</button>
+        <button id="sync-github-button" class="button secondary" type="button">Sincronizar fuentes</button>
         <button id="import-button" class="button secondary" type="button">Importar CSV</button>
         <button id="download-button" class="button secondary" type="button">Descargar JSON</button>
         <button id="publish-button" class="button secondary" type="button" disabled>Reintentar publicación</button>
@@ -54,12 +54,12 @@
           <button id="new-game-button" class="button primary small" type="button">+ Juego</button>
         </div>
 
-        <input id="game-search" class="search-input" type="search" placeholder="Buscar juego, port o repo…" autocomplete="off">
+        <input id="game-search" class="search-input" type="search" placeholder="Buscar juego, port, repo o ID…" autocomplete="off">
 
         <div id="sidebar-filters" class="filter-tabs" role="tablist" aria-label="Filtrar catálogo">
           <button type="button" class="filter-tab active" data-filter="all">Todos</button>
-          <button type="button" class="filter-tab" data-filter="github">GitHub</button>
-          <button type="button" class="filter-tab" data-filter="no-github">Sin GH</button>
+          <button type="button" class="filter-tab" data-filter="synced">Con sync</button>
+          <button type="button" class="filter-tab" data-filter="unsynced">Sin sync</button>
           <button type="button" class="filter-tab" data-filter="alerts">Alertas</button>
         </div>
 
@@ -81,14 +81,18 @@
     <div class="sync-modal-card">
       <div class="sync-modal-header">
         <div>
-          <span class="editor-eyebrow">MONITOREO DE REPOSITORIOS</span>
-          <h2 id="sync-modal-title">Sincronización con GitHub</h2>
+          <span class="editor-eyebrow">MONITOREO DE REPOSITORIOS Y TIENDA</span>
+          <h2 id="sync-modal-title">Sincronización automática</h2>
         </div>
         <button id="close-sync-modal" class="button quiet" type="button" aria-label="Cerrar">✕</button>
       </div>
 
       <div id="sync-stats-row" class="sync-stats-grid">
-        <div class="sync-stat"><span class="sync-stat-label">Ports en GitHub</span><strong id="stat-gh-total" class="tabular">0</strong></div>
+        <div class="sync-stat">
+          <span class="sync-stat-label">Fuentes activas</span>
+          <strong id="stat-gh-total" class="tabular">0</strong>
+          <small id="stat-sources-breakdown" class="sync-stat-sub tabular">0 GH · 0 GL · 0 PS</small>
+        </div>
         <div class="sync-stat"><span class="sync-stat-label">Alertas / Caídos</span><strong id="stat-gh-down" class="tabular">0</strong></div>
         <div class="sync-stat"><span class="sync-stat-label">Último sync</span><strong id="stat-last-sync" class="tabular">—</strong></div>
         <div class="sync-stat"><span class="sync-stat-label">Último backup GH</span><strong id="stat-last-publish" class="tabular">—</strong></div>

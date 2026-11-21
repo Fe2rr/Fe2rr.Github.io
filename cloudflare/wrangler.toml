@@ -11,7 +11,7 @@ binding = "DB"
 database_name = "napl-catalog-db"
 database_id = "9c988cf9-9b75-429c-b9de-bf328b472cb8"
 
-# Sincronización automática de repositorios de GitHub cada 6 horas
+# Sincronización automática de fuentes (GitHub, GitLab y Play Store) cada 6 horas
 [triggers]
 crons = ["0 */6 * * *"]
 

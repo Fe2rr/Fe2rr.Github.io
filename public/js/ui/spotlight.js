@@ -149,6 +149,8 @@ export function createSpotlightController() {
     const portLineEl = document.getElementById("spotlight-port-line");
     const prevButton = document.getElementById("spotlight-prev");
     const nextButton = document.getElementById("spotlight-next");
+    const progressTrack = document.getElementById("spotlight-progress");
+    const progressBar = document.getElementById("spotlight-progress-bar");
 
     let catalogGames = [];
     let queue = [];
@@ -159,6 +161,9 @@ export function createSpotlightController() {
     let hasFocusWithin = false;
     let isInViewport = true;
     let timerId = 0;
+    let remainingMs = SPOTLIGHT_INTERVAL_MS;
+    let cycleStartedAt = 0;
+    let progressAnimation = null;
     let renderToken = 0;
     let popularityHydrated = false;
     let hasResolvedPool = false;
@@ -169,10 +174,81 @@ export function createSpotlightController() {
         "(prefers-reduced-motion: reduce)"
     );
 
-    function clearIdleTimer() {
+    function syncProgressVisibility() {
+        if (!progressTrack) return;
+        const shouldHide = Boolean(
+            !section ||
+                !card ||
+                card.hidden ||
+                !isVisible ||
+                queue.length <= 1 ||
+                reducedMotionQuery?.matches
+        );
+        progressTrack.hidden = shouldHide;
+        if (shouldHide) {
+            progressTrack.classList.remove("is-paused");
+        }
+    }
+
+    function stopProgressAnimation() {
+        if (progressAnimation) {
+            progressAnimation.cancel();
+            progressAnimation = null;
+        }
+        if (progressBar) {
+            progressBar.style.transform = "scaleX(0)";
+        }
+        progressTrack?.classList.remove("is-paused");
+    }
+
+    function startProgressAnimation(startFraction, durationMs) {
+        if (!progressBar) return;
+        if (progressAnimation) {
+            progressAnimation.cancel();
+            progressAnimation = null;
+        }
+        progressTrack?.classList.remove("is-paused");
+
+        if (typeof progressBar.animate === "function") {
+            progressAnimation = progressBar.animate(
+                [
+                    { transform: `scaleX(${startFraction})` },
+                    { transform: "scaleX(1)" },
+                ],
+                {
+                    duration: durationMs,
+                    easing: "linear",
+                    fill: "forwards",
+                }
+            );
+        } else {
+            progressBar.style.transform = `scaleX(${startFraction})`;
+        }
+    }
+
+    function clearIdleTimer({ resetProgress = false } = {}) {
         if (timerId) {
             window.clearTimeout(timerId);
             timerId = 0;
+        }
+        cycleStartedAt = 0;
+        if (resetProgress) {
+            remainingMs = SPOTLIGHT_INTERVAL_MS;
+            stopProgressAnimation();
+        }
+    }
+
+    function pauseIdleCycle() {
+        if (timerId && cycleStartedAt > 0) {
+            const elapsed = performance.now() - cycleStartedAt;
+            remainingMs = Math.max(250, remainingMs - elapsed);
+        }
+        clearIdleTimer();
+        if (progressAnimation) {
+            progressAnimation.pause();
+        }
+        if (progressTrack && !progressTrack.hidden) {
+            progressTrack.classList.add("is-paused");
         }
     }
 
@@ -193,19 +269,41 @@ export function createSpotlightController() {
 
     function scheduleIdleCycle() {
         clearIdleTimer();
-        if (!canAutoCycle()) return;
+        syncProgressVisibility();
+        if (!canAutoCycle()) {
+            if (reducedMotionQuery?.matches || queue.length <= 1 || !isVisible) {
+                stopProgressAnimation();
+                remainingMs = SPOTLIGHT_INTERVAL_MS;
+            }
+            return;
+        }
+
+        const waitMs = Math.max(
+            250,
+            Math.min(SPOTLIGHT_INTERVAL_MS, remainingMs)
+        );
+        const startFraction = Math.max(
+            0,
+            Math.min(1, 1 - waitMs / SPOTLIGHT_INTERVAL_MS)
+        );
+
+        cycleStartedAt = performance.now();
+        startProgressAnimation(startFraction, waitMs);
 
         timerId = window.setTimeout(() => {
             timerId = 0;
+            cycleStartedAt = 0;
+            remainingMs = SPOTLIGHT_INTERVAL_MS;
             if (!canAutoCycle()) return;
             stepSlide(1, false);
-        }, SPOTLIGHT_INTERVAL_MS);
+        }, waitMs);
     }
 
     function syncNavButtons() {
         const disabled = queue.length <= 1;
         if (prevButton) prevButton.disabled = disabled;
         if (nextButton) nextButton.disabled = disabled;
+        syncProgressVisibility();
     }
 
     function triggerSwapMotion(direction) {
@@ -270,7 +368,8 @@ export function createSpotlightController() {
         if (queue.length === 0) {
             hasResolvedPool = true;
             if (section) section.hidden = true;
-            clearIdleTimer();
+            clearIdleTimer({ resetProgress: true });
+            syncProgressVisibility();
             return;
         }
 
@@ -286,7 +385,7 @@ export function createSpotlightController() {
                 section.hidden = true;
             }
             syncNavButtons();
-            clearIdleTimer();
+            clearIdleTimer({ resetProgress: true });
             return;
         }
 
@@ -375,6 +474,8 @@ export function createSpotlightController() {
         if (skeleton) skeleton.hidden = true;
         card.hidden = false;
         section.hidden = !isVisible;
+        remainingMs = SPOTLIGHT_INTERVAL_MS;
+        stopProgressAnimation();
         syncNavButtons();
 
         if (animate) {
@@ -413,6 +514,9 @@ export function createSpotlightController() {
         currentIndex = 0;
         syncNavButtons();
         preloadAdjacentEntries();
+        if (!timerId && canAutoCycle()) {
+            scheduleIdleCycle();
+        }
 
         if (!userManuallyStepped && kickerEl && !currentEntry?.isTrending) {
             // Silently swap onto a true trending title if user hasn't interacted yet
@@ -488,11 +592,13 @@ export function createSpotlightController() {
         if (isVisible) {
             document.documentElement.removeAttribute("data-spotlight");
             section.hidden = hasResolvedPool && queue.length === 0;
+            syncProgressVisibility();
             scheduleIdleCycle();
         } else {
             document.documentElement.setAttribute("data-spotlight", "hidden");
             section.hidden = true;
-            clearIdleTimer();
+            pauseIdleCycle();
+            syncProgressVisibility();
         }
     }
 
@@ -540,7 +646,7 @@ export function createSpotlightController() {
 
     section?.addEventListener("pointerenter", () => {
         isHovering = true;
-        clearIdleTimer();
+        pauseIdleCycle();
     });
 
     section?.addEventListener("pointerleave", () => {
@@ -550,7 +656,7 @@ export function createSpotlightController() {
 
     section?.addEventListener("focusin", () => {
         hasFocusWithin = true;
-        clearIdleTimer();
+        pauseIdleCycle();
     });
 
     section?.addEventListener("focusout", (event) => {
@@ -563,7 +669,7 @@ export function createSpotlightController() {
 
     document.addEventListener("visibilitychange", () => {
         if (document.hidden) {
-            clearIdleTimer();
+            pauseIdleCycle();
         } else {
             scheduleIdleCycle();
         }
@@ -581,7 +687,7 @@ export function createSpotlightController() {
                 if (isInViewport) {
                     scheduleIdleCycle();
                 } else {
-                    clearIdleTimer();
+                    pauseIdleCycle();
                 }
             },
             { threshold: 0.15 }
@@ -590,8 +696,9 @@ export function createSpotlightController() {
     }
 
     reducedMotionQuery?.addEventListener?.("change", () => {
+        syncProgressVisibility();
         if (reducedMotionQuery.matches) {
-            clearIdleTimer();
+            clearIdleTimer({ resetProgress: true });
         } else {
             scheduleIdleCycle();
         }

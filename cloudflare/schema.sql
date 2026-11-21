@@ -30,6 +30,8 @@ CREATE TABLE IF NOT EXISTS ports (
   github_repo TEXT NOT NULL DEFAULT '',
   github_status TEXT NOT NULL DEFAULT '',
   github_etag TEXT NOT NULL DEFAULT '',
+  sync_provider TEXT NOT NULL DEFAULT '',
+  sync_target TEXT NOT NULL DEFAULT '',
   last_checked_at TEXT NOT NULL DEFAULT '',
   last_update TEXT NOT NULL DEFAULT '',
   date_added TEXT NOT NULL DEFAULT '',
@@ -69,3 +71,4 @@ CREATE TABLE IF NOT EXISTS sync_logs (
 CREATE INDEX IF NOT EXISTS idx_games_sort ON games(sort_order, name);
 CREATE INDEX IF NOT EXISTS idx_ports_game ON ports(game_slug, sort_order);
 CREATE INDEX IF NOT EXISTS idx_ports_github ON ports(github_repo, last_checked_at);
+CREATE INDEX IF NOT EXISTS idx_ports_sync ON ports(sync_provider, sync_target, last_checked_at);

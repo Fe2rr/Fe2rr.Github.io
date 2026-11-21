@@ -337,6 +337,15 @@ app.post('/api/lookup/github', requireAdminAuth, async (req, res) => {
   }
 });
 
+app.post('/api/lookup/source', requireAdminAuth, async (req, res) => {
+  try {
+    const source = await localD1.inspectPortSource(req.body?.url || req.body?.repo || req.body?.target);
+    return res.json({ success: true, source });
+  } catch (error) {
+    return res.status(400).json({ error: error?.message || 'Error consultando la fuente del port.' });
+  }
+});
+
 app.post('/api/lookup/launchbox', requireAdminAuth, async (req, res) => {
   try {
     const launchbox = await localD1.inspectLaunchboxUrl(req.body?.url);
@@ -358,9 +367,9 @@ app.post('/api/ports/sync', requireAdminAuth, async (req, res) => {
   }
 });
 
-app.post('/api/sync-github', requireAdminAuth, async (req, res) => {
+async function handleBatchSync(req, res) {
   try {
-    const sync = await localD1.runGithubSyncBatch({
+    const sync = await localD1.runSyncBatch({
       source: 'manual',
       limit: req.body?.limit || 20,
       offset: req.body?.offset || 0,
@@ -369,9 +378,12 @@ app.post('/api/sync-github', requireAdminAuth, async (req, res) => {
     const state = localD1.readCatalog({ includeInternal: true });
     return res.json({ success: true, sync, ...state });
   } catch (error) {
-    return res.status(500).json({ error: error?.message || 'Error en sincronización de GitHub.' });
+    return res.status(500).json({ error: error?.message || 'Error en sincronización automática.' });
   }
-});
+}
+
+app.post('/api/sync-github', requireAdminAuth, handleBatchSync);
+app.post('/api/sync-sources', requireAdminAuth, handleBatchSync);
 
 app.post('/api/import-sheets', requireAdminAuth, async (req, res) => {
   try {
