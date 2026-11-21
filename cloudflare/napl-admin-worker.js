@@ -1709,9 +1709,10 @@ async function runSyncBatch(env, options = {}) {
   await env.DB.batch(metaOps);
 
   let autoPublishedCommit = "";
+  const pendingGithubSync = (await readMetaMap(env)).pending_github_sync === "1";
   if (
     source === "cron" &&
-    updatedCount > 0 &&
+    (updatedCount > 0 || pendingGithubSync) &&
     String(env.AUTO_PUBLISH_CRON || "true").toLowerCase() !== "false" &&
     env.GITHUB_TOKEN
   ) {
