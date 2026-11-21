@@ -5,7 +5,8 @@ const CATALOG_PATH = "public/assets/data/catalog.json";
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 const SESSION_TTL = 8 * 60 * 60 * 1000;
-const DEFAULT_CRON_BATCH = 20;
+const DEFAULT_CRON_BATCH = 40;
+const MAX_SYNC_BATCH = 50;
 
 const MONTHS = [
   "January",
@@ -1613,7 +1614,7 @@ const SYNC_PORT_FILTER = `
 
 async function runSyncBatch(env, options = {}) {
   await ensureSeeded(env);
-  const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_CRON_BATCH, 1), 22);
+  const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_CRON_BATCH, 1), MAX_SYNC_BATCH);
   const offset = Math.max(Number(options.offset) || 0, 0);
   const source = options.source || "manual";
 
@@ -1649,12 +1650,21 @@ async function runSyncBatch(env, options = {}) {
     try {
       const outcome = await syncSinglePortWithSource(env, row);
       if (outcome.status === "down") downCount += 1;
+      if (outcome.status === "skipped") {
+        await env.DB.prepare("UPDATE ports SET last_checked_at = ? WHERE port_id = ?")
+          .bind(new Date().toISOString(), row.port_id)
+          .run();
+      }
       if (outcome.changed) {
         updatedCount += 1;
         details.push(outcome);
       }
     } catch (err) {
       errorCount += 1;
+      // Move failed sources to the back of the queue so one bad URL cannot block the daily rotation.
+      await env.DB.prepare("UPDATE ports SET last_checked_at = ? WHERE port_id = ?")
+        .bind(new Date().toISOString(), row.port_id)
+        .run();
       details.push({
         portId: row.port_id,
         gameSlug: row.game_slug,
@@ -1988,12 +1998,14 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const batchSize = Number(env.CRON_BATCH_SIZE) || DEFAULT_CRON_BATCH;
+    const batchSize = Math.min(Math.max(Number(env.CRON_BATCH_SIZE) || DEFAULT_CRON_BATCH, 1), MAX_SYNC_BATCH);
     ctx.waitUntil(
       runSyncBatch(env, {
         source: "cron",
         limit: batchSize,
         useOffset: false,
+      }).catch((error) => {
+        console.error("NAPL cron sync failed:", error?.message || error);
       })
     );
   },
