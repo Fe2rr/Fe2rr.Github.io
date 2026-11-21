@@ -78,27 +78,8 @@ export function createHomeGameCard(game, port, options = {}) {
     coverContainer.className = "home-game-cover-container";
 
     const coverUrl = String(game.coverUrl || "").trim();
-    let backdrop = null;
 
     if (/^https?:\/\/\S+$/i.test(coverUrl)) {
-        backdrop = document.createElement("img");
-        backdrop.className = "home-game-backdrop";
-        backdrop.alt = "";
-        backdrop.decoding = "async";
-        backdrop.referrerPolicy = "no-referrer";
-        backdrop.setAttribute("aria-hidden", "true");
-
-        const syncBackdrop = (src) => {
-            if (!backdrop) return;
-            if (src) {
-                backdrop.src = src;
-                backdrop.classList.add("is-loaded");
-            } else {
-                backdrop.classList.remove("is-loaded");
-                backdrop.removeAttribute("src");
-            }
-        };
-
         const cover = document.createElement("img");
         cover.className = "home-game-cover";
         cover.alt = `${game.name} cover`;
@@ -109,7 +90,6 @@ export function createHomeGameCard(game, port, options = {}) {
             "load",
             () => {
                 coverContainer.classList.add("is-loaded");
-                syncBackdrop(cover.currentSrc || cover.src);
             },
             { once: true }
         );
@@ -118,15 +98,12 @@ export function createHomeGameCard(game, port, options = {}) {
 
         loadCoverImage(cover, coverUrl, () => {
             cover.remove();
-            backdrop?.remove();
-            backdrop = null;
             coverContainer.classList.remove("is-loaded");
             coverContainer.classList.add("cover-unavailable");
         });
 
         if (cover.complete && cover.naturalWidth > 0) {
             coverContainer.classList.add("is-loaded");
-            syncBackdrop(cover.currentSrc || cover.src);
         }
     } else {
         coverContainer.classList.add("cover-unavailable");
@@ -170,11 +147,7 @@ export function createHomeGameCard(game, port, options = {}) {
         content.appendChild(portName);
     }
 
-    if (backdrop) {
-        element.append(backdrop, coverContainer, content);
-    } else {
-        element.append(coverContainer, content);
-    }
+    element.append(coverContainer, content);
 
     const reducedMotionQuery = window.matchMedia?.(
         "(prefers-reduced-motion: reduce)"

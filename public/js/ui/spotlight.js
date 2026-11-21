@@ -392,7 +392,7 @@ export function createSpotlightController() {
         const entry = queue[currentIndex];
         if (!entry) return;
 
-        const { game, port, isTrending } = entry;
+        const { game, port } = entry;
         const gameUrl = new URL("./", window.location.href);
         gameUrl.searchParams.set("game", game.slug);
 
@@ -404,9 +404,7 @@ export function createSpotlightController() {
             titleLink.textContent = game.name;
         }
         if (kickerEl) {
-            kickerEl.textContent = isTrending
-                ? "Trending Spotlight"
-                : "Featured Spotlight";
+            kickerEl.textContent = "Trending";
         }
 
         if (metaEl) {
@@ -416,11 +414,6 @@ export function createSpotlightController() {
 
             const year = String(game.year || port?.year || "").trim();
             if (year) parts.push(year);
-
-            const portCount = Array.isArray(game.ports) ? game.ports.length : 0;
-            if (portCount > 0) {
-                parts.push(`${portCount} ${portCount === 1 ? "port" : "ports"}`);
-            }
 
             metaEl.textContent = parts.join(" · ");
             metaEl.hidden = parts.length === 0;
