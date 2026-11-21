@@ -11,10 +11,10 @@ binding = "DB"
 database_name = "napl-catalog-db"
 database_id = "9c988cf9-9b75-429c-b9de-bf328b472cb8"
 
-# Sincronización automática de fuentes (GitHub, GitLab y Play Store) cada 6 horas
+# Sincronización automática de fuentes (GitHub, GitLab y Play Store) cada hora
 [triggers]
-crons = ["0 */6 * * *"]
+crons = ["0 * * * *"]
 
 [vars]
 AUTO_PUBLISH_CRON = "true"
-CRON_BATCH_SIZE = "20"
+CRON_BATCH_SIZE = "40"
