@@ -268,12 +268,20 @@ button {
 }
 
 .notice {
-  margin: 12px 22px 0;
-  padding: 11px 14px;
+  position: fixed;
+  right: 20px;
+  bottom: 20px;
+  z-index: 10000;
+  width: max-content;
+  max-width: min(480px, calc(100vw - 32px));
+  margin: 0;
+  padding: 13px 16px;
   border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--panel2);
+  border-radius: 10px;
+  background: #142620;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.42);
   font-size: 12px;
+  line-height: 1.5;
   color: var(--muted);
 }
 
@@ -1295,4 +1303,37 @@ button {
 
 .editor-footer .button {
   min-width: 180px;
+}
+
+
+/* Source lookup panel inside each port, matching the LaunchBox autofill UI. */
+.port-source-section {
+  margin: 0 0 12px;
+}
+.port-source-section .autofill-box {
+  margin: 0;
+  padding: 14px;
+}
+.port-source-section .autofill-row {
+  align-items: flex-end;
+}
+.port-source-data-tab {
+  margin: 0 0 14px;
+}
+.port-source-data-tab .admin-game-data-panel {
+  padding-top: 12px;
+}
+@media (max-width: 640px) {
+  .notice {
+    right: 12px;
+    bottom: 12px;
+    max-width: calc(100vw - 24px);
+  }
+  .port-source-section .autofill-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .port-source-section .autofill-row .button {
+    width: 100%;
+  }
 }
