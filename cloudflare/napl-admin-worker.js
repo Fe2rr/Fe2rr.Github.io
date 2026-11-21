@@ -1087,7 +1087,7 @@ async function inspectGithubRepo(repoSlug, env) {
   const lastUpdate = formatNaplDate(updatedIso);
   const releaseUrl = release?.html_url || repoUrl;
   const apkUrl = apkAsset?.browser_download_url || "";
-  const recommendedUrl = apkUrl || releaseUrl || repoUrl;
+  const recommendedUrl = repoUrl;
 
   return {
     provider: "github",
@@ -1544,7 +1544,7 @@ async function syncSinglePortWithSource(env, portRow) {
   if (syncInfo.provider === "github") {
     const curParsed = parseGithubRepo(portRow.url);
     if (!nextUrl || info.moved || (curParsed && info.apkUrl && /\/releases\/|github\.com/i.test(nextUrl))) {
-      nextUrl = info.apkUrl || info.repoUrl;
+      nextUrl = info.repoUrl;
     }
   } else if (syncInfo.provider === "gitlab") {
     const curParsed = parseGitlabProject(portRow.url);
