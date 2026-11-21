@@ -1257,7 +1257,6 @@ function bindEditorEvents(root, game) {
     renderEditor();
     renderSidebar();
     markUnsavedAndSchedule();
-    root.querySelector('[data-port-card="0"] [data-port-field="project"]')?.focus();
   });
 }
 
