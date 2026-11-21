@@ -598,10 +598,11 @@ function portHtml(port, index) {
       "",
       "https://github.com/usuario/repositorio"
     ) +
-    '<button type="button" class="button secondary small" data-lookup-port="' + index + '">Obtener datos</button>' +
+    '<div class="port-source-actions"><button type="button" class="button secondary small" data-lookup-port="' + index + '">Obtener datos</button>' +
     (port.portId && detectedTarget
       ? '<button type="button" class="button secondary small" data-sync-port="' + index + '">Sync</button>'
       : "") +
+    "</div>" +
     "</div>" +
     statusLine +
     diffBanner +
@@ -628,7 +629,6 @@ function portHtml(port, index) {
 
     fieldByKey("controller") +
     fieldByKey("files") +
-    fieldByKey("works") +
     fieldByKey("dataUrl") +
     '<div class="admin-port-link-preview">' +
     (linkButtons || '<span class="admin-no-links">Todavía no hay enlaces disponibles</span>') +
@@ -684,18 +684,6 @@ function renderEditor() {
     " · " +
     game.ports.length +
     ' ports</p></div><div class="editor-heading-actions"><button class="button danger-button" id="delete-game" type="button">Eliminar juego</button></div></div>' +
-    '<section class="admin-game-hero"><div class="admin-cover-column"><div class="admin-cover-frame"><img class="cover-preview" id="cover-preview" src="' +
-    esc(game.coverUrl || "") +
-    '" alt="Portada de ' +
-    esc(game.name) +
-    '" onerror="this.hidden=true" onload="this.hidden=false"><span class="cover-placeholder">GAME COVER</span></div></div>' +
-    '<div class="admin-game-content"><div class="admin-game-kicker">FICHA DEL JUEGO</div>' +
-    fieldHtml("Nombre del juego", game.name, 'data-game-field="name"', "text", "admin-game-title-input") +
-    '<div class="field"><label for="game-platform">Plataforma</label><select id="game-platform" data-game-platform><option value="">Seleccionar plataforma…</option>' +
-    catalog.platformOrder.map((p) => '<option value="' + esc(p) + '"' + (game.platform === p ? " selected" : "") + '>' + esc(p) + '</option>').join("") +
-    '<option value="__add_new__">Agregar nueva plataforma…</option></select></div>' +
-    '<p class="admin-game-helper">La plataforma pertenece a esta ficha. Los ports se guardan dentro de ella.</p>' +
-    '</div></section>' +
     '<section class="game-launchbox-section"><div class="autofill-box"><div class="autofill-row">' +
     fieldHtml(
       "URL de LaunchBox GamesDB",
@@ -709,6 +697,19 @@ function renderEditor() {
     lbStatusHtml +
     lbDiffHtml +
     '</div></section>' +
+    '<section class="admin-game-hero"><div class="admin-cover-column"><div class="admin-cover-frame"><img class="cover-preview" id="cover-preview" src="' +
+    esc(game.coverUrl || "") +
+    '" alt="Portada de ' +
+    esc(game.name) +
+    '" onerror="this.hidden=true" onload="this.hidden=false"><span class="cover-placeholder">GAME COVER</span></div></div>' +
+    '<div class="admin-game-content"><div class="admin-game-kicker">FICHA DEL JUEGO</div>' +
+    fieldHtml("Nombre del juego", game.name, 'data-game-field="name"', "text", "admin-game-title-input") +
+    '<div class="field"><label for="game-platform">Plataforma</label><select id="game-platform" data-game-platform><option value="">Seleccionar plataforma…</option>' +
+    catalog.platformOrder.map((p) => '<option value="' + esc(p) + '"' + (game.platform === p ? " selected" : "") + '>' + esc(p) + '</option>').join("") +
+    '<option value="__add_new__">Agregar nueva plataforma…</option></select></div>' +
+    '<p class="admin-game-helper">La plataforma pertenece a esta ficha. Los ports se guardan dentro de ella.</p>' +
+    '</div></section>' +
+
     '<details class="admin-game-data-tab"><summary><span><strong>Datos del juego</strong><small>Portada, año, género, plataforma y descripción obtenidos de LaunchBox</small></span><span class="data-tab-hint">Editar datos</span></summary>' +
     '<div class="admin-game-data-panel">' +
     fieldHtml("URL de portada", game.coverUrl, 'data-game-field="coverUrl"', "url") +
