@@ -377,8 +377,8 @@ button {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 10px 11px;
+  gap: 6px;
+  padding: 9px 10px;
   cursor: pointer;
   font-size: 12px;
   font-weight: 700;
@@ -388,21 +388,55 @@ button {
   display: none;
 }
 
-.platform-group summary:after {
-  content: "＋";
-  color: var(--muted);
-  font-size: 11px;
+.platform-group summary::after {
+  content: "";
+  flex: 0 0 auto;
+  width: 6px;
+  height: 6px;
+  margin-left: 2px;
+  border-right: 1.8px solid var(--muted);
+  border-bottom: 1.8px solid var(--muted);
+  transform: translateY(-1px) rotate(45deg);
+  transition: transform 0.16s ease, border-color 0.16s ease;
 }
 
-.platform-group[open] summary:after {
-  content: "−";
+.platform-group[open] summary::after {
+  transform: translateY(2px) rotate(-135deg);
+  border-color: var(--accent);
+}
+
+.platform-name {
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
 }
 
 .platform-count {
+  flex: 0 0 auto;
   color: var(--muted);
   font: 11px "JetBrains Mono", monospace;
   font-variant-numeric: tabular-nums;
-  margin-left: auto;
+}
+
+.platform-add-btn {
+  flex: 0 0 auto;
+  border: 1px solid rgba(110, 231, 160, 0.32);
+  border-radius: 6px;
+  background: rgba(45, 128, 104, 0.28);
+  color: #b8f2d4;
+  padding: 3px 7px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+
+.platform-add-btn:hover {
+  background: var(--accent2);
+  border-color: var(--accent);
+  color: #fff;
 }
 
 .platform-section {
@@ -698,7 +732,7 @@ button {
 
 /* Ports Section */
 .admin-ports-section {
-  padding-bottom: 48px;
+  padding-bottom: 24px;
 }
 
 .admin-ports-heading {
@@ -1228,4 +1262,17 @@ button {
   .admin-game-data-panel {
     padding: 0 12px 12px;
   }
+}
+
+.editor-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 20px 0 32px;
+  border-top: 1px solid var(--admin-border);
+}
+
+.editor-footer .button {
+  min-width: 180px;
 }

@@ -24,6 +24,8 @@
 /* Editorial Showcase Hero */
 .game-summary-card,
 .game-hero {
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -35,6 +37,63 @@
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
+}
+
+.game-hero-backdrop-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  border-radius: inherit;
+  pointer-events: none;
+  user-select: none;
+}
+
+.game-hero-backdrop-layer::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    rgba(13, 27, 21, 0.78) 0%,
+    rgba(16, 33, 26, 0.62) 52%,
+    rgba(13, 27, 21, 0.48) 100%
+  );
+}
+
+html[data-theme="light"] .game-hero-backdrop-layer::after {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.84) 0%,
+    rgba(244, 248, 247, 0.7) 54%,
+    rgba(255, 255, 255, 0.54) 100%
+  );
+}
+
+.game-hero-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  filter: blur(8px) saturate(1.25) brightness(0.92);
+  transform: scale(1.07);
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+  transition: opacity 260ms var(--ease-out);
+}
+
+.game-hero-backdrop.is-loaded {
+  opacity: 1;
+}
+
+html[data-theme="light"] .game-hero-backdrop.is-loaded {
+  opacity: 0.72;
 }
 
 .game-summary-card.is-entering,
@@ -50,6 +109,8 @@ html[data-theme="light"] .game-hero {
 }
 
 .game-summary-top {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: 164px minmax(0, 1fr);
   grid-template-rows: auto 1fr;
@@ -113,6 +174,11 @@ html[data-theme="light"] .game-hero {
 .game-summary-info {
   grid-area: header;
   min-width: 0;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="light"] .game-summary-info {
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.85);
 }
 
 .game-summary-head {
@@ -203,6 +269,7 @@ html[data-theme="light"] .game-hero {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-popover);
   transform-origin: top right;
+  text-shadow: none;
 }
 
 .game-share-popover:not([hidden]) {
@@ -464,6 +531,11 @@ html[data-theme="light"] .game-share-platform.is-x .game-share-platform-icon {
 .game-hero-body {
   grid-area: body;
   min-width: 0;
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+}
+
+html[data-theme="light"] .game-hero-body {
+  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.85);
 }
 
 .game-summary-description-container {

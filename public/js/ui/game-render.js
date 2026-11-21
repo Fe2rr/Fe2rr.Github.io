@@ -1511,6 +1511,27 @@ function displayGameSummary(game, parentElement) {
     parentElement.replaceChildren();
     parentElement.className = "game-header game-summary-card game-hero";
 
+    const backdropLayer = document.createElement("div");
+    backdropLayer.className = "game-hero-backdrop-layer";
+    backdropLayer.setAttribute("aria-hidden", "true");
+
+    const backdropImg = document.createElement("img");
+    backdropImg.className = "game-hero-backdrop";
+    backdropImg.alt = "";
+    backdropImg.decoding = "async";
+    backdropImg.referrerPolicy = "no-referrer";
+    backdropLayer.appendChild(backdropImg);
+
+    const syncBackdrop = (src) => {
+        if (src) {
+            backdropImg.src = src;
+            backdropImg.classList.add("is-loaded");
+        } else {
+            backdropImg.classList.remove("is-loaded");
+            backdropImg.removeAttribute("src");
+        }
+    };
+
     const heroGrid = document.createElement("div");
     heroGrid.className = "game-summary-top";
 
@@ -1525,10 +1546,21 @@ function displayGameSummary(game, parentElement) {
         cover.loading = "eager";
         cover.decoding = "async";
         cover.referrerPolicy = "no-referrer";
+        cover.addEventListener(
+            "load",
+            () => {
+                syncBackdrop(cover.currentSrc || cover.src);
+            },
+            { once: true }
+        );
         media.appendChild(cover);
         loadCoverImage(cover, coverUrl, () => {
+            syncBackdrop("");
             cover.replaceWith(createCoverFallback(game.name));
         });
+        if (cover.complete && cover.naturalWidth > 0) {
+            syncBackdrop(cover.currentSrc || cover.src);
+        }
     } else {
         media.appendChild(createCoverFallback(game.name));
     }
@@ -1637,7 +1669,7 @@ function displayGameSummary(game, parentElement) {
         () => parentElement.classList.remove("is-entering"),
         { once: true }
     );
-    parentElement.appendChild(heroGrid);
+    parentElement.append(backdropLayer, heroGrid);
 }
 
 function displayPortCard(

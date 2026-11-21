@@ -282,7 +282,7 @@ function renderSidebar() {
     details.className = "platform-group";
     details.open = true;
     details.innerHTML =
-      "<summary><span>Sin plataforma asignada</span><span class='platform-count'>" +
+      "<summary><span class='platform-name'>Sin plataforma asignada</span><span class='platform-count'>" +
       unplacedGames.length +
       "</span></summary><div class='platform-section'>" +
       unplacedGames.map((g) => gameButton(g, "")).join("") +
@@ -324,13 +324,17 @@ function renderSidebar() {
       Boolean(activeGame && activeGame.platform === platform);
 
     details.innerHTML =
-      "<summary><span>" +
+      "<summary><span class='platform-name'>" +
       esc(platform) +
       "</span><span class='platform-count'>" +
       noGithub.length +
       "/" +
       games.length +
-      "</span></summary><div class='platform-section'>" +
+      "</span><button type='button' class='platform-add-btn' data-add-platform='" +
+      esc(platform) +
+      "' title='Agregar juego en " +
+      esc(platform) +
+      "'>+ Juego</button></summary><div class='platform-section'>" +
       (noGithub.length
         ? "<div class='section-label'>Sin enlaces GitHub · " +
           noGithub.length +
@@ -346,6 +350,14 @@ function renderSidebar() {
       "</div>";
     root.append(details);
   }
+
+  root.querySelectorAll("[data-add-platform]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      await createNewGame(button.dataset.addPlatform || "");
+    });
+  });
 
   root.querySelectorAll("[data-game]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -534,7 +546,7 @@ function renderEditor() {
     esc(game.slug) +
     " · " +
     game.ports.length +
-    ' ports</p></div><div class="editor-heading-actions"><button class="button primary" id="save-game-db" type="button">Guardar cambios</button><button class="button danger-button" id="delete-game" type="button">Eliminar juego</button></div></div>' +
+    ' ports</p></div><div class="editor-heading-actions"><button class="button danger-button" id="delete-game" type="button">Eliminar juego</button></div></div>' +
     '<section class="admin-game-hero"><div class="admin-cover-column"><div class="admin-cover-frame"><img class="cover-preview" id="cover-preview" src="' +
     esc(game.coverUrl || "") +
     '" alt="Portada de ' +
@@ -574,7 +586,8 @@ function renderEditor() {
     game.ports.length +
     ' ports asociados a este juego</p></div><button id="add-port" class="button primary" type="button">+ Agregar port</button></div><div id="ports-list" class="admin-port-grid">' +
     game.ports.map((port, index) => portHtml(port, index)).join("") +
-    "</div></section>";
+    "</div></section>" +
+    '<div class="editor-footer"><button class="button primary" id="save-game-db" type="button">Guardar cambios</button></div>';
 
   bindEditorEvents(root, game);
 }
@@ -1045,7 +1058,16 @@ function bindEditorEvents(root, game) {
 
   $("add-port")?.addEventListener("click", async () => {
     const i = game.ports.length + 1;
-    game.ports.push({
+    const shiftedUi = new Map();
+    for (const [key, value] of portUiState.entries()) {
+      shiftedUi.set(key + 1, value);
+    }
+    portUiState.clear();
+    for (const [key, value] of shiftedUi.entries()) {
+      portUiState.set(key, value);
+    }
+
+    game.ports.unshift({
       portId: `${game.slug}-port-${Date.now().toString(36)}-${i}`,
       project: "",
       developer: "",
@@ -1066,6 +1088,7 @@ function bindEditorEvents(root, game) {
     renderEditor();
     renderSidebar();
     markUnsavedAndSchedule();
+    root.querySelector('[data-port-card="0"] [data-port-field="project"]')?.focus();
   });
 }
 
@@ -1223,12 +1246,20 @@ $("sidebar-filters").addEventListener("click", (e) => {
   renderSidebar();
 });
 
-$("new-game-button").addEventListener("click", async () => {
+async function createNewGame(presetPlatform = "") {
   if (unsavedGame) {
     if (!confirm("Hay cambios sin guardar. ¿Descartarlos y crear otro juego?")) return;
     try { await discardLocalChanges(); }
     catch (error) { setNotice("No se pudieron descartar los cambios: " + error.message, "error"); return; }
   }
+  const cleanPlatform = String(presetPlatform || "").trim();
+  if (sidebarFilter === "github" || sidebarFilter === "alerts") {
+    sidebarFilter = "all";
+    $("sidebar-filters")?.querySelectorAll(".filter-tab").forEach((b) => {
+      b.classList.toggle("active", b.dataset.filter === "all");
+    });
+  }
+
   let base = "nuevo-juego";
   let slug = base;
   let n = 2;
@@ -1242,8 +1273,8 @@ $("new-game-button").addEventListener("click", async () => {
     genre: "",
     description: "",
     launchboxUrl: "",
-    platform: "",
-    platforms: [],
+    platform: cleanPlatform,
+    platforms: cleanPlatform ? [cleanPlatform] : [],
     ports: [],
   };
 
@@ -1254,8 +1285,18 @@ $("new-game-button").addEventListener("click", async () => {
   markUnsavedAndSchedule();
   renderSidebar();
   renderEditor();
-  setNotice("Nuevo juego creado localmente. Completá los datos y pulsá «Guardar cambios».", "success");
-});
+  const titleInput = $("game-editor")?.querySelector('[data-game-field="name"]');
+  titleInput?.focus();
+  titleInput?.select();
+  setNotice(
+    cleanPlatform
+      ? `Nuevo juego creado en ${cleanPlatform}. Completá los datos y pulsá «Guardar cambios».`
+      : "Nuevo juego creado localmente. Completá los datos y pulsá «Guardar cambios».",
+    "success"
+  );
+}
+
+$("new-game-button").addEventListener("click", () => createNewGame(""));
 
 $("sync-github-button").addEventListener("click", () => {
   renderSyncModal();

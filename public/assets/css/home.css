@@ -1168,18 +1168,18 @@ html[data-spotlight="hidden"] #game-spotlight {
   pointer-events: none;
   background: linear-gradient(
     90deg,
-    rgba(13, 27, 21, 0.74) 0%,
-    rgba(16, 33, 26, 0.54) 52%,
-    rgba(13, 27, 21, 0.4) 100%
+    rgba(13, 27, 21, 0.78) 0%,
+    rgba(16, 33, 26, 0.6) 54%,
+    rgba(13, 27, 21, 0.46) 100%
   );
 }
 
 html[data-theme="light"] .spotlight-card::before {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.8) 0%,
-    rgba(244, 248, 247, 0.64) 54%,
-    rgba(255, 255, 255, 0.46) 100%
+    rgba(255, 255, 255, 0.84) 0%,
+    rgba(244, 248, 247, 0.68) 56%,
+    rgba(255, 255, 255, 0.52) 100%
   );
 }
 

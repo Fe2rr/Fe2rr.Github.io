@@ -3,6 +3,7 @@
 CREATE TABLE IF NOT EXISTS games (
   slug TEXT PRIMARY KEY,
   name TEXT NOT NULL,
+  platform TEXT NOT NULL DEFAULT '',
   year TEXT NOT NULL DEFAULT '',
   cover_url TEXT NOT NULL DEFAULT '',
   genre TEXT NOT NULL DEFAULT '',
@@ -68,5 +69,3 @@ CREATE TABLE IF NOT EXISTS sync_logs (
 CREATE INDEX IF NOT EXISTS idx_games_sort ON games(sort_order, name);
 CREATE INDEX IF NOT EXISTS idx_ports_game ON ports(game_slug, sort_order);
 CREATE INDEX IF NOT EXISTS idx_ports_github ON ports(github_repo, last_checked_at);
-
-CREATE UNIQUE INDEX IF NOT EXISTS idx_ports_slug ON ports(slug) WHERE slug <> '';

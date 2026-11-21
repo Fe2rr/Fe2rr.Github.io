@@ -8,9 +8,20 @@ import { createLocalD1Store } from './lib/local-d1.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function readCliArg(name, fallback) {
+  const idx = process.argv.indexOf(name);
+  if (idx >= 0 && process.argv[idx + 1]) {
+    return String(process.argv[idx + 1]).trim();
+  }
+  const prefix = `${name}=`;
+  const eq = process.argv.find((arg) => arg.startsWith(prefix));
+  if (eq) return eq.slice(prefix.length).trim();
+  return fallback;
+}
+
 const app = express();
-const PORT = 3000;
-const HOST = '0.0.0.0';
+const PORT = Number(readCliArg('--port', '3000')) || 3000;
+const HOST = readCliArg('--host', '0.0.0.0') || '0.0.0.0';
 const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev';
 const CATALOG_PATH = path.join(__dirname, 'public', 'assets', 'data', 'catalog.json');
 const SCHEMA_PATH = path.join(__dirname, 'cloudflare', 'schema.sql');
@@ -241,25 +252,7 @@ app.get('/api/catalog-meta', (req, res) => {
   }
 });
 
-// Public live catalog served from local D1 parity database
-app.get('/api/public/catalog', (req, res) => {
-  try {
-    const { catalog } = localD1.readCatalog({ includeInternal: false });
-    const etag = `"napl-${catalog.updatedAt}"`;
-    if (req.headers['if-none-match'] === etag) {
-      res.setHeader('ETag', etag);
-      res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
-      return res.status(304).end();
-    }
-    res.setHeader('ETag', etag);
-    res.setHeader('Cache-Control', 'public, max-age=15, stale-while-revalidate=60');
-    return res.json(catalog);
-  } catch (error) {
-    return res.status(500).json({ error: error?.message || 'Could not read live catalog.' });
-  }
-});
-
-// Admin + D1 parity endpoints (mirroring Cloudflare Worker API)
+// Admin + D1 parity endpoints (mirroring Cloudflare Worker API; D1 requires admin auth)
 function requireAdminAuth(req, res, next) {
   if (!localD1.verifyToken(req.headers.authorization)) {
     return res.status(401).json({ error: 'Sesión inválida o vencida. Iniciá sesión nuevamente.' });
@@ -303,21 +296,23 @@ app.get('/api/catalog', requireAdminAuth, (req, res) => {
   }
 });
 
-app.post('/api/games', requireAdminAuth, (req, res) => {
+app.post('/api/games', requireAdminAuth, async (req, res) => {
   try {
     const saved = localD1.saveSingleGame(null, req.body?.game || req.body, true);
+    const publication = await localD1.publishSavedCatalog();
     const state = localD1.readCatalog({ includeInternal: true });
-    return res.json({ success: true, saved, ...state });
+    return res.json({ success: true, saved, ...publication, ...state });
   } catch (error) {
     return res.status(400).json({ error: error?.message || 'No se pudo crear el juego.' });
   }
 });
 
-app.put('/api/games/:slug', requireAdminAuth, (req, res) => {
+app.put('/api/games/:slug', requireAdminAuth, async (req, res) => {
   try {
     const saved = localD1.saveSingleGame(req.params.slug, req.body?.game || req.body, false);
+    const publication = await localD1.publishSavedCatalog();
     const state = localD1.readCatalog({ includeInternal: true });
-    return res.json({ success: true, saved, ...state });
+    return res.json({ success: true, saved, ...publication, ...state });
   } catch (error) {
     return res.status(400).json({ error: error?.message || 'No se pudo guardar el juego.' });
   }
@@ -857,6 +852,21 @@ const scheduledSyncTimer = setInterval(() => {
 }, SIX_HOURS_MS);
 scheduledSyncTimer.unref();
 
-app.listen(PORT, HOST, () => {
+const server = app.listen(PORT, HOST, () => {
   console.log(`Server running at http://${HOST}:${PORT}`);
+  console.log(`  ➜  Local:   http://localhost:${PORT}/`);
 });
+
+function shutdown() {
+  clearInterval(scheduledSyncTimer);
+  if (typeof server.closeAllConnections === 'function') {
+    server.closeAllConnections();
+  }
+  server.close(() => {
+    process.exit(0);
+  });
+  setTimeout(() => process.exit(0), 500).unref();
+}
+
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
