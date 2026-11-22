@@ -8,7 +8,7 @@
 
 import { hydrateCatalog } from "./catalog-schema.js";
 
-const CATALOG_JSON_URL = "https://raw.githubusercontent.com/Fe2rr/Napl-prueba/main/public/assets/data/catalog.json";
+const CATALOG_JSON_URL = "https://napl-admin-api.federicoxastro.workers.dev/api/public-catalog";
 const CATALOG_CACHE_NAME = "napl-catalog-v4";
 const CATALOG_CACHE_KEY = "/__napl_static_catalog__.json";
 const CATALOG_META_STORAGE_KEY = "napl_catalog_cache_meta_v4";
