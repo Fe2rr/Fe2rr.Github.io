@@ -452,8 +452,10 @@ function fromRows(rows) {
     const platform=currentPlatform;
     if(platform && norm(platform)!=="multi game apps" && !platforms.has(norm(platform)))platforms.set(norm(platform),platform);
     const key=norm(currentGame)+"|"+norm(platform);
-    if(!groups.has(key))groups.set(key,{name:currentGame,platform,year:currentYear||"",coverUrl:"",genre:"",description:"",launchboxUrl:"",ports:[]});
+    const sourcePopularityKey=col(row,["POPULARITY_KEY","POPULARITY KEY","POPULARITY ID","POPULARITY_ID"]);
+    if(!groups.has(key))groups.set(key,{name:currentGame,platform,year:currentYear||"",popularityKey:sourcePopularityKey,coverUrl:"",genre:"",description:"",launchboxUrl:"",ports:[]});
     const g=groups.get(key); if(!g.year&&currentYear)g.year=currentYear;
+    if(!g.popularityKey&&sourcePopularityKey)g.popularityKey=sourcePopularityKey;
     const lb=col(row,["LAUNCHBOX_URL","LAUNCHBOX URL"]);
     if(!g.launchboxUrl&&lb)g.launchboxUrl=lb;
     for(const [field,names] of [["coverUrl",["COVER_URL","COVER URL","COVER","COVER IMAGE","IMAGE URL","PORTADA"]],["genre",["GENRE","GÉNERO","GENERO"]],["description",["DESCRIPTION","DESCRIPCIÓN","DESCRIPCION"]]]){const v=col(row,names);if(!g[field]&&v)g[field]=v;}
@@ -470,7 +472,7 @@ function fromRows(rows) {
     if(Object.entries(p).some(([k,v])=>k!=="year"&&String(v||"").trim()))g.ports.push(p);
   }
   const seen=new Set();
-  const games=Array.from(groups.values()).map(g=>{const base=slugify(g.name)+"-"+(slugify(g.platform)||"sin-plataforma");let n=1,slug=base+"-"+n;while(seen.has(slug))slug=base+"-"+(++n);seen.add(slug);return {...g,slug};});
+  const games=Array.from(groups.values()).map(g=>{const base=slugify(g.name)+"-"+(slugify(g.platform)||"sin-plataforma");let n=1,slug=base+"-"+n;while(seen.has(slug))slug=base+"-"+(++n);seen.add(slug);return {...g,slug,popularityKey:String(g.popularityKey||"").trim()};});
   return {version:1,updatedAt:new Date().toISOString(),platformOrder:Array.from(platforms.values()),games};
 }
 
@@ -486,7 +488,9 @@ function validateCatalog(input) {
     const ports=g.ports.map((p,i)=>{const o={};for(const k of ["portId","project","developer","year","version","controller","files","works","link","url","dataUrl","githubRepo","githubStatus","syncProvider","syncTarget","lastCheckedAt","lastUpdate","dateAdded","notes"])o[k]=String(p?.[k]??"");
       if(!o.portId)o.portId=slug+"-port-"+(i+1);if(ids.has(o.portId))throw new Error("ID de port duplicado: "+o.portId);ids.add(o.portId);
       const syncInfo=resolvePortSyncTarget(o);o.githubRepo=syncInfo.githubRepo;o.syncProvider=syncInfo.provider;o.syncTarget=syncInfo.target;return o;});
-    return {name:g.name.trim(),platform,slug,year:String(g.year||""),coverUrl:String(g.coverUrl||""),genre:String(g.genre||""),description:String(g.description||""),launchboxUrl:String(g.launchboxUrl||""),ports};
+    const popularityKey=String(g.popularityKey||slugify(g.name)).trim().toLowerCase();
+     if(!/^[a-z0-9][a-z0-9-]{0,179}$/.test(popularityKey))throw new Error("Clave de popularidad inválida en "+g.name);
+     return {name:g.name.trim(),platform,slug,popularityKey,year:String(g.year||""),coverUrl:String(g.coverUrl||""),genre:String(g.genre||""),description:String(g.description||""),launchboxUrl:String(g.launchboxUrl||""),ports};
   });
   return {version:1,updatedAt:new Date().toISOString(),platformOrder:[...new Set(input.platformOrder.map(x=>String(x).trim()).filter(Boolean))],games};
 }
@@ -1395,8 +1399,13 @@ async function route(req, env) {
     const newSet = new Set(imported.games.map((g) => g.slug));
     const oldPorts = new Map(oldGames.flatMap((g) => (g.ports || []).map((p) => [p.portId, p])));
     const oldGamesBySlug = new Map(oldGames.map((game) => [game.slug, game]));
+    const oldGamesByPortId = new Map(oldGames.flatMap((g) => (g.ports || []).map((p) => [p.portId, g])));
     for (const game of imported.games) {
-      const oldGame = oldGamesBySlug.get(game.slug);
+      const oldGame = oldGamesBySlug.get(game.slug)
+        || oldGames.find((item) => norm(item.name) === norm(game.name))
+        || (game.ports || []).map((port) => oldGamesByPortId.get(port.portId)).find(Boolean)
+        || null;
+      if (!game.popularityKey) game.popularityKey = oldGame?.popularityKey || slugify(oldGame?.name || game.name);
       if (oldGame) {
         game.steamUrl = oldGame.steamUrl || "";
         game.sortOrder = oldGame.sortOrder;
