@@ -23,7 +23,8 @@ const app = express();
 const PORT = Number(readCliArg('--port', '3000')) || 3000;
 const HOST = readCliArg('--host', '0.0.0.0') || '0.0.0.0';
 const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev';
-const CATALOG_PATH = path.join(__dirname, 'public', 'assets', 'data', 'catalog.json');
+const CATALOG_PATH = path.join(__dirname, '.local', 'catalog-seed.json');
+const CATALOG_SEED_URL = 'https://napl-catalog.pages.dev/assets/data/catalog.json';
 const SCHEMA_PATH = path.join(__dirname, 'cloudflare', 'schema.sql');
 const localD1 = createLocalD1Store({
   rootDir: __dirname,
@@ -863,6 +864,25 @@ const scheduledSyncTimer = setInterval(() => {
   localD1.runGithubSyncBatch({ source: 'cron', limit: 20, useOffset: false }).catch(() => {});
 }, SIX_HOURS_MS);
 scheduledSyncTimer.unref();
+
+async function prepareLocalCatalogSeed() {
+  if (fs.existsSync(CATALOG_PATH)) return;
+  try {
+    const response = await fetch(CATALOG_SEED_URL, { headers: { Accept: 'application/json' } });
+    if (!response.ok) throw new Error(`Catálogo remoto HTTP ${response.status}`);
+    const catalog = await response.json();
+    if (!catalog || !Array.isArray(catalog.games) || !catalog.games.length) {
+      throw new Error('El catálogo remoto no tiene juegos válidos.');
+    }
+    fs.mkdirSync(path.dirname(CATALOG_PATH), { recursive: true });
+    fs.writeFileSync(CATALOG_PATH, JSON.stringify(catalog), 'utf8');
+    console.log(`Catálogo inicial descargado: ${catalog.games.length} juegos.`);
+  } catch (error) {
+    console.warn('No se pudo descargar el catálogo inicial para el modo local:', error?.message || error);
+  }
+}
+
+await prepareLocalCatalogSeed();
 
 const server = app.listen(PORT, HOST, () => {
   console.log(`Server running at http://${HOST}:${PORT}`);
