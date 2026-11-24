@@ -63,7 +63,7 @@ function buildEligibleEntries(games) {
 }
 
 function withCategory(items, category) {
-    return items.map((item) => ({ ...item, category, isTrending: category === "Trending" }));
+    return items.map((item) => ({ ...item, category }));
 }
 
 function buildSpotlightQueue(games) {
@@ -122,7 +122,19 @@ function buildSpotlightQueue(games) {
 }
 
 function buildFallbackPool(games) {
-    return withCategory(buildEligibleEntries(games).slice(0, MAX_SPOTLIGHT_POOL), "Featured");
+    const candidates = buildEligibleEntries(games).map((item) => {
+        const hasDescription = Boolean(String(item.game.description || "").trim());
+        const portCount = item.game.ports.length;
+        const latestDate = getLatestGameDate(item.game, "lastUpdate") ||
+            getLatestGameDate(item.game, "dateAdded");
+        const recencyScore = latestDate ? latestDate.getTime() / 1e12 : 0;
+        return {
+            ...item,
+            score: (hasDescription ? 10 : 0) + Math.min(portCount, 5) * 2 + recencyScore,
+        };
+    });
+    candidates.sort((a, b) => b.score - a.score);
+    return withCategory(candidates.slice(0, MAX_SPOTLIGHT_POOL), "Featured");
 }
 
 function preloadSpotlightCover(game) {
