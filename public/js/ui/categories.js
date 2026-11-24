@@ -845,11 +845,11 @@ export function createCategoryController(state, options = {}) {
             case "popular":
                 sorted.sort((a, b) => {
                     const visitsA = getPopularVisits(
-                        a.slug,
+                        a.popularityKey || a.name,
                         state.selectedPopularPeriod
                     );
                     const visitsB = getPopularVisits(
-                        b.slug,
+                        b.popularityKey || b.name,
                         state.selectedPopularPeriod
                     );
                     const res = visitsB - visitsA;
