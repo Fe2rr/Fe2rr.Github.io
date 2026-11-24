@@ -1,66 +1,49 @@
-# NAPL API & Database Worker (Cloudflare Worker + D1)
+# NAPL API — Cloudflare Worker + GitHub JSON
 
-## Producción — 20 de noviembre de 2026
+## Arquitectura vigente (24 de noviembre de 2026)
 
-- D1 `napl-catalog-db` creada y esquema aplicado.
-- Worker `napl-admin-api` desplegado con binding `DB`.
-- Secretos `ADMIN_PASSWORD`, `GITHUB_TOKEN` y `SESSION_SECRET` conservados.
-- Cron Trigger activo cada 6 horas (`0 */6 * * *`).
-- D1 solo es accesible desde el Worker; los endpoints de datos requieren sesión de administrador.
-- El sitio público carga exclusivamente `public/assets/data/catalog.json` con caché local stale-while-revalidate.
-- El panel Admin publica la instantánea de D1 hacia ese JSON en GitHub Pages.
-- D1 se siembra desde el JSON estático solo cuando está vacía.
+El Worker `napl-admin-api` ya no utiliza Cloudflare D1. El catálogo operativo se guarda como JSON privado versionado en `Fe2rr/NAPL-Data`.
 
-Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudflare D1**, con:
-- API de datos privada: todas las rutas de lectura/escritura de D1 requieren sesión de administrador.
-- El sitio público no llama al Worker ni a D1; consume exclusivamente el JSON estático.
-- Autenticación de administrador y operaciones CRUD directas sobre juegos y ports en D1.
-- Autocompletado server-side al pegar URLs de **GitHub** (`POST /api/lookup/github`) y **LaunchBox GamesDB** (`POST /api/lookup/launchbox`).
-- Sincronización automática programada (Cron Trigger cada 6 horas) y manual (`POST /api/sync-github`) de versiones, fechas, redirecciones y repositorios caídos en GitHub.
-- Publicación de instantánea hacia `public/assets/data/catalog.json` en `Fe2rr/Napl-prueba` (`POST /api/publish`) para mantener GitHub Pages y el fallback estático al día.
+- `private/catalog-state.json`: fuente interna del catálogo, con metadatos de sincronización y estado de ports. No se publica en Pages.
+- `public/assets/data/catalog.json`: proyección pública del catálogo, sin campos internos.
+- `private/backups/d1-pre-migration-2026-11-24.json`: exportación íntegra de las tablas D1 anteriores (1000 juegos, 1249 ports, 28 plataformas, 96 logs y metadatos).
+- Cloudflare Pages `napl-catalog` publica exclusivamente la carpeta `public`.
+- El Worker valida la sesión y lee/escribe el JSON privado usando `CATALOG_DATA_GITHUB_TOKEN`.
+- Los visitantes siguen consumiendo únicamente el JSON estático de Pages; no consultan el Worker ni GitHub.
+- Supabase conserva los reportes, visitas, dispositivos y ratings; no se migraron.
 
-## Configuración en Cloudflare
+## Worker y secretos
 
-1. **Crear la base de datos D1** (desde Dashboard o CLI):
-   ```bash
-   npx wrangler d1 create napl-catalog-db
-   ```
-   Copiá el `database_id` en `cloudflare/wrangler.toml` (o enlazá la base con nombre de binding **`DB`** desde *Workers & Pages → napl-admin-api → Settings → Bindings*).
+Worker: `napl-admin-api`  
+URL: `https://napl-admin-api.federicoxastro.workers.dev`
 
-2. **Aplicar el esquema SQL**:
-   ```bash
-   npx wrangler d1 execute napl-catalog-db --remote --file=cloudflare/schema.sql
-   ```
-   *(El Worker inicializa las tablas si no existen y siembra D1 desde `catalog.json` cuando el administrador abre el panel y la base está vacía).*
+Secretos conservados:
+- `ADMIN_PASSWORD`: contraseña del panel.
+- `SESSION_SECRET`: firma de sesiones.
+- `GITHUB_TOKEN`: respaldo del JSON público en `Fe2rr/Napl-prueba`.
+- `CATALOG_DATA_GITHUB_TOKEN`: acceso Contents Read and write limitado a `Fe2rr/NAPL-Data`.
 
-3. **Variables y Secretos requeridos** (*Settings → Variables and Secrets*):
-   - `ADMIN_PASSWORD`: contraseña de acceso al panel Admin.
-   - `GITHUB_TOKEN`: Fine-grained PAT con **Contents: Read and write** para `Fe2rr/Napl-prueba` (también amplía el límite de consultas GitHub a 5.000 req/h).
-   - `SESSION_SECRET`: secreto HMAC ya configurado para firmar tokens de sesión.
-   - `ADMIN_ORIGIN` *(opcional)*: orígenes extra separados por coma además de `https://fe2rr.github.io`.
-   - `AUTO_PUBLISH_CRON` *(opcional, default `"true"`)*: si es `"true"`, cuando el Cron detecta cambios en GitHub actualiza también `public/assets/data/catalog.json` en GitHub.
+Variables:
+- `AUTO_PUBLISH_CRON = true`
+- `CRON_BATCH_SIZE = 40`
 
-4. **Desplegar Worker y Cron**:
-   ```bash
-   npx wrangler deploy --config cloudflare/wrangler.toml
-   ```
+Cron activo: `0 * * * *` (cada hora).
 
-## Endpoints principales
+## Endpoints
 
-- `GET /api/health` — estado de D1 y secretos configurados.
-- `POST /api/login` / `POST /api/logout` — sesión de administrador (Bearer token de 8h).
-- `GET /api/catalog` — catálogo completo, estadísticas y últimos logs de sincronización.
-- `POST /api/games` / `PUT /api/games/:slug` / `DELETE /api/games/:slug` — CRUD directo en D1.
-- `POST /api/ports/sync` — sincroniza un port individual de GitHub y lo guarda en D1.
-- `POST /api/lookup/github` — extrae proyecto, desarrollador, versión, fecha y descarga desde una URL de GitHub.
-- `POST /api/lookup/launchbox` — extrae título, año, género, descripción y portada desde LaunchBox GamesDB.
-- `POST /api/sync-github` — ejecuta lote de revisión de repositorios en GitHub y registra historial.
-- `POST /api/import-sheets` — importa CSV de Google Sheets a D1.
-- `POST /api/publish` — publica la instantánea actual de D1 en `Fe2rr/Napl-prueba` (`public/assets/data/catalog.json`).
+- `GET /api/health`: verifica configuración y lectura del JSON privado; informa `storage: github-json` y `d1: false`.
+- `POST /api/login` / `POST /api/logout`: sesión de administrador (Bearer token de 8 horas).
+- `GET /api/catalog`: catálogo interno, estadísticas y últimos logs.
+- `POST /api/games`, `PUT /api/games/:slug`, `DELETE /api/games/:slug`: CRUD sobre el JSON privado.
+- `POST /api/ports/sync`: sincroniza un port individual.
+- `POST /api/lookup/github`, `POST /api/lookup/source`, `POST /api/lookup/launchbox`: consulta fuentes.
+- `POST /api/sync-github`: lote manual de sincronización.
+- `POST /api/import-sheets`: importa desde Google Sheets al JSON privado.
+- `POST /api/publish`: vuelve a publicar el JSON público y el respaldo de Napl-prueba.
+- `GET /api/public-catalog`: redirige al JSON público de Pages para compatibilidad.
 
+## Restauración
 
-## NAPL-Data y catálogo estático
-- `GET /api/public-catalog` redirige al JSON público de Cloudflare Pages en `https://napl-catalog.pages.dev/assets/data/catalog.json`, para conservar el cargador existente sin modificar el frontend de Napl-prueba.
-- El Worker conserva `GITHUB_TOKEN` para el respaldo actual en Napl-prueba.
-- Para publicar automáticamente el snapshot privado en NAPL-Data requiere el secreto adicional `CATALOG_DATA_GITHUB_TOKEN`, con permisos Contents read/write limitados a `Fe2rr/NAPL-Data`.
-- La publicación de Pages queda marcada como pendiente hasta que ese secreto esté configurado y la escritura sea confirmada.
+La exportación completa anterior a la migración está en `Fe2rr/NAPL-Data/private/backups/d1-pre-migration-2026-11-24.json`. El estado operativo inicial migrado está en `private/catalog-state.json`. Ambos archivos están fuera de `public/` y no son servidos por Cloudflare Pages.
+
+La base D1 anterior quedó desconectada del Worker para permitir una reversión controlada; no eliminarla hasta validar el panel y conservar el backup fuera de línea.
