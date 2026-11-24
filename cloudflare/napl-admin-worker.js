@@ -339,7 +339,7 @@ async function ghFetch(path, env, options = {}) {
 
 async function gitBlobSha(content) {
   const bytes = new TextEncoder().encode(content);
-  const header = new TextEncoder().encode(`blob ${bytes.length}\\0`);
+  const header = new TextEncoder().encode(`blob ${bytes.length}\0`);
   const input = new Uint8Array(header.length + bytes.length);
   input.set(header);
   input.set(bytes, header.length);
