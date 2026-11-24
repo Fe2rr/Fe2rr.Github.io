@@ -55,7 +55,7 @@ export function createGameViewController() {
         status.textContent = "";
         if (portsHeader) portsHeader.hidden = true;
         renderGameDetailSkeletons(gameHeader, portList, Math.max(1, Math.min(game.ports?.length || 2, 3)));
-        registerGameVisit(game.name);
+        registerGameVisit(game.popularityKey || game.name);
 
         try {
             const portIds = Array.from(
