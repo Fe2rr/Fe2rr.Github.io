@@ -57,3 +57,10 @@ Worker `napl-admin-api` para gestionar el catálogo de **NAPL** sobre **Cloudfla
 - `POST /api/sync-github` — ejecuta lote de revisión de repositorios en GitHub y registra historial.
 - `POST /api/import-sheets` — importa CSV de Google Sheets a D1.
 - `POST /api/publish` — publica la instantánea actual de D1 en `Fe2rr/Napl-prueba` (`public/assets/data/catalog.json`).
+
+
+## NAPL-Data y catálogo estático
+- `GET /api/public-catalog` redirige al JSON público de Cloudflare Pages en `https://napl-catalog.pages.dev/assets/data/catalog.json`, para conservar el cargador existente sin modificar el frontend de Napl-prueba.
+- El Worker conserva `GITHUB_TOKEN` para el respaldo actual en Napl-prueba.
+- Para publicar automáticamente el snapshot privado en NAPL-Data requiere el secreto adicional `CATALOG_DATA_GITHUB_TOKEN`, con permisos Contents read/write limitados a `Fe2rr/NAPL-Data`.
+- La publicación de Pages queda marcada como pendiente hasta que ese secreto esté configurado y la escritura sea confirmada.
