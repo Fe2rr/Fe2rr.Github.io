@@ -1391,11 +1391,24 @@ async function route(req, env) {
     const oldGames = state.catalog.games, oldSet = new Set(oldGames.map((g) => g.slug));
     const newSet = new Set(imported.games.map((g) => g.slug));
     const oldPorts = new Map(oldGames.flatMap((g) => (g.ports || []).map((p) => [p.portId, p])));
+    const oldGamesBySlug = new Map(oldGames.map((game) => [game.slug, game]));
     for (const game of imported.games) {
-      game.ports = (game.ports || []).map((port) => {
+      const oldGame = oldGamesBySlug.get(game.slug);
+      if (oldGame) {
+        game.steamUrl = oldGame.steamUrl || "";
+        game.sortOrder = oldGame.sortOrder;
+        game.sourceUpdatedAt = oldGame.sourceUpdatedAt || "";
+      }
+      game.ports = (game.ports || []).map((port, index) => {
+        if (!port.portId) port.portId = game.slug + "-port-" + (index + 1);
         const old = oldPorts.get(port.portId);
-        return old ? { ...port, githubRepo: old.githubRepo || "", syncProvider: old.syncProvider || "",
-          syncTarget: old.syncTarget || "", githubStatus: old.githubStatus || "", lastCheckedAt: old.lastCheckedAt || "" } : port;
+        return old ? { ...port,
+          platform: old.platform || "", slug: old.slug || "", launchboxUrl: old.launchboxUrl || "",
+          launchboxName: old.launchboxName || "", coverUrl: old.coverUrl || "", genre: old.genre || "",
+          description: old.description || "", githubEtag: old.githubEtag || "", sortOrder: old.sortOrder,
+          githubRepo: old.githubRepo || "", syncProvider: old.syncProvider || "",
+          syncTarget: old.syncTarget || "", githubStatus: old.githubStatus || "", lastCheckedAt: old.lastCheckedAt || ""
+        } : port;
       });
     }
     state.catalog = imported; state.meta.updated_at = imported.updatedAt; state.meta.pending_github_sync = "1";
