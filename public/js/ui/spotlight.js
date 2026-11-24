@@ -95,8 +95,8 @@ function buildTrendingPool(games) {
         const port = getRepresentativePort(game);
         if (!port) continue;
 
-        const weeklyVisits = getPopularVisits(game.slug, "week");
-        const allTimeVisits = getPopularVisits(game.slug, "alltime");
+        const weeklyVisits = getPopularVisits(game.popularityKey || game.name, "week");
+        const allTimeVisits = getPopularVisits(game.popularityKey || game.name, "alltime");
         if (weeklyVisits <= 0 && allTimeVisits <= 0) continue;
 
         const score = weeklyVisits * 4 + allTimeVisits;
