@@ -677,7 +677,7 @@ async function ensureSeeded(env) {
   await ensureSchema(env);
   // A COUNT(*) scans the entire games table on every admin request.
   // Existence is enough here and LIMIT 1 stops after the first matching row.
-  const existingGame = await env.DB.prepare("SELECT 1 AS exists FROM games LIMIT 1").first();
+  const existingGame = await env.DB.prepare("SELECT 1 AS present FROM games LIMIT 1").first();
   if (existingGame) return false;
 
   const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${CATALOG_PATH}`;
