@@ -1,158 +1,45 @@
-/*
- * NAPL — POPULARITY SERVICE
- *
- * Popular rankings are served by the Google Apps Script web app.
- * Popular and All Time category sorting are handled independently
- * through the Apps Script endpoint.
- */
-
+/* NAPL popularity service — Supabase-backed. */
 import { createSlug } from "./helpers.js";
-
-const POPULAR_URL =
-    "https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec";
-
-const popularByPeriod = new Map();
-const popularPromises = new Map();
-let callbackSequence = 0;
-
-/**
- * Load a popularity period through JSONP.
- * Apps Script supports JSONP and can therefore be called from GitHub Pages
- * without a CORS proxy.
- */
-function requestPopular(period) {
-    return new Promise((resolve, reject) => {
-        if (typeof document === "undefined" || typeof window === "undefined") {
-            reject(new Error("Popularity service is only available in a browser."));
-            return;
-        }
-
-        const callbackName =
-            `naplPopularCallback_${Date.now()}_${++callbackSequence}`;
-        const script = document.createElement("script");
-        let timeoutId = null;
-        let settled = false;
-
-        const cleanup = () => {
-            if (timeoutId !== null) {
-                window.clearTimeout(timeoutId);
-            }
-            delete window[callbackName];
-            script.onerror = null;
-            script.remove();
-        };
-
-        const finish = (error, data) => {
-            if (settled) return;
-            settled = true;
-            cleanup();
-
-            if (error) {
-                reject(error);
-                return;
-            }
-
-            if (!data?.success || !Array.isArray(data.games)) {
-                reject(new Error(data?.error || "Invalid popularity response."));
-                return;
-            }
-
-            resolve(data.games);
-        };
-
-        window[callbackName] = (data) => finish(null, data);
-
-        script.async = true;
-        script.src =
-            `${POPULAR_URL}?popular=${encodeURIComponent(period)}&callback=${callbackName}`;
-
-        script.onerror = () => {
-            finish(new Error("Could not load popular games from Apps Script."));
-        };
-
-        timeoutId = window.setTimeout(() => {
-            finish(new Error("Popularity request timed out."));
-        }, 15000);
-
-        document.head.appendChild(script);
-    });
+import { POPULARITY_API_BASE } from "./config.js";
+const popularByPeriod=new Map();
+const popularPromises=new Map();
+async function requestPopularity(period){
+ const response=await fetch(`${POPULARITY_API_BASE}?period=${encodeURIComponent(period)}`,{method:"GET",cache:"no-store"});
+ if(!response.ok)throw new Error(`Popularity API returned HTTP ${response.status}.`);
+ const data=await response.json();
+ if(!data?.success||!Array.isArray(data.games))throw new Error("Invalid popularity response.");
+ return data.games;
 }
-
-async function fetchPopularPeriod(period = "week") {
-    return requestPopular(period);
+export async function ensurePopularPeriod(period="alltime"){
+ const normalized=String(period||"alltime").trim().toLowerCase();
+ if(!["week","month","alltime"].includes(normalized))return new Map();
+ if(popularByPeriod.has(normalized))return popularByPeriod.get(normalized);
+ if(popularPromises.has(normalized))return popularPromises.get(normalized);
+ const promise=requestPopularity(normalized).then(items=>{
+  const map=new Map();
+  for(const item of items){const visits=Number(item?.visits)||0;const slug=createSlug(item?.slug||"");if(slug)map.set(slug,visits);}
+  popularByPeriod.set(normalized,map);return map;
+ }).catch(error=>{console.warn(`Could not load ${normalized} popularity:`,error);return new Map();}).finally(()=>popularPromises.delete(normalized));
+ popularPromises.set(normalized,promise);return promise;
 }
-
-export async function ensurePopularPeriod(period = "alltime") {
-    const normalizedPeriod = String(period || "alltime").trim().toLowerCase();
-    if (popularByPeriod.has(normalizedPeriod)) {
-        return popularByPeriod.get(normalizedPeriod);
-    }
-
-    if (popularPromises.has(normalizedPeriod)) {
-        return popularPromises.get(normalizedPeriod);
-    }
-
-    const promise = fetchPopularPeriod(normalizedPeriod)
-        .then((items) => {
-            const periodMap = new Map();
-
-            for (const item of items) {
-                const visits = Number(item.visits) || 0;
-                const apiSlug = createSlug(item.slug || "");
-                const gameSlug = createSlug(item.game || "");
-                if (apiSlug) {
-                    periodMap.set(apiSlug, Math.max(periodMap.get(apiSlug) || 0, visits));
-                }
-                if (gameSlug) {
-                    periodMap.set(gameSlug, Math.max(periodMap.get(gameSlug) || 0, visits));
-                }
-            }
-
-            popularByPeriod.set(normalizedPeriod, periodMap);
-            return periodMap;
-        })
-        .catch((error) => {
-            console.warn(`Could not load ${normalizedPeriod} popularity:`, error);
-            return new Map();
-        })
-        .finally(() => {
-            popularPromises.delete(normalizedPeriod);
-        });
-
-    popularPromises.set(normalizedPeriod, promise);
-    return promise;
+export function getPopularVisits(gameName,period="alltime"){
+ const key=createSlug(gameName||"");return popularByPeriod.get(String(period||"alltime").trim().toLowerCase())?.get(key)||0;
 }
-
-export function getPopularVisits(slug, period = "alltime") {
-    const normalizedPeriod = String(period || "alltime").trim().toLowerCase();
-    return popularByPeriod.get(normalizedPeriod)?.get(slug) || 0;
+export async function refreshPopularPeriod(period="alltime"){
+ const normalized=String(period||"alltime").trim().toLowerCase();
+ if(!["week","month","alltime"].includes(normalized))return new Map();
+ const items=await requestPopularity(normalized);
+ const map=new Map();
+ for(const item of items){const visits=Number(item?.visits)||0;const slug=createSlug(item?.slug||"");if(slug)map.set(slug,visits);}
+ popularByPeriod.set(normalized,map);
+ return map;
 }
-
-export async function ensureAllTimePopular() {
-    return ensurePopularPeriod("alltime");
+export async function ensureAllTimePopular(){return ensurePopularPeriod("alltime");}
+export function getAllTimeVisits(gameName){return getPopularVisits(gameName,"alltime");}
+export function registerGameVisit(gameName){
+ const game=createSlug(gameName||"");if(!game)return;
+ fetch(POPULARITY_API_BASE,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({game}),cache:"no-store",keepalive:true})
+ .then(response=>{if(!response.ok)throw new Error(`HTTP ${response.status}`);return response.json();})
+ .then(result=>{if(result?.counted)popularByPeriod.clear();})
+ .catch(error=>console.warn("NAPL: could not register the game visit.",error));
 }
-
-export function getAllTimeVisits(slug) {
-    return getPopularVisits(slug, "alltime");
-}
-
-export function registerGameVisit(gameName) {
-    if (!gameName) return;
-
-    const slug = createSlug(gameName);
-    if (!slug) return;
-
-    const url = new URL(POPULAR_URL);
-    url.searchParams.set("game", slug);
-    url.searchParams.set("_", String(Date.now()));
-
-    fetch(url.toString(), {
-        method: "GET",
-        mode: "no-cors",
-        cache: "no-store",
-        keepalive: true,
-    }).catch((error) => {
-        console.warn("NAPL: could not send the game visit.", error);
-    });
-}
-
