@@ -47,75 +47,85 @@ function shuffleInPlace(list) {
     return list;
 }
 
-function buildFallbackPool(games) {
-    const candidates = [];
-
-    for (const game of games) {
-        if (!hasValidCoverUrl(game)) continue;
-        if (!Array.isArray(game.ports) || game.ports.length === 0) continue;
-
-        const port = getRepresentativePort(game);
-        if (!port) continue;
-
-        const hasDescription = Boolean(String(game.description || "").trim());
-        const portCount = game.ports.length;
-        const latestDate = game.ports.reduce((latest, p) => {
-            const d = parseLastUpdate(p?.lastUpdate) || parseDateAdded(p?.dateAdded);
-            if (!d) return latest;
-            return !latest || d > latest ? d : latest;
-        }, null);
-
-        const recencyScore = latestDate ? latestDate.getTime() / 1e12 : 0;
-        const score =
-            (hasDescription ? 10 : 0) +
-            Math.min(portCount, 5) * 2 +
-            recencyScore;
-
-        candidates.push({
-            game,
-            port,
-            score,
-            isTrending: false,
-        });
-    }
-
-    candidates.sort((a, b) => b.score - a.score);
-    const pool = candidates.slice(0, MAX_FALLBACK_SCAN);
-    shuffleInPlace(pool);
-    return pool.slice(0, MAX_SPOTLIGHT_POOL);
+function getLatestGameDate(game, field) {
+    return (Array.isArray(game?.ports) ? game.ports : [])
+        .map((port) => field === "lastUpdate"
+            ? parseLastUpdate(port?.lastUpdate)
+            : parseDateAdded(port?.dateAdded))
+        .filter(Boolean)
+        .reduce((latest, date) => !latest || date > latest ? date : latest, null);
 }
 
-function buildTrendingPool(games) {
-    const scored = [];
-
-    for (const game of games) {
-        if (!hasValidCoverUrl(game)) continue;
-        if (!Array.isArray(game.ports) || game.ports.length === 0) continue;
-
+function buildEligibleEntries(games) {
+    return games.flatMap((game) => {
+        if (!hasValidCoverUrl(game) || !Array.isArray(game.ports) || game.ports.length === 0) return [];
         const port = getRepresentativePort(game);
-        if (!port) continue;
+        return port ? [{ game, port }] : [];
+    });
+}
 
-        const weeklyVisits = getPopularVisits(game.popularityKey || game.name, "week");
-        const allTimeVisits = getPopularVisits(game.popularityKey || game.name, "alltime");
-        if (weeklyVisits <= 0 && allTimeVisits <= 0) continue;
+function withCategory(items, category) {
+    return items.map((item) => ({ ...item, category, isTrending: category === "Trending" }));
+}
 
-        const score = weeklyVisits * 4 + allTimeVisits;
-        scored.push({
-            game,
-            port,
-            score,
-            isTrending: weeklyVisits > 0,
-        });
-    }
+function buildSpotlightQueue(games) {
+    const eligible = buildEligibleEntries(games);
+    const byKey = new Map(eligible.map((item) => [item.game.slug, item]));
+    const visits = (item, period) => getPopularVisits(item.game.popularityKey || item.game.name, period);
+    const score = (item) => visits(item, "week") * 4 + visits(item, "alltime");
 
-    if (scored.length === 0) {
-        return [];
-    }
+    // Trending: los cinco mejores según visitas semanales (x4) + históricas.
+    const trending = [...eligible]
+        .map((item) => ({ ...item, score: score(item) }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
 
-    scored.sort((a, b) => b.score - a.score);
-    const topTier = scored.slice(0, MAX_SPOTLIGHT_POOL);
-    shuffleInPlace(topTier);
-    return topTier;
+    // Rising: ranking de los últimos 50 juegos agregados, ponderando semana y mes.
+    const newest50 = [...eligible]
+        .map((item) => ({ ...item, addedAt: getLatestGameDate(item.game, "dateAdded") }))
+        .filter((item) => item.addedAt)
+        .sort((a, b) => b.addedAt - a.addedAt)
+        .slice(0, 50);
+    const rising = newest50
+        .map((item) => ({
+            ...item,
+            score: visits(item, "week") * 4 + visits(item, "month"),
+        }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 5);
+
+    // Popular: cinco juegos aleatorios del Top 50 histórico.
+    const top50 = [...eligible]
+        .map((item) => ({ ...item, score: visits(item, "alltime") }))
+        .filter((item) => item.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 50);
+    const popular = shuffleInPlace([...top50]).slice(0, 5);
+
+    // Recently Updated: solo juegos del Top 50 histórico; ventana 24 h y fallback hasta 48 h.
+    const now = Date.now();
+    const updatedCandidates = top50
+        .map((item) => ({ ...item, updatedAt: getLatestGameDate(item.game, "lastUpdate") }))
+        .filter((item) => item.updatedAt && item.updatedAt.getTime() <= now)
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+    const within24h = updatedCandidates.filter((item) => now - item.updatedAt.getTime() <= 24 * 60 * 60 * 1000);
+    const recentlyUpdated = (within24h.length >= 5
+        ? within24h
+        : updatedCandidates.filter((item) => now - item.updatedAt.getTime() <= 48 * 60 * 60 * 1000)
+    ).slice(0, 5);
+
+    return [
+        ...withCategory(trending, "Trending"),
+        ...withCategory(rising, "Rising"),
+        ...withCategory(popular, "Popular"),
+        ...withCategory(recentlyUpdated, "Recently Updated"),
+    ];
+}
+
+function buildFallbackPool(games) {
+    return withCategory(buildEligibleEntries(games).slice(0, MAX_SPOTLIGHT_POOL), "Featured");
 }
 
 function preloadSpotlightCover(game) {
@@ -404,7 +414,7 @@ export function createSpotlightController() {
             titleLink.textContent = game.name;
         }
         if (kickerEl) {
-            kickerEl.textContent = "Trending";
+            kickerEl.textContent = entry.category || "Trending";
         }
 
         if (metaEl) {
@@ -488,36 +498,6 @@ export function createSpotlightController() {
         renderCurrentEntry(delta, true);
     }
 
-    function mergeTrendingQueue(trendingPool) {
-        if (!Array.isArray(trendingPool) || trendingPool.length === 0) return;
-
-        hasResolvedPool = true;
-        if (card?.hidden || queue.length === 0) {
-            queue = trendingPool;
-            currentIndex = 0;
-            renderCurrentEntry(1, false);
-            return;
-        }
-
-        const currentEntry = queue[currentIndex];
-        const remaining = trendingPool.filter(
-            (item) => item.game.slug !== currentEntry?.game?.slug
-        );
-        queue = currentEntry ? [currentEntry, ...remaining] : trendingPool;
-        currentIndex = 0;
-        syncNavButtons();
-        preloadAdjacentEntries();
-        if (!timerId && canAutoCycle()) {
-            scheduleIdleCycle();
-        }
-
-        if (!userManuallyStepped && kickerEl && !currentEntry?.isTrending) {
-            // Silently swap onto a true trending title if user hasn't interacted yet
-            queue = trendingPool;
-            currentIndex = 0;
-            renderCurrentEntry(1, false);
-        }
-    }
 
     async function setGames(games) {
         catalogGames = Array.isArray(games) ? games : [];
@@ -528,54 +508,19 @@ export function createSpotlightController() {
             return;
         }
 
-        if (popularityHydrated) {
-            const trendingPool = buildTrendingPool(catalogGames);
-            if (trendingPool.length > 0) {
-                hasResolvedPool = true;
-                if (queue.length === 0) {
-                    queue = trendingPool;
-                    currentIndex = 0;
-                    renderCurrentEntry(1, false);
-                } else {
-                    mergeTrendingQueue(trendingPool);
-                }
-                return;
-            }
-        }
-
-        const popularityPromise = Promise.allSettled([
+        // Load all periods required by the four Spotlight categories.
+        await Promise.allSettled([
             ensurePopularPeriod("week"),
+            ensurePopularPeriod("month"),
             ensureAllTimePopular(),
-        ]).then(() => {
-            popularityHydrated = true;
-            return buildTrendingPool(catalogGames);
-        });
+        ]);
+        popularityHydrated = true;
 
-        const raceTimeout = new Promise((resolve) => {
-            window.setTimeout(() => resolve(null), POPULARITY_RACE_MS);
-        });
-
-        const firstResult = await Promise.race([popularityPromise, raceTimeout]);
-        if (Array.isArray(firstResult) && firstResult.length > 0) {
-            hasResolvedPool = true;
-            queue = firstResult;
-            currentIndex = 0;
-            renderCurrentEntry(1, false);
-            return;
-        }
-
-        if (queue.length === 0) {
-            queue = buildFallbackPool(catalogGames);
-            currentIndex = 0;
-            hasResolvedPool = true;
-            renderCurrentEntry(1, false);
-        }
-
-        popularityPromise.then((trendingPool) => {
-            if (Array.isArray(trendingPool) && trendingPool.length > 0) {
-                mergeTrendingQueue(trendingPool);
-            }
-        });
+        const categoryQueue = buildSpotlightQueue(catalogGames);
+        queue = categoryQueue.length > 0 ? categoryQueue : buildFallbackPool(catalogGames);
+        currentIndex = 0;
+        hasResolvedPool = true;
+        renderCurrentEntry(1, false);
     }
 
     function syncVisibility(shouldShow) {
