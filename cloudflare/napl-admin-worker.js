@@ -337,33 +337,32 @@ async function ghFetch(path, env, options = {}) {
   return { res, data };
 }
 
+async function gitBlobSha(content) {
+  const bytes = new TextEncoder().encode(content);
+  const header = new TextEncoder().encode(`blob ${bytes.length}\\0`);
+  const input = new Uint8Array(header.length + bytes.length);
+  input.set(header);
+  input.set(bytes, header.length);
+  const digest = await crypto.subtle.digest("SHA-1", input);
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 async function ghCommitCatalog(catalog, env, message = "NAPL: sincronizar catálogo desde D1") {
   if (!env.GITHUB_TOKEN) {
     throw new Error("Falta el secreto GITHUB_TOKEN en Cloudflare.");
   }
-  const { res: metaRes, data: meta } = await ghFetch(
-    `/repos/${OWNER}/${REPO}/contents/${CATALOG_PATH}?ref=${BRANCH}`,
-    env
-  );
-  const payload = {
-    message,
-    content: toB64(JSON.stringify(catalog)),
-    branch: BRANCH,
-  };
-  if (metaRes.ok && meta.sha) {
-    payload.sha = meta.sha;
+  const path = `/repos/${OWNER}/${REPO}/contents/${CATALOG_PATH}`;
+  const { res: metaRes, data: meta } = await ghFetch(`${path}?ref=${BRANCH}`, env);
+  const raw = JSON.stringify(catalog);
+  const expectedSha = await gitBlobSha(raw);
+  if (metaRes.ok && meta.sha === expectedSha) {
+    return { commit: "", sha: meta.sha, unchanged: true };
   }
-  const { res, data } = await ghFetch(`/repos/${OWNER}/${REPO}/contents/${CATALOG_PATH}`, env, {
-    method: "PUT",
-    body: payload,
-  });
-  if (!res.ok) {
-    throw new Error(data.message || `GitHub HTTP ${res.status}`);
-  }
-  return {
-    commit: data.commit?.html_url || "",
-    sha: data.commit?.sha || "",
-  };
+  const payload = { message, content: toB64(raw), branch: BRANCH };
+  if (metaRes.ok && meta.sha) payload.sha = meta.sha;
+  const { res, data } = await ghFetch(path, env, { method: "PUT", body: payload });
+  if (!res.ok) throw new Error(data.message || `GitHub HTTP ${res.status}`);
+  return { commit: data.commit?.html_url || "", sha: data.commit?.sha || "", unchanged: false };
 }
 
 async function ghCommitDataCatalog(catalog, env, message = "NAPL: publicar snapshot estático en NAPL-Data") {
@@ -376,11 +375,12 @@ async function ghCommitDataCatalog(catalog, env, message = "NAPL: publicar snaps
   if (!metaRes.ok && metaRes.status !== 404) {
     throw new Error(meta.message || `No se pudo leer NAPL-Data (HTTP ${metaRes.status}).`);
   }
-  const encoded = toB64(JSON.stringify(catalog));
-  if (metaRes.ok && typeof meta.content === "string" && meta.content.replace(/\\s/g, "") === encoded) {
+  const raw = JSON.stringify(catalog);
+  const expectedSha = await gitBlobSha(raw);
+  if (metaRes.ok && meta.sha === expectedSha) {
     return { commit: "", sha: meta.sha || "", unchanged: true };
   }
-  const payload = { message, content: encoded, branch: "main" };
+  const payload = { message, content: toB64(raw), branch: "main" };
   if (metaRes.ok && meta.sha) payload.sha = meta.sha;
   const { res, data } = await ghFetch(path, env, { method: "PUT", body: payload, token });
   if (!res.ok) {
