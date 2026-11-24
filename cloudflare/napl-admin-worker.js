@@ -542,6 +542,13 @@ async function readCatalogState(env) {
   state.meta = state.meta && typeof state.meta === "object" ? state.meta : {};
   state.syncLogs = Array.isArray(state.syncLogs) ? state.syncLogs : [];
   state.catalog.platformOrder = Array.isArray(state.catalog.platformOrder) ? state.catalog.platformOrder : [];
+  state.catalog.games = state.catalog.games.map((game) => {
+    const popularityKey = String(game?.popularityKey || slugify(game?.name || "")).trim().toLowerCase();
+    if (!/^[a-z0-9][a-z0-9-]{0,179}$/.test(popularityKey)) {
+      throw new Error("Clave de popularidad inválida en " + String(game?.name || "juego sin nombre"));
+    }
+    return { ...game, popularityKey };
+  });
   state._sha = loaded.sha;
   return state;
 }
