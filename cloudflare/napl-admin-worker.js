@@ -675,8 +675,10 @@ async function replaceWholeCatalogInD1(env, rawCatalog, options = {}) {
 
 async function ensureSeeded(env) {
   await ensureSchema(env);
-  const countRow = await env.DB.prepare("SELECT COUNT(*) AS count FROM games").first();
-  if (countRow && Number(countRow.count) > 0) return false;
+  // A COUNT(*) scans the entire games table on every admin request.
+  // Existence is enough here and LIMIT 1 stops after the first matching row.
+  const existingGame = await env.DB.prepare("SELECT 1 AS exists FROM games LIMIT 1").first();
+  if (existingGame) return false;
 
   const rawUrl = `https://raw.githubusercontent.com/${OWNER}/${REPO}/${BRANCH}/${CATALOG_PATH}`;
   const res = await fetch(rawUrl, { headers: { Accept: "application/json" } });
@@ -1758,20 +1760,62 @@ async function runSyncBatch(env, options = {}) {
 }
 
 
+function toPublicCatalog(catalog) {
+  return {
+    version: catalog.version,
+    updatedAt: catalog.updatedAt,
+    platformOrder: catalog.platformOrder,
+    games: catalog.games.map((game) => ({
+      name: game.name,
+      slug: game.slug,
+      year: game.year,
+      coverUrl: game.coverUrl,
+      genre: game.genre,
+      description: game.description,
+      platform: game.platform,
+      ...(game.launchboxUrl ? { launchboxUrl: game.launchboxUrl } : {}),
+      ports: game.ports.map((port) => {
+        const {
+          syncProvider,
+          syncTarget,
+          githubStatus,
+          lastCheckedAt,
+          ...publicPort
+        } = port;
+        if (!publicPort.githubRepo) delete publicPort.githubRepo;
+        return publicPort;
+      }),
+    })),
+  };
+}
+
 async function publishSavedCatalog(env) {
   const now = new Date().toISOString();
+  let state = null;
   try {
     if (!env.GITHUB_TOKEN) throw new Error("Falta configurar GitHub Token en Cloudflare.");
-    const { catalog } = await readCatalogFromD1(env, { includeInternal: false });
+
+    // Read the admin state once, then derive the public snapshot from the same result.
+    // Previously this function read all games/ports and the route read them all again.
+    state = await readCatalogFromD1(env, { includeInternal: true });
+    const catalog = toPublicCatalog(state.catalog);
     const pub = await ghCommitCatalog(catalog, env, "NAPL: guardar ficha y publicar catálogo");
     await env.DB.batch([
       env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", "0", now),
       env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_github_publish_at", now, now),
     ]);
-    return { commit: pub.commit, publishError: "" };
+    state.meta.pending_github_sync = "0";
+    state.meta.last_github_publish_at = now;
+    state.stats.pendingGitHubSync = false;
+    state.stats.lastGitHubPublishAt = now;
+    return { commit: pub.commit, publishError: "", state };
   } catch (error) {
     await env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", "1", now).run();
-    return { commit: "", publishError: error?.message || "Error publicando en GitHub" };
+    if (state) {
+      state.meta.pending_github_sync = "1";
+      state.stats.pendingGitHubSync = true;
+    }
+    return { commit: "", publishError: error?.message || "Error publicando en GitHub", state };
   }
 }
 
@@ -1845,8 +1889,8 @@ async function route(req, env) {
     const body = await req.json().catch(() => ({}));
     const saved = await saveSingleGameInD1(env, null, body.game || body, true);
     const publication = await publishSavedCatalog(env);
-    const state = await readCatalogFromD1(env, { includeInternal: true });
-    return json({ success: true, saved, ...publication, ...state }, 200, headers);
+    const { state, ...publicationResult } = publication;
+    return json({ success: true, saved, ...publicationResult, ...(state || {}) }, 200, headers);
   }
 
   const gameMatch = path.match(/^\/api\/games\/([^/]+)$/);
@@ -1856,8 +1900,8 @@ async function route(req, env) {
       const body = await req.json().catch(() => ({}));
       const saved = await saveSingleGameInD1(env, targetSlug, body.game || body, false);
       const publication = await publishSavedCatalog(env);
-      const state = await readCatalogFromD1(env, { includeInternal: true });
-      return json({ success: true, saved, ...publication, ...state }, 200, headers);
+      const { state, ...publicationResult } = publication;
+      return json({ success: true, saved, ...publicationResult, ...(state || {}) }, 200, headers);
     }
     if (req.method === "DELETE") {
       const removed = await deleteGameFromD1(env, targetSlug);
