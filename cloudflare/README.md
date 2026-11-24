@@ -12,6 +12,15 @@ El Worker `napl-admin-api` ya no utiliza Cloudflare D1. El catálogo operativo s
 - Los visitantes siguen consumiendo únicamente el JSON estático de Pages; no consultan el Worker ni GitHub.
 - Supabase conserva los reportes, visitas, dispositivos y ratings; no se migraron.
 
+## Identificadores de popularidad
+
+Cada entrada del catálogo usa `popularityKey`, independiente del `slug` de navegación (que puede variar por plataforma) y del nombre visible. Las visitas de Supabase se registran y consultan exclusivamente con esa clave.
+
+- Los catálogos anteriores reciben una clave derivada del nombre al cargarse.
+- Al importar Google Sheets, el Worker conserva la clave previa por juego o por `portId`.
+- Para renombrar un juego sin perder su historial, se puede añadir la columna opcional `POPULARITY_KEY` (o `POPULARITY ID`) y mantener el mismo valor en todas las filas/plataformas de ese juego.
+- La clave debe ser un identificador normalizado: letras minúsculas, números y guiones; no debe cambiar al modificar el nombre visible.
+
 ## Worker y secretos
 
 Worker: `napl-admin-api`  
