@@ -1102,6 +1102,7 @@ async function syncSinglePortWithSource(env, port) {
   const syncInfo = resolvePortSyncTarget(port);
   if (!syncInfo.provider || !syncInfo.target) return { portId: port.portId, status: "skipped", reason: "Sin fuente sincronizable", changed: false };
   const now = new Date().toISOString();
+  const oldVersion = port.version;
   let info;
   if (syncInfo.provider === "playstore") info = await inspectPlayStoreApp(syncInfo.target);
   else if (syncInfo.provider === "gitlab") {
@@ -1138,7 +1139,7 @@ async function syncSinglePortWithSource(env, port) {
     githubStatus: info.status, version: nextVersion, lastUpdate: nextLastUpdate, url: nextUrl, link: nextLink, lastCheckedAt: now });
   return { portId: port.portId, gameSlug: port.gameSlug || "", project: port.project || info.project,
     provider: syncInfo.provider, syncTarget: nextSyncTarget, githubRepo: nextGithubRepo, status: info.status,
-    changed, oldVersion: port.version, newVersion: nextVersion, url: nextUrl, lastUpdate: nextLastUpdate };
+    changed, oldVersion, newVersion: nextVersion, url: nextUrl, lastUpdate: nextLastUpdate };
 }
 
 
@@ -1175,6 +1176,7 @@ async function runSyncBatch(env, options = {}) {
         details.push(outcome);
       }
     } catch (error) {
+      errorCount++;
       entry._port.lastCheckedAt = new Date().toISOString();
       details.push({ portId: entry.portId, gameSlug: entry.gameSlug, project: entry.project,
         provider: resolvePortSyncTarget(entry).provider, status: "error",
