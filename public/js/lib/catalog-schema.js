@@ -100,9 +100,11 @@ function normalizeCatalogDocument(rawDoc, options = {}) {
         const rawPorts = Array.isArray(rawGame.ports) ? rawGame.ports : [];
         const ports = rawPorts.filter((p) => p && typeof p === "object").map((p) => compactPort(p, year));
 
+        const popularityKey = createSlug(cleanStr(rawGame.popularityKey) || name);
         const gameEntry = {
             name,
             slug,
+            popularityKey,
         };
         if (year) gameEntry.year = year;
         if (coverUrl) gameEntry.coverUrl = coverUrl;
@@ -142,6 +144,7 @@ export function hydrateCatalog(doc) {
         const gameGenre = String(rawGame.genre || "");
         const gameDescription = String(rawGame.description || "");
         const slug = String(rawGame.slug || createSlug(gameName));
+        const popularityKey = createSlug(cleanStr(rawGame.popularityKey) || gameName);
 
         const platform = String(rawGame.platform || rawGame.platforms?.[0] || "");
 
@@ -182,6 +185,7 @@ export function hydrateCatalog(doc) {
             name: gameName,
             year: gameYear,
             slug,
+            popularityKey,
             coverUrl: gameCover,
             genre: gameGenre,
             description: gameDescription,
@@ -423,6 +427,7 @@ function groupGames(rows) {
                 name: port.game,
                 year: port.year || "",
                 slug: createSlug(port.game),
+                popularityKey: createSlug(port.game),
                 coverUrl: port.coverUrl || "",
                 genre: port.genre || "",
                 description: port.description || "",
