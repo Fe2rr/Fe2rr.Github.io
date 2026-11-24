@@ -46,4 +46,4 @@ Cron activo: `0 * * * *` (cada hora).
 
 La exportación completa anterior a la migración está en `Fe2rr/NAPL-Data/private/backups/d1-pre-migration-2026-11-24.json`. El estado operativo inicial migrado está en `private/catalog-state.json`. Ambos archivos están fuera de `public/` y no son servidos por Cloudflare Pages.
 
-La base D1 anterior quedó desconectada del Worker para permitir una reversión controlada; no eliminarla hasta validar el panel y conservar el backup fuera de línea.
+La base D1 del catálogo fue eliminada después de verificar el respaldo JSON íntegro en `private/backups/d1-pre-migration-2026-11-24.json` y migrar el estado operativo a `private/catalog-state.json`. Para restaurar, recrear D1 con `schema.sql` y reimportar las tablas desde el respaldo.
