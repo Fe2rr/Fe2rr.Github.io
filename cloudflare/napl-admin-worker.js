@@ -1004,6 +1004,463 @@ function deleteGameFromJson(state, slug) {
   return { deleted: true, slug, updatedAt: now };
 }
 
+async function inspectGithubRepo(repoSlug, env) {
+  const parsed = parseGithubRepo(repoSlug);
+  if (!parsed) {
+    throw new Error("URL de GitHub inválida.");
+  }
+
+  const { res: repoRes, data: repoData } = await ghFetch(
+    `/repos/${parsed.owner}/${parsed.repo}`,
+    env
+  );
+
+  if (repoRes.status === 404 || repoRes.status === 410) {
+    return {
+      provider: "github",
+      status: "down",
+      syncTarget: `${parsed.owner}/${parsed.repo}`,
+      githubRepo: `${parsed.owner}/${parsed.repo}`,
+      repoUrl: `https://github.com/${parsed.owner}/${parsed.repo}`,
+      error: `Repositorio no disponible (HTTP ${repoRes.status}).`,
+    };
+  }
+
+  if (!repoRes.ok) {
+    throw new Error(repoData.message || `GitHub HTTP ${repoRes.status}`);
+  }
+
+  const canonicalRepo = String(repoData.full_name || `${parsed.owner}/${parsed.repo}`);
+  const repoUrl = String(repoData.html_url || `https://github.com/${canonicalRepo}`);
+  const moved = canonicalRepo.toLowerCase() !== `${parsed.owner}/${parsed.repo}`.toLowerCase();
+
+  let release = null;
+  const latest = await ghFetch(`/repos/${canonicalRepo}/releases/latest`, env);
+  if (latest.res.ok && latest.data && latest.data.tag_name) {
+    release = latest.data;
+  } else {
+    const list = await ghFetch(`/repos/${canonicalRepo}/releases?per_page=1`, env);
+    if (list.res.ok && Array.isArray(list.data) && list.data.length > 0) {
+      release = list.data[0];
+    }
+  }
+
+  let tagFallback = null;
+  if (!release) {
+    const tags = await ghFetch(`/repos/${canonicalRepo}/tags?per_page=1`, env);
+    if (tags.res.ok && Array.isArray(tags.data) && tags.data.length > 0) {
+      tagFallback = tags.data[0];
+    }
+  }
+
+  const assets = Array.isArray(release?.assets) ? release.assets : [];
+  const apkAsset =
+    assets.find((a) => /\.apk$/i.test(String(a.name || "")) && !/debug/i.test(String(a.name || ""))) ||
+    assets.find((a) => /\.apk$/i.test(String(a.name || "")));
+
+  const version = String(release?.tag_name || tagFallback?.name || "").trim();
+  const updatedIso = release?.published_at || repoData.pushed_at || repoData.updated_at || "";
+  const lastUpdate = formatNaplDate(updatedIso);
+  const releaseUrl = release?.html_url || repoUrl;
+  const apkUrl = apkAsset?.browser_download_url || "";
+  const recommendedUrl = repoUrl;
+
+  return {
+    provider: "github",
+    syncTarget: canonicalRepo,
+    status: moved ? "moved" : "ok",
+    moved,
+    archived: Boolean(repoData.archived),
+    githubRepo: canonicalRepo,
+    repoUrl,
+    releaseUrl,
+    apkUrl,
+    recommendedUrl,
+    project: String(repoData.name || parsed.repo),
+    developer: String(repoData.owner?.login || parsed.owner),
+    version,
+    lastUpdate,
+    link: repoData.archived ? "Free (Github - Archived)" : "Free (Github)",
+    description: String(repoData.description || ""),
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+async function glFetch(apiPath, env) {
+  const headers = {
+    Accept: "application/json",
+    "User-Agent": "NAPL-Catalog-Sync/2.0",
+  };
+  if (env?.GITLAB_TOKEN) {
+    headers["PRIVATE-TOKEN"] = env.GITLAB_TOKEN;
+  }
+  const res = await fetch(`https://gitlab.com/api/v4${apiPath}`, { headers });
+  const text = await res.text();
+  let data = {};
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = {};
+  }
+  return { res, data };
+}
+
+async function inspectGitlabProject(projectInput, env) {
+  const parsed = parseGitlabProject(projectInput);
+  if (!parsed) throw new Error("URL de GitLab inválida.");
+
+  const encoded = encodeURIComponent(parsed.projectPath);
+  const { res: projRes, data: projData } = await glFetch(`/projects/${encoded}`, env);
+  if (projRes.status === 404 || projRes.status === 410) {
+    return {
+      provider: "gitlab",
+      status: "down",
+      syncTarget: parsed.projectPath,
+      githubRepo: "",
+      repoUrl: `https://gitlab.com/${parsed.projectPath}`,
+      error: `Repositorio de GitLab no disponible (HTTP ${projRes.status}).`,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (!projRes.ok) {
+    throw new Error(projData?.message || `GitLab HTTP ${projRes.status}`);
+  }
+
+  const canonicalPath = String(projData.path_with_namespace || parsed.projectPath);
+  const canonicalEncoded = encodeURIComponent(canonicalPath);
+  const repoUrl = String(projData.web_url || `https://gitlab.com/${canonicalPath}`);
+  const moved = canonicalPath.toLowerCase() !== parsed.projectPath.toLowerCase();
+
+  let release = null;
+  const rels = await glFetch(`/projects/${canonicalEncoded}/releases?per_page=1`, env);
+  if (rels.res.ok && Array.isArray(rels.data) && rels.data.length > 0) {
+    release = rels.data[0];
+  }
+
+  let tagFallback = null;
+  if (!release) {
+    const tags = await glFetch(`/projects/${canonicalEncoded}/repository/tags?per_page=1`, env);
+    if (tags.res.ok && Array.isArray(tags.data) && tags.data.length > 0) {
+      tagFallback = tags.data[0];
+    }
+  }
+
+  let commitFallback = null;
+  if (!release && !tagFallback) {
+    const commits = await glFetch(`/projects/${canonicalEncoded}/repository/commits?per_page=1`, env);
+    if (commits.res.ok && Array.isArray(commits.data) && commits.data.length > 0) {
+      commitFallback = commits.data[0];
+    }
+  }
+
+  const assetLinks = Array.isArray(release?.assets?.links) ? release.assets.links : [];
+  const apkAsset =
+    assetLinks.find((l) => /\.apk(?:$|[?#])/i.test(String(l?.name || l?.direct_asset_url || l?.url || "")) && !/debug/i.test(String(l?.name || ""))) ||
+    assetLinks.find((l) => /\.apk(?:$|[?#])/i.test(String(l?.name || l?.direct_asset_url || l?.url || "")));
+  let apkUrl = String(apkAsset?.direct_asset_url || apkAsset?.url || "").trim();
+  if (!apkUrl && release?.description) {
+    const mdApk = String(release.description).match(/https?:\/\/[^\s)"']+\.apk/i);
+    if (mdApk) apkUrl = mdApk[0];
+  }
+
+  const version = String(release?.tag_name || tagFallback?.name || "").trim();
+  const updatedIso =
+    release?.released_at ||
+    release?.created_at ||
+    tagFallback?.commit?.committed_date ||
+    commitFallback?.committed_date ||
+    projData.last_activity_at ||
+    "";
+  const lastUpdate = formatNaplDate(updatedIso);
+  const releaseUrl = release?.tag_name
+    ? `${repoUrl}/-/releases/${encodeURIComponent(release.tag_name)}`
+    : repoUrl;
+
+  return {
+    provider: "gitlab",
+    syncTarget: canonicalPath,
+    status: moved ? "moved" : "ok",
+    moved,
+    archived: Boolean(projData.archived),
+    githubRepo: "",
+    repoUrl,
+    releaseUrl,
+    apkUrl,
+    recommendedUrl: apkUrl || releaseUrl || repoUrl,
+    project: String(projData.name || parsed.project),
+    developer: String(projData.namespace?.name || projData.namespace?.full_path || parsed.namespace),
+    version,
+    lastUpdate,
+    link: projData.archived ? "Free (Gitlab - Archived)" : "Free (Gitlab)",
+    description: String(projData.description || ""),
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+async function inspectPlayStoreApp(appInput) {
+  const parsed = parsePlayStorePackage(appInput);
+  if (!parsed) throw new Error("URL o ID de Google Play Store inválido.");
+
+  const packageId = parsed.packageId;
+  const storeUrl = `https://play.google.com/store/apps/details?id=${encodeURIComponent(packageId)}`;
+  const fetchUrl = `${storeUrl}&hl=en&gl=US`;
+  const res = await fetch(fetchUrl, {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      "Accept-Language": "en-US,en;q=0.9",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+
+  if (res.status === 404 || res.status === 410) {
+    return {
+      provider: "playstore",
+      status: "down",
+      syncTarget: packageId,
+      githubRepo: "",
+      repoUrl: storeUrl,
+      storeUrl,
+      error: `App no disponible en Play Store (HTTP ${res.status}).`,
+      checkedAt: new Date().toISOString(),
+    };
+  }
+  if (!res.ok) {
+    throw new Error(`Play Store HTTP ${res.status}`);
+  }
+
+  const html = await res.text();
+  let appInfo = null;
+  const cbRegex = /AF_initDataCallback\(\{key:\s*['"](ds:\d+)['"][\s\S]*?data:([\s\S]*?),\s*sideChannel:/g;
+  for (const m of html.matchAll(cbRegex)) {
+    try {
+      const parsedJson = JSON.parse(m[2]);
+      const candidate = parsedJson?.[1]?.[2];
+      if (Array.isArray(candidate) && (candidate?.[77]?.[0] === packageId || (m[1] === "ds:5" && candidate?.[0]?.[0]))) {
+        appInfo = candidate;
+        if (candidate?.[77]?.[0] === packageId) break;
+      }
+    } catch {
+      // Continue scanning callbacks
+    }
+  }
+
+  if (!appInfo) {
+    throw new Error("No se pudieron leer los datos de la ficha en Google Play Store.");
+  }
+
+  const title = decodeHtmlEntities(String(appInfo?.[0]?.[0] || "").trim());
+  const developer = decodeHtmlEntities(String(appInfo?.[37]?.[0] || appInfo?.[68]?.[0] || "").trim());
+
+  const priceMicros = Number(appInfo?.[57]?.[0]?.[0]?.[0]?.[0]?.[1]?.[0]?.[0] || 0);
+  const priceFormatted = String(appInfo?.[57]?.[0]?.[0]?.[0]?.[0]?.[1]?.[0]?.[2] || "").trim();
+  const isPaid = priceMicros > 0 || Boolean(priceFormatted && !/^(\$?0(\.0+)?|free)$/i.test(priceFormatted));
+
+  const rawVersion = String(appInfo?.[140]?.[0]?.[0]?.[0] || "").trim();
+  const version = /^varies with device$/i.test(rawVersion) ? "" : rawVersion;
+
+  const updatedTs = Number(appInfo?.[145]?.[0]?.[1]?.[0] || 0);
+  const updatedText = String(appInfo?.[145]?.[0]?.[0] || "").trim();
+  let lastUpdate = "";
+  if (Number.isFinite(updatedTs) && updatedTs > 0) {
+    lastUpdate = formatNaplDate(new Date(updatedTs * 1000).toISOString());
+  } else if (updatedText) {
+    const parsedDate = Date.parse(updatedText);
+    if (!Number.isNaN(parsedDate)) {
+      lastUpdate = formatNaplDate(new Date(parsedDate).toISOString());
+    }
+  }
+
+  return {
+    provider: "playstore",
+    syncTarget: packageId,
+    status: "ok",
+    moved: false,
+    archived: false,
+    githubRepo: "",
+    repoUrl: storeUrl,
+    storeUrl,
+    recommendedUrl: storeUrl,
+    project: title || packageId,
+    developer,
+    version,
+    lastUpdate,
+    link: isPaid ? "Paid (Playstore)" : "Free (Playstore)",
+    checkedAt: new Date().toISOString(),
+  };
+}
+
+async function inspectPortSource(rawInput, env) {
+  const value = String(rawInput || "").trim();
+  if (!value) throw new Error("Ingresá una URL de GitHub, GitLab o Play Store.");
+  if (parsePlayStorePackage(value)) {
+    return inspectPlayStoreApp(value);
+  }
+  if (parseGitlabProject(value)) {
+    return inspectGitlabProject(value, env);
+  }
+  if (parseGithubRepo(value)) {
+    return inspectGithubRepo(value, env);
+  }
+  throw new Error("URL no reconocida. Usá enlaces de GitHub, GitLab o Google Play Store.");
+}
+
+function decodeHtmlEntities(str) {
+  return String(str || "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&nbsp;/g, " ");
+}
+
+function resolveLaunchboxImageUrl(fileName) {
+  const clean = String(fileName || "").trim().replace(/^\/+/, "");
+  if (!clean) return "";
+  if (/^https?:\/\//i.test(clean)) return clean;
+  if (clean.startsWith("r2_")) {
+    return `https://gamesdb-images.launchbox.gg/${clean}`;
+  }
+  return `https://images.launchbox-app.com//${clean}`;
+}
+
+async function inspectLaunchboxUrl(rawUrl) {
+  let targetUrl;
+  try {
+    targetUrl = new URL(String(rawUrl || "").trim());
+  } catch {
+    throw new Error("URL de LaunchBox inválida.");
+  }
+
+  if (
+    (targetUrl.protocol !== "https:" && targetUrl.protocol !== "http:") ||
+    targetUrl.hostname.toLowerCase() !== "gamesdb.launchbox-app.com"
+  ) {
+    throw new Error("Solo se permiten URLs de gamesdb.launchbox-app.com.");
+  }
+
+  const res = await fetch(targetUrl.toString(), {
+    headers: {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      Accept: "text/html,application/xhtml+xml",
+    },
+  });
+
+  if (!res.ok) {
+    throw new Error(`LaunchBox respondió HTTP ${res.status}.`);
+  }
+
+  const html = await res.text();
+  let name = "";
+  let year = "";
+  let genre = "";
+  let description = "";
+  let coverUrl = "";
+  let developer = "";
+
+  // 1. Primary extraction via Nuxt SSR __NUXT_DATA__ payload
+  const nuxtMatch = html.match(/<script[^>]+id=["']__NUXT_DATA__["'][^>]*>([\s\S]*?)<\/script>/i);
+  if (nuxtMatch) {
+    try {
+      const pool = JSON.parse(nuxtMatch[1]);
+      const gameIdx = pool.findIndex(
+        (item) => item && typeof item === "object" && !Array.isArray(item) && "gameGenres" in item && "gameImages" in item
+      );
+      if (gameIdx >= 0) {
+        const resolveVal = (v, depth = 0) => {
+          if (depth > 5) return v;
+          if (typeof v === "number" && Number.isInteger(v) && v >= 0 && v < pool.length) {
+            return resolveNode(pool[v], depth + 1);
+          }
+          return v;
+        };
+        const resolveNode = (node, depth = 0) => {
+          if (Array.isArray(node)) return node.map((i) => resolveVal(i, depth));
+          if (node && typeof node === "object") {
+            const out = {};
+            for (const [k, v] of Object.entries(node)) {
+              out[k] = resolveVal(v, depth);
+            }
+            return out;
+          }
+          return node;
+        };
+
+        const game = resolveNode(pool[gameIdx], 0);
+        name = String(game.name || "").trim();
+        description = String(game.overview || "").trim();
+
+        const rawYear = game.releaseYear || game.releaseDate || "";
+        const yearMatch = String(rawYear).match(/\b(19\d\d|20\d\d)\b/);
+        if (yearMatch) year = yearMatch[1];
+
+        if (Array.isArray(game.gameGenres) && game.gameGenres.length) {
+          genre = game.gameGenres
+            .map((g) => String(g?.name || "").trim())
+            .filter(Boolean)
+            .slice(0, 2)
+            .join(", ");
+        }
+
+        if (Array.isArray(game.gameDevelopers) && game.gameDevelopers.length) {
+          developer = String(game.gameDevelopers[0]?.name || "").trim();
+        }
+
+        if (Array.isArray(game.gameImages) && game.gameImages.length) {
+          const preferred =
+            game.gameImages.find((img) => /box\s*-\s*front/i.test(String(img?.imageTypeName || ""))) ||
+            game.gameImages.find((img) => /fanart|poster|clear logo/i.test(String(img?.imageTypeName || ""))) ||
+            game.gameImages[0];
+          if (preferred) {
+            coverUrl = resolveLaunchboxImageUrl(
+              preferred.fullGameImageFileName || preferred.imageFileName || ""
+            );
+          }
+        }
+      }
+    } catch {
+      // Fallback to HTML regex extraction below
+    }
+  }
+
+  // 2. HTML Meta / Tag fallback
+  if (!name) {
+    const h1 = html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i);
+    if (h1) name = decodeHtmlEntities(h1[1].replace(/<[^>]+>/g, "")).trim();
+  }
+  if (!description) {
+    const metaDesc = html.match(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i);
+    if (metaDesc) description = decodeHtmlEntities(metaDesc[1]).trim();
+  }
+  if (!year) {
+    const timeMatch = html.match(/<time[^>]*datetime=["']([^"']+)["']/i);
+    const ym = timeMatch && timeMatch[1].match(/\b(19\d\d|20\d\d)\b/);
+    if (ym) year = ym[1];
+  }
+  if (!coverUrl) {
+    const ogImg = html.match(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i);
+    if (ogImg) coverUrl = ogImg[1].trim();
+  }
+
+  if (!name) {
+    throw new Error("No se pudieron leer los datos de esa ficha de LaunchBox.");
+  }
+
+  return {
+    name,
+    year,
+    genre,
+    description: description.replace(/\r\n/g, "\n").trim(),
+    coverUrl,
+    developer,
+    launchboxUrl: targetUrl.toString(),
+  };
+}
+
+
 async function syncSinglePortWithSource(env, port) {
   const syncInfo = resolvePortSyncTarget(port);
   if (!syncInfo.provider || !syncInfo.target) return { portId: port.portId, status: "skipped", reason: "Sin fuente sincronizable", changed: false };
@@ -1045,6 +1502,71 @@ async function syncSinglePortWithSource(env, port) {
   return { portId: port.portId, gameSlug: port.gameSlug || "", project: port.project || info.project,
     provider: syncInfo.provider, syncTarget: nextSyncTarget, githubRepo: nextGithubRepo, status: info.status,
     changed, oldVersion: port.version, newVersion: nextVersion, url: nextUrl, lastUpdate: nextLastUpdate };
+}
+
+
+async function runSyncBatch(env, options = {}) {
+  const state = await readCatalogState(env);
+  const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_CRON_BATCH, 1), MAX_SYNC_BATCH);
+  const offset = Math.max(Number(options.offset) || 0, 0);
+  const source = options.source || "manual";
+  const ports = state.catalog.games.flatMap((game) => (game.ports || []).map((port) => ({
+    ...port, gameSlug: game.slug, _port: port
+  }))).filter((port) => {
+    const info = resolvePortSyncTarget(port);
+    return Boolean(info.provider && info.target);
+  });
+  const ordered = options.useOffset
+    ? ports.sort((a,b) => String(a.portId).localeCompare(String(b.portId))).slice(offset, offset + limit)
+    : ports.sort((a,b) => String(a.lastCheckedAt || "").localeCompare(String(b.lastCheckedAt || "")) ||
+      String(a.portId).localeCompare(String(b.portId))).slice(0, limit);
+  let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
+  const details = [];
+  for (const entry of ordered) {
+    checkedCount++;
+    const originalVersion = entry.version;
+    try {
+      const outcome = await syncSinglePortWithSource(env, entry);
+      const target = entry._port;
+      for (const key of ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link","lastCheckedAt"]) {
+        target[key] = entry[key] ?? target[key] ?? "";
+      }
+      if (outcome.status === "down") downCount++;
+      if (outcome.changed) {
+        updatedCount++;
+        outcome.oldVersion = originalVersion;
+        details.push(outcome);
+      }
+    } catch (error) {
+      entry._port.lastCheckedAt = new Date().toISOString();
+      details.push({ portId: entry.portId, gameSlug: entry.gameSlug, project: entry.project,
+        provider: resolvePortSyncTarget(entry).provider, status: "error",
+        error: error?.message || "Error consultando fuente externa" });
+    }
+  }
+  const now = new Date().toISOString();
+  state.meta.last_sync_at = now;
+  if (updatedCount > 0) {
+    state.catalog.updatedAt = now;
+    state.meta.updated_at = now;
+    state.meta.pending_github_sync = "1";
+  }
+  const lastId = Math.max(0, ...state.syncLogs.map((log) => Number(log.id) || 0));
+  state.syncLogs.unshift({ id: lastId + 1, source, checkedCount, updatedCount, downCount, errorCount,
+    summary: details.slice(0, 40), createdAt: now });
+  state.syncLogs = state.syncLogs.slice(0, 12);
+  await saveCatalogState(env, state, "NAPL: registrar sincronización " + source);
+  let autoPublishedCommit = "", autoPublishedDataCommit = "";
+  if (source === "cron" && (updatedCount > 0 || state.meta.pending_github_sync === "1") &&
+      String(env.AUTO_PUBLISH_CRON || "true").toLowerCase() !== "false") {
+    const published = await publishSavedCatalog(env, state);
+    autoPublishedCommit = published.commit || "";
+    autoPublishedDataCommit = published.dataCommit || "";
+  }
+  return { source, totalSyncPorts: ports.length, totalGithubPorts: ports.length, checkedCount, updatedCount,
+    downCount, errorCount, nextOffset: offset + checkedCount,
+    hasMore: Boolean(options.useOffset && offset + checkedCount < ports.length),
+    autoPublishedCommit, autoPublishedDataCommit, details, syncedAt: now };
 }
 
 async function publishSavedCatalog(env, state) {
