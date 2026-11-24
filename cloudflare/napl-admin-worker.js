@@ -318,8 +318,9 @@ async function ghFetch(path, env, options = {}) {
     "User-Agent": "NAPL-Catalog-Sync/2.0",
     ...(options.headers || {}),
   };
-  if (env.GITHUB_TOKEN) {
-    headers.Authorization = `Bearer ${env.GITHUB_TOKEN}`;
+  const token = options.token || env.GITHUB_TOKEN;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
   const res = await fetch(`https://api.github.com${path}`, {
     method: options.method || "GET",
@@ -363,6 +364,29 @@ async function ghCommitCatalog(catalog, env, message = "NAPL: sincronizar catál
     commit: data.commit?.html_url || "",
     sha: data.commit?.sha || "",
   };
+}
+
+async function ghCommitDataCatalog(catalog, env, message = "NAPL: publicar snapshot estático en NAPL-Data") {
+  const token = env.CATALOG_DATA_GITHUB_TOKEN;
+  if (!token) {
+    throw new Error("Falta configurar CATALOG_DATA_GITHUB_TOKEN con Contents: Read and write para Fe2rr/NAPL-Data.");
+  }
+  const path = "/repos/Fe2rr/NAPL-Data/contents/public/assets/data/catalog.json";
+  const { res: metaRes, data: meta } = await ghFetch(`${path}?ref=main`, env, { token });
+  if (!metaRes.ok && metaRes.status !== 404) {
+    throw new Error(meta.message || `No se pudo leer NAPL-Data (HTTP ${metaRes.status}).`);
+  }
+  const encoded = toB64(JSON.stringify(catalog));
+  if (metaRes.ok && typeof meta.content === "string" && meta.content.replace(/\\s/g, "") === encoded) {
+    return { commit: "", sha: meta.sha || "", unchanged: true };
+  }
+  const payload = { message, content: encoded, branch: "main" };
+  if (metaRes.ok && meta.sha) payload.sha = meta.sha;
+  const { res, data } = await ghFetch(path, env, { method: "PUT", body: payload, token });
+  if (!res.ok) {
+    throw new Error(data.message || `NAPL-Data HTTP ${res.status}`);
+  }
+  return { commit: data.commit?.html_url || "", sha: data.commit?.sha || "", unchanged: false };
 }
 
 function csvParse(csv) {
@@ -1711,6 +1735,7 @@ async function runSyncBatch(env, options = {}) {
   await env.DB.batch(metaOps);
 
   let autoPublishedCommit = "";
+  let autoPublishedDataCommit = "";
   const pendingGithubSync = (await readMetaMap(env)).pending_github_sync === "1";
   if (
     source === "cron" &&
@@ -1726,18 +1751,23 @@ async function runSyncBatch(env, options = {}) {
         `NAPL: sincronización automática (${updatedCount} ports actualizados)`
       );
       autoPublishedCommit = pub.commit;
-      await env.DB.batch([
-        env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind(
-          "pending_github_sync",
-          "0",
-          now
-        ),
-        env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind(
-          "last_github_publish_at",
-          now,
-          now
-        ),
-      ]);
+      let dataPublishError = "";
+      try {
+        const dataPub = await ghCommitDataCatalog(catalog, env, "NAPL: sincronización automática en NAPL-Data");
+        autoPublishedDataCommit = dataPub.commit;
+      } catch (error) {
+        dataPublishError = error?.message || "No se pudo publicar en NAPL-Data.";
+      }
+      const pending = dataPublishError ? "1" : "0";
+      const publishOps = [
+        env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", pending, now),
+        env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_github_publish_at", now, now),
+        env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_pages_publish_error", dataPublishError, now),
+      ];
+      if (!dataPublishError) {
+        publishOps.push(env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_pages_publish_at", now, now));
+      }
+      await env.DB.batch(publishOps);
     } catch {
       // Cron keeps D1 updated even if GitHub commit fails
     }
@@ -1754,6 +1784,7 @@ async function runSyncBatch(env, options = {}) {
     nextOffset: offset + checkedCount,
     hasMore: options.useOffset ? offset + checkedCount < totalSyncPorts : false,
     autoPublishedCommit,
+    autoPublishedDataCommit,
     details,
     syncedAt: now,
   };
@@ -1795,27 +1826,41 @@ async function publishSavedCatalog(env) {
   try {
     if (!env.GITHUB_TOKEN) throw new Error("Falta configurar GitHub Token en Cloudflare.");
 
-    // Read the admin state once, then derive the public snapshot from the same result.
-    // Previously this function read all games/ports and the route read them all again.
     state = await readCatalogFromD1(env, { includeInternal: true });
     const catalog = toPublicCatalog(state.catalog);
     const pub = await ghCommitCatalog(catalog, env, "NAPL: guardar ficha y publicar catálogo");
-    await env.DB.batch([
-      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", "0", now),
+    let dataCommit = "";
+    let dataPublishError = "";
+    try {
+      const dataPub = await ghCommitDataCatalog(catalog, env);
+      dataCommit = dataPub.commit;
+    } catch (error) {
+      dataPublishError = error?.message || "No se pudo publicar el snapshot en NAPL-Data.";
+    }
+    const pending = dataPublishError ? "1" : "0";
+    const ops = [
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", pending, now),
       env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_github_publish_at", now, now),
-    ]);
-    state.meta.pending_github_sync = "0";
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_pages_publish_error", dataPublishError, now),
+    ];
+    if (!dataPublishError) {
+      ops.push(env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_pages_publish_at", now, now));
+    }
+    await env.DB.batch(ops);
+    state.meta.pending_github_sync = pending;
     state.meta.last_github_publish_at = now;
-    state.stats.pendingGitHubSync = false;
+    state.meta.last_pages_publish_error = dataPublishError;
+    if (!dataPublishError) state.meta.last_pages_publish_at = now;
+    state.stats.pendingGitHubSync = Boolean(dataPublishError);
     state.stats.lastGitHubPublishAt = now;
-    return { commit: pub.commit, publishError: "", state };
+    return { commit: pub.commit, dataCommit, dataPublishError, publishError: "", state };
   } catch (error) {
     await env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", "1", now).run();
     if (state) {
       state.meta.pending_github_sync = "1";
       state.stats.pendingGitHubSync = true;
     }
-    return { commit: "", publishError: error?.message || "Error publicando en GitHub", state };
+    return { commit: "", dataCommit: "", dataPublishError: "", publishError: error?.message || "Error publicando en GitHub", state };
   }
 }
 
@@ -1826,6 +1871,19 @@ async function route(req, env) {
   const headers = cors(req, env);
   const origin = req.headers.get("Origin") || "";
 
+  if (path === "/api/public-catalog" && req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: cors(req, env, true) });
+  }
+  if (path === "/api/public-catalog" && req.method === "GET") {
+    return new Response(null, {
+      status: 302,
+      headers: {
+        ...cors(req, env, true),
+        Location: "https://napl-catalog.pages.dev/assets/data/catalog.json",
+        "Cache-Control": "public, max-age=30",
+      },
+    });
+  }
   if (req.method === "OPTIONS") {
     const okOrigin = !origin || isAllowedOrigin(origin, env);
     return new Response(null, { status: okOrigin ? 204 : 403, headers });
@@ -1844,6 +1902,7 @@ async function route(req, env) {
         configured: {
           adminPassword: Boolean(env.ADMIN_PASSWORD),
           githubToken: Boolean(env.GITHUB_TOKEN),
+          dataGithubToken: Boolean(env.CATALOG_DATA_GITHUB_TOKEN),
           sessionSecret: Boolean(env.SESSION_SECRET),
           d1: Boolean(env.DB),
         },
@@ -2014,20 +2073,26 @@ async function route(req, env) {
     const { catalog } = await readCatalogFromD1(env, { includeInternal: false });
     const pub = await ghCommitCatalog(catalog, env, "NAPL: actualizar catálogo JSON desde D1");
     const now = new Date().toISOString();
-    await env.DB.batch([
-      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind(
-        "pending_github_sync",
-        "0",
-        now
-      ),
-      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind(
-        "last_github_publish_at",
-        now,
-        now
-      ),
-    ]);
+    let dataCommit = "";
+    let dataPublishError = "";
+    try {
+      const dataPub = await ghCommitDataCatalog(catalog, env, "NAPL: publicar catálogo desde Admin en NAPL-Data");
+      dataCommit = dataPub.commit;
+    } catch (error) {
+      dataPublishError = error?.message || "No se pudo publicar en NAPL-Data.";
+    }
+    const pending = dataPublishError ? "1" : "0";
+    const ops = [
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("pending_github_sync", pending, now),
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_github_publish_at", now, now),
+      env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_pages_publish_error", dataPublishError, now),
+    ];
+    if (!dataPublishError) {
+      ops.push(env.DB.prepare("INSERT OR REPLACE INTO catalog_meta (key, value, updated_at) VALUES (?, ?, ?)").bind("last_pages_publish_at", now, now));
+    }
+    await env.DB.batch(ops);
     const state = await readCatalogFromD1(env, { includeInternal: true });
-    return json({ success: true, commit: pub.commit, sha: pub.sha, ...state }, 200, headers);
+    return json({ success: true, commit: pub.commit, sha: pub.sha, dataCommit, dataPublishError, ...state }, 200, headers);
   }
 
   return json({ error: "Ruta no encontrada." }, 404, headers);
