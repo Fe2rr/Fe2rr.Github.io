@@ -30,9 +30,7 @@ import {
 } from "../lib/helpers.js";
 
 const SPOTLIGHT_INTERVAL_MS = 8000;
-const POPULARITY_RACE_MS = 1100;
 const MAX_SPOTLIGHT_POOL = 28;
-const MAX_FALLBACK_SCAN = 120;
 
 function hasValidCoverUrl(game) {
     const url = String(game?.coverUrl || "").trim();
@@ -70,7 +68,6 @@ function withCategory(items, category) {
 
 function buildSpotlightQueue(games) {
     const eligible = buildEligibleEntries(games);
-    const byKey = new Map(eligible.map((item) => [item.game.slug, item]));
     const visits = (item, period) => getPopularVisits(item.game.popularityKey || item.game.name, period);
     const score = (item) => visits(item, "week") * 4 + visits(item, "alltime");
 
@@ -175,7 +172,6 @@ export function createSpotlightController() {
     let cycleStartedAt = 0;
     let progressAnimation = null;
     let renderToken = 0;
-    let popularityHydrated = false;
     let hasResolvedPool = false;
     let userManuallyStepped = false;
     let swapResetTimer = 0;
@@ -514,7 +510,6 @@ export function createSpotlightController() {
             ensurePopularPeriod("month"),
             ensureAllTimePopular(),
         ]);
-        popularityHydrated = true;
 
         const categoryQueue = buildSpotlightQueue(catalogGames);
         queue = categoryQueue.length > 0 ? categoryQueue : buildFallbackPool(catalogGames);
