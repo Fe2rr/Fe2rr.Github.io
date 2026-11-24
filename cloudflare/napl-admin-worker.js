@@ -1,7 +1,3 @@
-const OWNER = "Fe2rr";
-const REPO = "Napl-prueba";
-const BRANCH = "main";
-const CATALOG_PATH = "public/assets/data/catalog.json";
 const DATA_REPO = "Fe2rr/NAPL-Data";
 const DATA_BRANCH = "main";
 const INTERNAL_STATE_PATH = "private/catalog-state.json";
@@ -346,24 +342,6 @@ async function gitBlobSha(content) {
   input.set(bytes, header.length);
   const digest = await crypto.subtle.digest("SHA-1", input);
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function ghCommitCatalog(catalog, env, message = "NAPL: sincronizar catálogo desde D1") {
-  if (!env.GITHUB_TOKEN) {
-    throw new Error("Falta el secreto GITHUB_TOKEN en Cloudflare.");
-  }
-  const path = `/repos/${OWNER}/${REPO}/contents/${CATALOG_PATH}`;
-  const { res: metaRes, data: meta } = await ghFetch(`${path}?ref=${BRANCH}`, env);
-  const raw = JSON.stringify(catalog);
-  const expectedSha = await gitBlobSha(raw);
-  if (metaRes.ok && meta.sha === expectedSha) {
-    return { commit: "", sha: meta.sha, unchanged: true };
-  }
-  const payload = { message, content: toB64(raw), branch: BRANCH };
-  if (metaRes.ok && meta.sha) payload.sha = meta.sha;
-  const { res, data } = await ghFetch(path, env, { method: "PUT", body: payload });
-  if (!res.ok) throw new Error(data.message || `GitHub HTTP ${res.status}`);
-  return { commit: data.commit?.html_url || "", sha: data.commit?.sha || "", unchanged: false };
 }
 
 async function ghCommitDataCatalog(catalog, env, message = "NAPL: publicar snapshot estático en NAPL-Data") {
@@ -1234,18 +1212,13 @@ async function publishSavedCatalog(env, state) {
     state.meta.last_pages_publish_error = "";
     await saveCatalogState(env, state, "NAPL: guardar estado interno antes de publicar");
     const publicCatalog = toPublicCatalog(state.catalog);
-    let backupCommit = "";
-    if (env.GITHUB_TOKEN) {
-      const backup = await ghCommitCatalog(publicCatalog, env, "NAPL: respaldo del catálogo desde JSON");
-      backupCommit = backup.commit || "";
-    }
     const dataPub = await ghCommitDataCatalog(publicCatalog, env, "NAPL: publicar catálogo JSON desde estado interno");
     state.meta.pending_github_sync = "0";
     state.meta.last_github_publish_at = now;
     state.meta.last_pages_publish_at = now;
     state.meta.last_pages_publish_error = "";
     await saveCatalogState(env, state, "NAPL: confirmar publicación del catálogo");
-    return { commit: backupCommit, dataCommit: dataPub.commit || "", dataPublishError: "", publishError: "", state: catalogStateResponse(state) };
+    return { commit: "", dataCommit: dataPub.commit || "", dataPublishError: "", publishError: "", state: catalogStateResponse(state) };
   } catch (error) {
     if (state) {
       state.meta.pending_github_sync = "1";
