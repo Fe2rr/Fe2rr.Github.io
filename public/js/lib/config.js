@@ -5,6 +5,9 @@
 export const RATINGS_API_BASE =
     "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/ratings";
 
+export const POPULARITY_API_BASE =
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/popularity";
+
 export const COMPATIBILITY_API_URL =
     "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
 
