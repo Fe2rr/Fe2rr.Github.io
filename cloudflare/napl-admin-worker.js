@@ -603,7 +603,9 @@ async function saveSingleGameInJson(state, targetSlug, rawGame, isCreate) {
     }
     seenSlugs.add(portSlug);
     const syncInfo = resolvePortSyncTarget(p);
+    const previousPort = (state.catalog.games.find((g) => g.slug === targetSlug)?.ports || []).find((item) => item.portId === portId) || {};
     return {
+      ...previousPort,
       portId, slug: portSlug, project: String(p?.project || ""), developer: String(p?.developer || ""),
       year: String(p?.year || rawGame.year || ""), version: String(p?.version || ""),
       controller: String(p?.controller || ""), files: String(p?.files || ""), works: String(p?.works || ""),
@@ -614,7 +616,9 @@ async function saveSingleGameInJson(state, targetSlug, rawGame, isCreate) {
       dateAdded: String(p?.dateAdded || now.slice(0, 10)), notes: String(p?.notes || ""),
     };
   });
+  const previousGame = state.catalog.games.find((g) => g.slug === targetSlug) || {};
   const game = {
+    ...previousGame,
     name: rawGame.name.trim(), slug: nextSlug, year: String(rawGame.year || ""),
     coverUrl: String(rawGame.coverUrl || ""), genre: String(rawGame.genre || ""),
     description: String(rawGame.description || ""), platform: String(rawGame.platform || ""),
@@ -1257,14 +1261,14 @@ function toPublicCatalog(catalog) {
       platform: game.platform,
       ...(game.launchboxUrl ? { launchboxUrl: game.launchboxUrl } : {}),
       ports: game.ports.map((port) => {
-        const {
-          syncProvider,
-          syncTarget,
-          githubStatus,
-          lastCheckedAt,
-          ...publicPort
-        } = port;
-        if (!publicPort.githubRepo) delete publicPort.githubRepo;
+        const publicPort = {
+          portId: port.portId, project: port.project, developer: port.developer,
+          year: port.year, version: port.version, controller: port.controller,
+          files: port.files, works: port.works, link: port.link, url: port.url,
+          dataUrl: port.dataUrl, lastUpdate: port.lastUpdate, dateAdded: port.dateAdded,
+          notes: port.notes,
+        };
+        if (port.githubRepo) publicPort.githubRepo = port.githubRepo;
         return publicPort;
       }),
     })),
