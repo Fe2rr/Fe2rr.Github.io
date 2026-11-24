@@ -42,7 +42,7 @@ function isAllowedOrigin(origin, env) {
     .split(",")
     .map((x) => x.trim())
     .filter(Boolean);
-  if (list.includes(origin)) return true;
+  if (list.includes(origin) || origin === "https://napl-admin.pages.dev") return true;
   if (origin === "http://localhost:3000" || origin === "http://127.0.0.1:3000") {
     return true;
   }
@@ -1878,6 +1878,10 @@ async function route(req, env) {
 
   if (!(await authenticated(req, env))) {
     return json({ error: "Sesión inválida o vencida. Iniciá sesión nuevamente." }, 401, headers);
+  }
+
+  if (path === "/api/verify-session" && req.method === "GET") {
+    return json({ ok: true }, 200, headers);
   }
 
   if (path === "/api/catalog" && req.method === "GET") {
