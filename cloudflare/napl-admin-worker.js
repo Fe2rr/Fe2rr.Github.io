@@ -10,6 +10,7 @@ const MAX_SUBREQUESTS_PER_RUN = 34;
 const MAX_PLAYSTORE_PER_RUN = 2;
 const SYNC_ELAPSED_BUDGET_MS = 12000;
 const UPSTREAM_TIMEOUT_MS = 7000;
+const SYNC_STAGE_PATH = "private/sync-staging.json";
 
 const MONTHS = [
   "January",
@@ -1232,6 +1233,20 @@ async function syncSinglePortWithSource(env, port, budget = null) {
 }
 
 
+async function readSyncStage(env) {
+  const token = env.CATALOG_DATA_GITHUB_TOKEN;
+  if (!token) throw new Error("Falta configurar CATALOG_DATA_GITHUB_TOKEN.");
+  const apiPath = "/repos/" + DATA_REPO + "/contents/" + SYNC_STAGE_PATH + "?ref=" + DATA_BRANCH;
+  const result = await ghFetch(apiPath, env, { token });
+  if (result.res.status === 404) return { value: null, sha: "" };
+  if (!result.res.ok) throw new Error(result.data.message || "No se pudo leer el progreso de sincronización.");
+  return { value: JSON.parse(decodeGitHubBase64(result.data.content || "")), sha: result.data.sha || "" };
+}
+
+async function writeSyncStage(env, stage, sha) {
+  return writeDataJsonFile(env, SYNC_STAGE_PATH, stage, sha, "NAPL: guardar progreso de revisión de fuentes");
+}
+
 async function runSyncBatch(env, options = {}) {
   const state = await readCatalogState(env);
   const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_CRON_BATCH, 1), MAX_SYNC_BATCH);
@@ -1248,6 +1263,69 @@ async function runSyncBatch(env, options = {}) {
     : ports.sort((a,b) => String(a.lastCheckedAt || "").localeCompare(String(b.lastCheckedAt || "")) ||
       String(a.portId).localeCompare(String(b.portId))).slice(0, limit);
   const budget = { subrequests: 1, playstore: 0, startedAt: Date.now() };
+  if (options.stageOnly) {
+    const loaded = await readSyncStage(env);
+    let stage = offset > 0 ? loaded.value : null;
+    if (offset > 0 && (!stage || stage.status !== "scanning")) {
+      throw new Error("No hay una revisión pendiente para reanudar. Iniciá una nueva sincronización completa.");
+    }
+    if (!stage) {
+      stage = { version: 1, status: "scanning", startedAt: new Date().toISOString(),
+        totalSyncPorts: ports.length, nextOffset: 0, checkedCount: 0, updatedCount: 0,
+        downCount: 0, errorCount: 0, updates: {}, checkedAt: {}, details: [] };
+    }
+    if (stage.totalSyncPorts !== ports.length) {
+      throw new Error("El catálogo cambió durante la revisión. Recargá el panel e iniciá una nueva sincronización.");
+    }
+    if (offset !== Number(stage.nextOffset || 0)) {
+      throw new Error("El punto de reanudación no coincide con el progreso guardado. Consultá el estado de sincronización.");
+    }
+    stage.checkedAt = stage.checkedAt || {};
+    let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
+    const details = [];
+    const mutableKeys = ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link"];
+    for (const entry of ordered) {
+      if (budget.subrequests >= MAX_SUBREQUESTS_PER_RUN || (Date.now() - budget.startedAt) >= SYNC_ELAPSED_BUDGET_MS) break;
+      if (entry._syncInfo.provider === "playstore" && budget.playstore >= MAX_PLAYSTORE_PER_RUN) break;
+      checkedCount++;
+      const originalVersion = entry.version;
+      try {
+        const outcome = await syncSinglePortWithSource(env, entry, budget);
+        stage.checkedAt[entry.portId] = entry.lastCheckedAt || new Date().toISOString();
+        if (outcome.status === "down") downCount++;
+        if (outcome.changed) {
+          updatedCount++;
+          outcome.oldVersion = originalVersion;
+          details.push(outcome);
+          const patch = {};
+          for (const key of mutableKeys) patch[key] = entry[key] ?? entry._port[key] ?? "";
+          stage.updates[entry.portId] = patch;
+        }
+      } catch (error) {
+        errorCount++;
+        stage.checkedAt[entry.portId] = new Date().toISOString();
+        details.push({ portId: entry.portId, gameSlug: entry.gameSlug, project: entry.project,
+          provider: entry._syncInfo.provider, status: "error",
+          error: error?.message || "Error consultando fuente externa" });
+      }
+    }
+    const now = new Date().toISOString();
+    stage.checkedCount += checkedCount;
+    stage.updatedCount += updatedCount;
+    stage.downCount += downCount;
+    stage.errorCount += errorCount;
+    stage.nextOffset = offset + checkedCount;
+    stage.details = [...(stage.details || []), ...details].slice(-300);
+    if (stage.nextOffset >= ports.length) {
+      stage.status = "completed";
+      stage.completedAt = now;
+    }
+    const savedStage = await writeSyncStage(env, stage, loaded.sha);
+    return { source, staged: true, stageStatus: stage.status, totalSyncPorts: ports.length,
+      checkedCount, updatedCount, downCount, errorCount, nextOffset: stage.nextOffset,
+      hasMore: stage.status !== "completed", details, syncedAt: now, stageCommit: savedStage.commit || "" };
+  }
+
   let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
   const details = [];
   for (const entry of ordered) {
@@ -1307,6 +1385,48 @@ async function runSyncBatch(env, options = {}) {
   if (options.returnState) return { sync: result, state };
   return result;
 }
+
+async function applyStagedSync(env) {
+  const loaded = await readSyncStage(env);
+  const stage = loaded.value;
+  if (!stage || stage.status !== "completed") {
+    throw new Error("La revisión completa todavía no terminó. No hay actualizaciones listas para aplicar.");
+  }
+  const state = await readCatalogState(env);
+  const portsById = new Map();
+  for (const game of state.catalog.games) for (const port of game.ports || []) portsById.set(port.portId, port);
+  let appliedCount = 0;
+  for (const [portId, patch] of Object.entries(stage.updates || {})) {
+    const port = portsById.get(portId);
+    if (!port) continue;
+    Object.assign(port, patch);
+    appliedCount++;
+  }
+  for (const [portId, checkedAt] of Object.entries(stage.checkedAt || {})) {
+    const port = portsById.get(portId);
+    if (port && checkedAt) port.lastCheckedAt = checkedAt;
+  }
+  const now = new Date().toISOString();
+  state.meta.last_sync_at = now;
+  if (appliedCount) {
+    state.catalog.updatedAt = now;
+    state.meta.updated_at = now;
+    state.meta.pending_github_sync = "1";
+  }
+  const lastId = Math.max(0, ...state.syncLogs.map((log) => Number(log.id) || 0));
+  state.syncLogs.unshift({ id: lastId + 1, source: "manual", checkedCount: stage.checkedCount || 0,
+    updatedCount: appliedCount, downCount: stage.downCount || 0, errorCount: stage.errorCount || 0,
+    summary: (stage.details || []).filter((item) => item.status === "down" || item.changed).slice(0, 40),
+    createdAt: now });
+  state.syncLogs = state.syncLogs.slice(0, 12);
+  await saveCatalogState(env, state, "NAPL: aplicar actualizaciones revisadas de fuentes");
+  const cleared = { version: 1, status: "applied", appliedAt: now, checkedCount: stage.checkedCount || 0,
+    updatedCount: appliedCount, downCount: stage.downCount || 0, errorCount: stage.errorCount || 0,
+    nextOffset: stage.totalSyncPorts || 0, totalSyncPorts: stage.totalSyncPorts || 0, updates: {}, details: [] };
+  await writeSyncStage(env, cleared, loaded.sha);
+  return { success: true, appliedCount, stage: cleared, ...catalogStateResponse(state) };
+}
+
 
 async function publishSavedCatalog(env, state) {
   const now = new Date().toISOString();
@@ -1405,6 +1525,14 @@ async function route(req, env) {
   if (!path.startsWith("/api/")) return json({ name: "NAPL JSON Catalog Worker", ok: true }, 200, headers);
   if (!(await authenticated(req, env))) return json({ error: "Sesión inválida o vencida. Iniciá sesión nuevamente." }, 401, headers);
   if (path === "/api/verify-session" && req.method === "GET") return json({ ok: true }, 200, headers);
+  if (path === "/api/sync-stage" && req.method === "GET") {
+    const loaded = await readSyncStage(env);
+    return json({ success: true, stage: loaded.value || null }, 200, headers);
+  }
+  if (path === "/api/sync-apply" && req.method === "POST") {
+    const result = await applyStagedSync(env);
+    return json(result, 200, headers);
+  }
   if (path === "/api/catalog" && req.method === "GET") {
     const state = await readCatalogState(env), data = catalogStateResponse(state);
     return json({ ...data, exists: data.catalog.games.length > 0 }, 200, headers);
