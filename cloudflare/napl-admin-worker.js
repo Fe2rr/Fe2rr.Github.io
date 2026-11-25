@@ -1612,6 +1612,7 @@ async function route(req, env) {
   if ((path === "/api/sync-github" || path === "/api/sync-sources") && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
     const sync = await runSyncBatch(env, { source: "manual", limit: body.limit || 20, offset: body.offset || 0, useOffset: Boolean(body.useOffset), stageOnly: Boolean(body.stageOnly) });
+    if (body.stageOnly) return json({ success: true, sync }, 200, headers);
     const state = await readCatalogState(env);
     return json({ success: true, sync, ...catalogStateResponse(state) }, 200, headers);
   }
