@@ -83,7 +83,8 @@ export function createHomeGameCard(game, port, options = {}) {
         const cover = document.createElement("img");
         cover.className = "home-game-cover";
         cover.alt = `${game.name} cover`;
-        cover.loading = "eager";
+        cover.loading = options.loading === "eager" ? "eager" : "lazy";
+        cover.fetchPriority = options.loading === "eager" ? "high" : "low";
         cover.decoding = "async";
         cover.referrerPolicy = "no-referrer";
         cover.addEventListener(
