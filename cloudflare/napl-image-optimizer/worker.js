@@ -23,7 +23,7 @@ function allowedSource(raw) {
 }
 
 export default {
-  async fetch(request, env, ctx) {
+  async fetch(request, env) {
     const requestUrl = new URL(request.url);
     if (request.method !== "GET") {
       return new Response("Method not allowed", { status: 405, headers: { allow: "GET" } });
@@ -38,15 +38,6 @@ export default {
 
     const widthRaw = Number(requestUrl.searchParams.get("w") || 180);
     const width = [160, 180, 200, 240].includes(widthRaw) ? widthRaw : 180;
-    const cacheKey = new Request(request.url, { method: "GET" });
-    const cache = caches.default;
-
-    try {
-      const cached = await cache.match(cacheKey);
-      if (cached) return cached;
-    } catch (error) {
-      console.warn("image cache read skipped", String(error?.message || error));
-    }
 
     let origin;
     try {
@@ -78,18 +69,13 @@ export default {
         .transform({ width, fit: "scale-down" })
         .output({ format: "image/webp", quality: 74 });
 
-      const response = transformed.response({
+      return transformed.response({
         headers: {
           "cache-control": "public, max-age=2592000, s-maxage=31536000, stale-while-revalidate=86400",
           "x-content-type-options": "nosniff",
           "access-control-allow-origin": "*"
         }
       });
-
-      ctx.waitUntil(cache.put(cacheKey, response.clone()).catch((error) => {
-        console.warn("image cache write skipped", String(error?.message || error));
-      }));
-      return response;
     } catch (error) {
       console.error("image transformation failed", { message: String(error?.message || error) });
       return json({ error: "Image transformation failed" }, 502);
