@@ -520,13 +520,15 @@ async function readCatalogState(env) {
   state.meta = state.meta && typeof state.meta === "object" ? state.meta : {};
   state.syncLogs = Array.isArray(state.syncLogs) ? state.syncLogs : [];
   state.catalog.platformOrder = Array.isArray(state.catalog.platformOrder) ? state.catalog.platformOrder : [];
-  state.catalog.games = state.catalog.games.map((game) => {
+  // Avoid cloning every game on each read. The catalog is large and this
+  // endpoint runs before every admin mutation.
+  for (const game of state.catalog.games) {
     const popularityKey = String(game?.popularityKey || slugify(game?.name || "")).trim().toLowerCase();
     if (!/^[a-z0-9][a-z0-9-]{0,179}$/.test(popularityKey)) {
       throw new Error("Clave de popularidad inválida en " + String(game?.name || "juego sin nombre"));
     }
-    return { ...game, popularityKey };
-  });
+    if (game.popularityKey !== popularityKey) game.popularityKey = popularityKey;
+  }
   state._sha = loaded.sha;
   return state;
 }
@@ -541,17 +543,20 @@ async function saveCatalogState(env, state, message) {
 
 function catalogStats(state) {
   const games = state.catalog.games || [];
-  const ports = games.flatMap((game) => (game.ports || []).map((port) => ({ ...port, gameSlug: game.slug })));
-  let githubCount = 0, gitlabCount = 0, playstoreCount = 0, downCount = 0;
-  for (const port of ports) {
-    const source = resolvePortSyncTarget(port);
-    if (source.provider === "github") githubCount++;
-    else if (source.provider === "gitlab") gitlabCount++;
-    else if (source.provider === "playstore") playstoreCount++;
-    if (port.githubStatus === "down") downCount++;
+  let githubCount = 0, gitlabCount = 0, playstoreCount = 0, downCount = 0, portsCount = 0;
+  // Count in place instead of allocating a second array and cloning every port.
+  for (const game of games) {
+    for (const port of game.ports || []) {
+      portsCount++;
+      const source = resolvePortSyncTarget(port);
+      if (source.provider === "github") githubCount++;
+      else if (source.provider === "gitlab") gitlabCount++;
+      else if (source.provider === "playstore") playstoreCount++;
+      if (port.githubStatus === "down") downCount++;
+    }
   }
   return {
-    gamesCount: games.length, portsCount: ports.length, githubCount, gitlabCount, playstoreCount,
+    gamesCount: games.length, portsCount, githubCount, gitlabCount, playstoreCount,
     syncableCount: githubCount + gitlabCount + playstoreCount, downCount,
     lastSyncAt: state.meta.last_sync_at || "",
     lastGitHubPublishAt: state.meta.last_github_publish_at || "",
@@ -1424,7 +1429,8 @@ async function route(req, env) {
     const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
     const saved = await saveSingleGameInJson(state, null, body.game || body, true);
     const publication = await publishSavedCatalog(env, state);
-    return json({ success: true, saved, ...publication, ...(publication.state || {}) }, 200, headers);
+    const { state: snapshot, ...publicationResult } = publication;
+    return json({ success: true, saved, ...publicationResult, ...(snapshot || {}) }, 200, headers);
   }
   const gameMatch = path.match(/^\/api\/games\/([^/]+)$/);
   if (gameMatch) {
@@ -1433,12 +1439,14 @@ async function route(req, env) {
       const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
       const saved = await saveSingleGameInJson(state, slug, body.game || body, false);
       const publication = await publishSavedCatalog(env, state);
-      return json({ success: true, saved, ...publication, ...(publication.state || {}) }, 200, headers);
+      const { state: snapshot, ...publicationResult } = publication;
+      return json({ success: true, saved, ...publicationResult, ...(snapshot || {}) }, 200, headers);
     }
     if (req.method === "DELETE") {
       const state = await readCatalogState(env), removed = deleteGameFromJson(state, slug);
       const publication = await publishSavedCatalog(env, state);
-      return json({ success: true, removed, ...publication, ...(publication.state || {}) }, 200, headers);
+      const { state: snapshot, ...publicationResult } = publication;
+      return json({ success: true, removed, ...publicationResult, ...(snapshot || {}) }, 200, headers);
     }
   }
   if (path === "/api/lookup/github" && req.method === "POST") {
