@@ -1109,12 +1109,13 @@ html[data-theme="light"] .home-feature-cta.is-gold:hover {
   .category-filters-panel:not([hidden]),
   .category-filter-tray:not([hidden]),
   .filter-grid-option.is-selected,
-  .spotlight-card.is-swapping-next,
-  .spotlight-card.is-swapping-prev {
+  .spotlight-card.is-swapping-next .spotlight-content,
+  .spotlight-card.is-swapping-prev .spotlight-content {
     animation: none !important;
   }
 
-  .spotlight-card:hover .spotlight-cover {
+  .spotlight-card:hover .spotlight-cover,
+  .spotlight-card:hover .spotlight-cta-arrow {
     transform: none;
   }
 }
@@ -1137,20 +1138,10 @@ html[data-spotlight="hidden"] #game-spotlight {
   position: relative;
   overflow: hidden;
   isolation: isolate;
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 12px 10px;
   background: var(--surface-1);
   border: 1px solid var(--border-medium);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
-}
-
-.spotlight-skeleton {
-  grid-template-columns: minmax(0, 1fr);
-  padding: 12px 46px;
 }
 
 .spotlight-card {
@@ -1166,20 +1157,50 @@ html[data-spotlight="hidden"] #game-spotlight {
   inset: 0;
   z-index: 1;
   pointer-events: none;
+  background:
+    radial-gradient(ellipse 64% 96% at 12% 18%, rgba(110, 231, 160, 0.14), transparent 60%),
+    linear-gradient(
+      102deg,
+      rgba(12, 26, 20, 0.92) 0%,
+      rgba(15, 31, 24, 0.8) 54%,
+      rgba(13, 27, 21, 0.66) 100%
+    );
+}
+
+.spotlight-card::after {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 3;
+  height: 1px;
+  pointer-events: none;
   background: linear-gradient(
     90deg,
-    rgba(13, 27, 21, 0.78) 0%,
-    rgba(16, 33, 26, 0.6) 54%,
-    rgba(13, 27, 21, 0.46) 100%
+    transparent 0%,
+    rgba(167, 243, 208, 0.34) 30%,
+    rgba(110, 231, 160, 0.5) 50%,
+    rgba(167, 243, 208, 0.34) 70%,
+    transparent 100%
   );
 }
 
 html[data-theme="light"] .spotlight-card::before {
+  background:
+    radial-gradient(ellipse 64% 96% at 12% 18%, rgba(15, 92, 82, 0.08), transparent 60%),
+    linear-gradient(
+      102deg,
+      rgba(255, 255, 255, 0.94) 0%,
+      rgba(244, 248, 247, 0.84) 56%,
+      rgba(255, 255, 255, 0.72) 100%
+    );
+}
+
+html[data-theme="light"] .spotlight-card::after {
   background: linear-gradient(
     90deg,
-    rgba(255, 255, 255, 0.84) 0%,
-    rgba(244, 248, 247, 0.68) 56%,
-    rgba(255, 255, 255, 0.52) 100%
+    transparent 0%,
+    rgba(15, 92, 82, 0.18) 50%,
+    transparent 100%
   );
 }
 
@@ -1201,20 +1222,24 @@ html[data-theme="light"] .spotlight-card::before {
   height: 100%;
   object-fit: cover;
   object-position: center;
-  filter: blur(8px) saturate(1.25) brightness(0.92);
-  transform: scale(1.07);
+  filter: blur(18px) saturate(1.32) brightness(0.84);
+  transform: scale(1.12);
   opacity: 0;
   pointer-events: none;
   user-select: none;
-  transition: opacity 260ms var(--ease-out);
+  transition: opacity 280ms var(--ease-out);
 }
 
 .spotlight-backdrop.is-loaded {
   opacity: 1;
 }
 
+html[data-theme="light"] .spotlight-backdrop {
+  filter: blur(20px) saturate(1.15) brightness(1.04);
+}
+
 html[data-theme="light"] .spotlight-backdrop.is-loaded {
-  opacity: 0.72;
+  opacity: 0.32;
 }
 
 .spotlight-card[hidden],
@@ -1222,18 +1247,18 @@ html[data-theme="light"] .spotlight-backdrop.is-loaded {
   display: none;
 }
 
-.spotlight-card.is-swapping-next {
-  animation: napl-spotlight-next 200ms var(--ease-out) both;
+.spotlight-card.is-swapping-next .spotlight-content {
+  animation: napl-spotlight-next 220ms var(--ease-out) both;
 }
 
-.spotlight-card.is-swapping-prev {
-  animation: napl-spotlight-prev 200ms var(--ease-out) both;
+.spotlight-card.is-swapping-prev .spotlight-content {
+  animation: napl-spotlight-prev 220ms var(--ease-out) both;
 }
 
 @keyframes napl-spotlight-next {
   from {
-    opacity: 0.45;
-    transform: translateX(8px);
+    opacity: 0.38;
+    transform: translateX(10px);
   }
   to {
     opacity: 1;
@@ -1243,8 +1268,8 @@ html[data-theme="light"] .spotlight-backdrop.is-loaded {
 
 @keyframes napl-spotlight-prev {
   from {
-    opacity: 0.45;
-    transform: translateX(-8px);
+    opacity: 0.38;
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
@@ -1252,33 +1277,45 @@ html[data-theme="light"] .spotlight-backdrop.is-loaded {
   }
 }
 
-.spotlight-content {
+.spotlight-content,
+.spotlight-skeleton-content {
   position: relative;
   z-index: 2;
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 16px;
-  align-items: center;
+  grid-template-columns: 118px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "cover body"
+    "cover footer";
+  column-gap: 20px;
+  row-gap: 12px;
+  align-items: start;
+  padding: 18px 20px 16px;
   min-width: 0;
 }
 
 .spotlight-cover-frame {
+  grid-area: cover;
+  align-self: center;
   position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 92px;
+  width: 118px;
   aspect-ratio: 3 / 4;
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--surface-2);
-  border: 1px solid var(--border-subtle);
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.36);
-  transition: border-color var(--duration-fast) var(--ease-out);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.44);
+  transition:
+    border-color var(--duration-fast) var(--ease-out),
+    box-shadow var(--duration-fast) var(--ease-out);
 }
 
 html[data-theme="light"] .spotlight-cover-frame {
-  box-shadow: 0 6px 18px rgba(11, 31, 28, 0.16);
+  border-color: var(--border-medium);
+  box-shadow: 0 10px 24px rgba(11, 31, 28, 0.16);
 }
 
 .spotlight-card:hover .spotlight-cover-frame {
@@ -1299,39 +1336,52 @@ html[data-theme="light"] .spotlight-cover-frame {
   height: 100%;
   object-fit: cover;
   transform-origin: center center;
-  transition: transform 220ms var(--ease-out);
+  transition: transform 240ms var(--ease-out);
 }
 
 .spotlight-card:hover .spotlight-cover {
-  transform: scale(1.04);
+  transform: scale(1.035);
 }
 
 .spotlight-body {
+  grid-area: body;
+  align-self: start;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 7px;
   min-width: 0;
-  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 10px rgba(0, 0, 0, 0.35);
 }
 
 html[data-theme="light"] .spotlight-body {
-  text-shadow: 0 1px 10px rgba(255, 255, 255, 0.85);
+  text-shadow: none;
 }
 
 .spotlight-top-row {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 4px 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
 }
 
 .spotlight-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   font-family: var(--font-mono);
-  font-size: 10.5px;
+  font-size: 11px;
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
   color: var(--accent);
+}
+
+.spotlight-kicker::before {
+  content: "";
+  width: 14px;
+  height: 1.5px;
+  background: currentColor;
+  opacity: 0.85;
 }
 
 .spotlight-meta {
@@ -1339,7 +1389,7 @@ html[data-theme="light"] .spotlight-body {
   font-variant-numeric: tabular-nums;
   font-size: 11.5px;
   line-height: 1.35;
-  color: var(--text-main);
+  color: var(--text-secondary);
   white-space: normal;
   overflow-wrap: break-word;
   max-width: 100%;
@@ -1348,10 +1398,10 @@ html[data-theme="light"] .spotlight-body {
 .spotlight-title {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.12rem, 2vw, 1.45rem);
+  font-size: clamp(1.28rem, 2.25vw, 1.8rem);
   font-weight: 700;
-  line-height: 1.18;
-  letter-spacing: -0.02em;
+  line-height: 1.14;
+  letter-spacing: -0.025em;
   color: var(--text-strong);
   text-wrap: balance;
   overflow-wrap: break-word;
@@ -1367,6 +1417,17 @@ html[data-theme="light"] .spotlight-body {
   color: var(--accent);
 }
 
+.spotlight-footer {
+  grid-area: footer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  min-width: 0;
+}
+
 .spotlight-port-line {
   margin: 0;
   font-size: 13px;
@@ -1377,52 +1438,83 @@ html[data-theme="light"] .spotlight-body {
   overflow-wrap: break-word;
 }
 
+.spotlight-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.spotlight-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--accent);
+  white-space: nowrap;
+  transition: color var(--duration-fast) var(--ease-out);
+}
+
+.spotlight-cta-arrow {
+  transition: transform var(--duration-fast) var(--ease-out);
+}
+
+.spotlight-card:hover .spotlight-cta {
+  color: var(--accent-hover);
+}
+
+.spotlight-card:hover .spotlight-cta-arrow {
+  transform: translateX(3px);
+}
+
+.spotlight-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .spotlight-nav-btn {
-  position: relative;
-  z-index: 2;
-  align-self: center;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 76px;
+  width: 34px;
+  height: 34px;
   padding: 0;
-  background: transparent;
-  border: 0;
+  background: rgba(17, 34, 27, 0.56);
+  border: 1px solid var(--border-medium);
   border-radius: var(--radius-sm);
   color: var(--text-main);
-  opacity: 0.82;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
   flex-shrink: 0;
-  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.55));
   transition:
+    background-color var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
     color var(--duration-fast) var(--ease-out),
-    opacity var(--duration-fast) var(--ease-out),
     transform var(--duration-fast) var(--ease-out);
 }
 
 html[data-theme="light"] .spotlight-nav-btn {
-  filter: drop-shadow(0 1px 3px rgba(255, 255, 255, 0.85));
+  background: rgba(255, 255, 255, 0.84);
 }
 
 .spotlight-nav-btn:hover:not(:disabled) {
+  background: var(--surface-2);
+  border-color: var(--border-strong);
   color: var(--accent);
-  opacity: 1;
-}
-
-.spotlight-nav-prev:hover:not(:disabled) {
-  transform: translateX(-2px);
-}
-
-.spotlight-nav-next:hover:not(:disabled) {
-  transform: translateX(2px);
 }
 
 .spotlight-nav-btn:active:not(:disabled) {
-  transform: scale(0.92);
+  transform: scale(0.94);
 }
 
 .spotlight-nav-btn:disabled {
-  opacity: 0.3;
+  opacity: 0.32;
   cursor: not-allowed;
 }
 
@@ -1432,10 +1524,10 @@ html[data-theme="light"] .spotlight-nav-btn {
   right: 0;
   bottom: 0;
   z-index: 3;
-  height: 2px;
+  height: 2.5px;
   pointer-events: none;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.09);
   transition: opacity var(--duration-fast) var(--ease-out);
 }
 
@@ -1448,7 +1540,7 @@ html[data-theme="light"] .spotlight-nav-btn {
 }
 
 html[data-theme="light"] .spotlight-progress {
-  background: rgba(11, 31, 28, 0.1);
+  background: rgba(11, 31, 28, 0.09);
 }
 
 .spotlight-progress-bar {
@@ -1467,47 +1559,70 @@ html[data-theme="light"] .spotlight-progress {
 html[data-theme="light"] .spotlight-progress-bar {
   background: linear-gradient(
     90deg,
-    rgba(15, 138, 107, 0.45) 0%,
+    rgba(15, 92, 82, 0.42) 0%,
     var(--accent) 100%
   );
 }
 
 /* Spotlight Skeleton */
-.spotlight-skeleton-content {
-  display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 16px;
-  align-items: center;
-  min-width: 0;
-}
-
 .spotlight-skeleton-cover {
-  width: 92px;
+  grid-area: cover;
+  align-self: center;
+  width: 118px;
   aspect-ratio: 3 / 4;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-subtle);
 }
 
 .spotlight-skeleton-body {
+  grid-area: body;
+  align-self: start;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 7px;
   min-width: 0;
 }
 
 .spotlight-skeleton-kicker {
-  width: 120px;
+  width: 110px;
   height: 11px;
 }
 
 .spotlight-skeleton-title {
-  width: min(300px, 78%);
-  height: 22px;
+  width: min(340px, 76%);
+  height: 26px;
+}
+
+.spotlight-skeleton-footer {
+  grid-area: footer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
 }
 
 .spotlight-skeleton-meta {
-  width: min(200px, 60%);
+  width: min(210px, 55%);
   height: 13px;
+}
+
+.spotlight-skeleton-cta {
+  width: 92px;
+  height: 14px;
+}
+
+.spotlight-skeleton-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.spotlight-skeleton-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
 }
 
 @media (max-width: 680px) {
@@ -1515,30 +1630,44 @@ html[data-theme="light"] .spotlight-progress-bar {
     margin-bottom: 18px;
   }
 
-  .spotlight-card {
-    gap: 4px;
-    padding: 10px 6px;
-  }
-
-  .spotlight-skeleton {
-    padding: 10px 34px;
-  }
-
   .spotlight-content,
   .spotlight-skeleton-content {
-    grid-template-columns: 72px minmax(0, 1fr);
-    align-items: center;
-    gap: 12px;
+    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    grid-template-areas:
+      "cover body"
+      "footer footer";
+    column-gap: 14px;
+    row-gap: 10px;
+    padding: 14px;
   }
 
   .spotlight-cover-frame,
   .spotlight-skeleton-cover {
-    width: 72px;
+    width: 84px;
+    align-self: start;
   }
 
-  .spotlight-nav-btn {
-    width: 28px;
-    height: 68px;
+  .spotlight-body,
+  .spotlight-skeleton-body {
+    align-self: start;
+    gap: 5px;
+  }
+
+  .spotlight-title {
+    font-size: clamp(1.12rem, 4.8vw, 1.38rem);
+  }
+
+  .spotlight-footer,
+  .spotlight-skeleton-footer {
+    padding-top: 10px;
+    gap: 10px 12px;
+  }
+
+  .spotlight-nav-btn,
+  .spotlight-skeleton-btn {
+    width: 40px;
+    height: 40px;
   }
 }
 

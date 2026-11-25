@@ -7,7 +7,6 @@
 
 import {
     getRepresentativePort,
-    getPortDisplayName,
     getGamePlatformLabel,
 } from "./game-card.js";
 import {
@@ -30,6 +29,7 @@ import {
     getLatestUpdate,
     getDateAdded,
     clearHeroViewTransitions,
+    extractGameGenres,
 } from "../lib/helpers.js";
 
 const SPOTLIGHT_INTERVAL_MS = 8000;
@@ -60,6 +60,19 @@ function withCategory(items, category) {
     return items.map((item) => ({ ...item, category }));
 }
 
+function interleaveCategories(groups) {
+    const maxLength = Math.max(0, ...groups.map((group) => group.length));
+    const interleaved = [];
+    for (let i = 0; i < maxLength; i++) {
+        for (const group of groups) {
+            if (i < group.length) {
+                interleaved.push(group[i]);
+            }
+        }
+    }
+    return interleaved;
+}
+
 function buildSpotlightQueue(games) {
     const eligible = buildEligibleEntries(games);
     const visits = (item, period) => getPopularVisits(item.game.popularityKey || item.game.name, period);
@@ -87,17 +100,17 @@ function buildSpotlightQueue(games) {
         .sort((a, b) => b.score - a.score)
         .slice(0, 5);
 
-    // Popular: cinco juegos aleatorios del Top 50 histórico.
-    const top50 = [...eligible]
+    // Top 100 histórico (Popular usa los primeros 50; Recently Updated evalúa los 100).
+    const top100 = [...eligible]
         .map((item) => ({ ...item, score: visits(item, "alltime") }))
         .filter((item) => item.score > 0)
         .sort((a, b) => b.score - a.score)
-        .slice(0, 50);
-    const popular = shuffleInPlace([...top50]).slice(0, 5);
+        .slice(0, 100);
+    const popular = shuffleInPlace(top100.slice(0, 50)).slice(0, 5);
 
-    // Recently Updated: solo juegos del Top 50 histórico; ventana 24 h y fallback hasta 48 h.
+    // Recently Updated: solo juegos del Top 100 histórico; ventana 24 h y fallback hasta 48 h.
     const now = Date.now();
-    const updatedCandidates = top50
+    const updatedCandidates = top100
         .map((item) => ({ ...item, updatedAt: getLatestUpdate(item.game) }))
         .filter((item) => item.updatedAt && item.updatedAt.getTime() <= now)
         .sort((a, b) => b.updatedAt - a.updatedAt);
@@ -107,12 +120,12 @@ function buildSpotlightQueue(games) {
         : updatedCandidates.filter((item) => now - item.updatedAt.getTime() <= 48 * 60 * 60 * 1000)
     ).slice(0, 5);
 
-    return [
-        ...withCategory(trending, "Trending"),
-        ...withCategory(rising, "Rising"),
-        ...withCategory(popular, "Popular"),
-        ...withCategory(recentlyUpdated, "Recently Updated"),
-    ];
+    return interleaveCategories([
+        withCategory(trending, "Trending"),
+        withCategory(rising, "Rising"),
+        withCategory(popular, "Popular"),
+        withCategory(recentlyUpdated, "Recently Updated"),
+    ]);
 }
 
 function buildFallbackPool(games) {
@@ -135,7 +148,7 @@ function preloadSpotlightCover(game) {
     if (!rawUrl || isCoverUrlFailed(rawUrl)) return;
 
     const effectiveUrl =
-        getOptimizedCoverUrl(rawUrl, 200) ||
+        getOptimizedCoverUrl(rawUrl, 280) ||
         getCachedResolvedCoverUrl(rawUrl) ||
         rawUrl;
     if (getMemoryCachedImageSrc(effectiveUrl)) return;
@@ -428,22 +441,18 @@ export function createSpotlightController() {
             const year = String(game.year || port?.year || "").trim();
             if (year) parts.push(year);
 
+            const primaryGenre = extractGameGenres(game.genre)[0];
+            if (primaryGenre) parts.push(primaryGenre);
+
             metaEl.textContent = parts.join(" · ");
             metaEl.hidden = parts.length === 0;
         }
 
         if (portLineEl) {
-            const portName = getPortDisplayName(port);
-            const dev = String(port?.developer || "").trim();
-            const hasDistinctDev =
-                dev &&
-                dev !== "-" &&
-                dev.toLowerCase() !== "unknown" &&
-                dev.toLowerCase() !== portName.toLowerCase();
-
-            portLineEl.textContent = hasDistinctDev
-                ? `Port: ${portName} · by ${dev}`
-                : `Port: ${portName}`;
+            const portCount = Array.isArray(game.ports) ? game.ports.length : 0;
+            portLineEl.textContent = `${portCount} ${
+                portCount === 1 ? "port available" : "ports available"
+            }`;
         }
 
         if (coverImg) {
@@ -473,7 +482,7 @@ export function createSpotlightController() {
                         handleBrokenCurrentEntry(game.slug, direction);
                     }
                 },
-                200
+                280
             );
 
             if (coverImg.complete && coverImg.naturalWidth > 0) {
@@ -552,6 +561,13 @@ export function createSpotlightController() {
     nextButton?.addEventListener("click", (event) => {
         event.stopPropagation();
         stepSlide(1);
+    });
+
+    section?.addEventListener("keydown", (event) => {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+        if (event.metaKey || event.ctrlKey || event.altKey) return;
+        event.preventDefault();
+        stepSlide(event.key === "ArrowLeft" ? -1 : 1);
     });
 
     titleLink?.addEventListener("click", (event) => {
