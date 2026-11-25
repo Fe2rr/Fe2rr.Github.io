@@ -5,6 +5,32 @@
 import { loadCoverImage } from "../lib/cover-fallback.js";
 import { clearHeroViewTransitions } from "../lib/helpers.js";
 
+const COVER_OPTIMIZER_URL =
+    "https://napl-image-optimizer.federicoxastro.workers.dev/image";
+const OPTIMIZABLE_COVER_HOSTS = new Set([
+    "images.launchbox-app.com",
+    "gamesdb-images.launchbox.gg",
+]);
+
+function getOptimizedCoverUrl(rawUrl) {
+    try {
+        const source = new URL(rawUrl);
+        if (
+            !["http:", "https:"].includes(source.protocol) ||
+            !OPTIMIZABLE_COVER_HOSTS.has(source.hostname.toLowerCase())
+        ) {
+            return "";
+        }
+        source.protocol = "https:";
+        const optimized = new URL(COVER_OPTIMIZER_URL);
+        optimized.searchParams.set("url", source.toString());
+        optimized.searchParams.set("w", "180");
+        return optimized.toString();
+    } catch {
+        return "";
+    }
+}
+
 export function getRepresentativePort(game) {
     if (!game || !Array.isArray(game.ports)) {
         return null;
@@ -97,11 +123,21 @@ export function createHomeGameCard(game, port, options = {}) {
 
         coverContainer.appendChild(cover);
 
-        loadCoverImage(cover, coverUrl, () => {
+        const markCoverUnavailable = () => {
             cover.remove();
             coverContainer.classList.remove("is-loaded");
             coverContainer.classList.add("cover-unavailable");
-        });
+        };
+        const optimizedCoverUrl = getOptimizedCoverUrl(coverUrl);
+
+        if (optimizedCoverUrl) {
+            loadCoverImage(cover, optimizedCoverUrl, () => {
+                // Preserve the original LaunchBox image if optimization is unavailable.
+                loadCoverImage(cover, coverUrl, markCoverUnavailable);
+            });
+        } else {
+            loadCoverImage(cover, coverUrl, markCoverUnavailable);
+        }
 
         if (cover.complete && cover.naturalWidth > 0) {
             coverContainer.classList.add("is-loaded");
