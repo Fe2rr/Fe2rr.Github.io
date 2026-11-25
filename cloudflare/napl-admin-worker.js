@@ -977,12 +977,27 @@ async function inspectSteamUrl(rawUrl) {
   const result = payload?.[appId];
   if (!result?.success || !result.data) throw new Error("Steam no devolvió datos para ese AppID.");
   const data = result.data;
-  const yearMatch = String(data.release_date?.date || "").match(/\b(19\d{2}|20\d{2})\b/);
-  const genres = Array.isArray(data.genres) ? data.genres.map(g => String(g?.description || "").trim()).filter(Boolean).slice(0, 2).join(", ") : "";
-  const developers = Array.isArray(data.developers) ? data.developers.map(v => String(v || "").trim()).filter(Boolean).join(", ") : "";
-  // Resolve Steam's current hash-based Store assets. Newer apps do not
-  // reliably expose images at predictable /{appid}/library_600x900.jpg paths.
-  let coverUrl = "";
+
+  // Solo resolver la portada vertical. Los demás metadatos siguen viniendo de appdetails.
+  const allowedSteamHosts = new Set([
+    "shared.fastly.steamstatic.com",
+    "shared.akamai.steamstatic.com",
+    "cdn.cloudflare.steamstatic.com",
+    "steamcdn-a.akamaihd.net",
+  ]);
+  const candidates = [];
+  const addCandidate = (value) => {
+    const raw = String(value || "").trim();
+    if (!raw) return;
+    try {
+      const url = new URL(raw);
+      if (url.protocol !== "https:" || !allowedSteamHosts.has(url.hostname.toLowerCase())) return;
+      if (!candidates.includes(url.href)) candidates.push(url.href);
+    } catch {
+      // Ignorar rutas o URLs de assets mal formadas.
+    }
+  };
+
   try {
     const browseInput = {
       ids: [{ appid: Number(appId) }],
@@ -996,23 +1011,73 @@ async function inspectSteamUrl(rawUrl) {
       const browsePayload = await browseResponse.json();
       const item = browsePayload?.response?.store_items?.find((entry) => Number(entry?.appid) === Number(appId));
       const assets = item?.assets || {};
-      const assetPath = String(assets.library_capsule_2x || assets.library_capsule || "").trim();
-      const assetFormat = String(assets.asset_url_format || "").trim();
-      if (assetPath && assetFormat.includes("${FILENAME}")) {
-        const assetPathEncoded = assetPath.split("/").map(encodeURIComponent).join("/");
-        const resolvedPath = assetFormat.replace("${FILENAME}", assetPathEncoded);
-        coverUrl = `https://shared.fastly.steamstatic.com/store_item_assets/${resolvedPath}`;
+      const format = String(assets.asset_url_format || "").trim();
+      for (const key of ["library_capsule_2x", "library_capsule"]) {
+        const file = String(assets[key] || "").trim();
+        if (!file || !format) continue;
+        const encoded = file.split("/").map(encodeURIComponent).join("/");
+        const expanded = format.replace(/\$\{FILENAME\}|\{FILENAME\}/g, encoded);
+        addCandidate(expanded);
       }
     }
-  } catch (error) {
-    // Fall back to legacy Steam assets below if StoreBrowse is unavailable.
+  } catch {
+    // Continuar con las rutas verticales convencionales.
   }
-  if (!coverUrl) {
-    coverUrl = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
-  }
-  return { appId, name: String(data.name || "").trim(), year: yearMatch ? yearMatch[1] : "", genre: genres, description: String(data.short_description || data.about_the_game || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(), coverUrl, developer: developers, steamUrl: `https://store.steampowered.com/app/${appId}/` };
-}
 
+  const baseHosts = [
+    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps",
+    "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps",
+    "https://cdn.cloudflare.steamstatic.com/steam/apps",
+    "https://steamcdn-a.akamaihd.net/steam/apps",
+  ];
+  const verticalFiles = [
+    "library_600x900_2x.jpg",
+    "library_600x900.jpg",
+    "library_capsule_2x.jpg",
+    "library_capsule.jpg",
+  ];
+  for (const base of baseHosts) {
+    for (const file of verticalFiles) addCandidate(`${base}/${appId}/${file}`);
+  }
+
+  let coverUrl = "";
+  for (const candidate of candidates) {
+    try {
+      const imageResponse = await fetch(candidate, {
+        method: "GET",
+        headers: { Accept: "image/avif,image/webp,image/*,*/*;q=0.8", Range: "bytes=0-0" },
+        redirect: "follow",
+      });
+      const finalUrl = new URL(imageResponse.url || candidate);
+      const contentType = String(imageResponse.headers.get("content-type") || "").toLowerCase();
+      const valid = imageResponse.ok
+        && finalUrl.protocol === "https:"
+        && allowedSteamHosts.has(finalUrl.hostname.toLowerCase())
+        && contentType.startsWith("image/");
+      if (imageResponse.body) await imageResponse.body.cancel();
+      if (valid) {
+        coverUrl = candidate;
+        break;
+      }
+    } catch {
+      // Probar la siguiente variante vertical.
+    }
+  }
+
+  const yearMatch = String(data.release_date?.date || "").match(/\b(19\d{2}|20\d{2})\b/);
+  const genres = Array.isArray(data.genres) ? data.genres.map(g => String(g?.description || "").trim()).filter(Boolean).slice(0, 2).join(", ") : "";
+  const developers = Array.isArray(data.developers) ? data.developers.map(v => String(v || "").trim()).filter(Boolean).join(", ") : "";
+  return {
+    appId,
+    name: String(data.name || "").trim(),
+    year: yearMatch ? yearMatch[1] : "",
+    genre: genres,
+    description: String(data.short_description || data.about_the_game || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(),
+    coverUrl,
+    developer: developers,
+    steamUrl: `https://store.steampowered.com/app/${appId}/`,
+  };
+}
 
 async function inspectLaunchboxUrl(rawUrl) {
   let targetUrl;
