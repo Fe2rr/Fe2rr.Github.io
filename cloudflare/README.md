@@ -34,7 +34,7 @@ Secretos conservados:
 
 Variables:
 - `AUTO_PUBLISH_CRON = true`
-- `CRON_BATCH_SIZE = 40`
+- `CRON_BATCH_SIZE = 10`
 
 Cron activo: `0 * * * *` (cada hora).
 

@@ -11,4 +11,4 @@ crons = ["0 * * * *"]
 
 [vars]
 AUTO_PUBLISH_CRON = "true"
-CRON_BATCH_SIZE = "40"
+CRON_BATCH_SIZE = "10"

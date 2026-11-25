@@ -4,8 +4,12 @@ const INTERNAL_STATE_PATH = "private/catalog-state.json";
 const SHEET_URL =
   "https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv";
 const SESSION_TTL = 8 * 60 * 60 * 1000;
-const DEFAULT_CRON_BATCH = 40;
-const MAX_SYNC_BATCH = 50;
+const DEFAULT_CRON_BATCH = 10;
+const MAX_SYNC_BATCH = 15;
+const MAX_SUBREQUESTS_PER_RUN = 34;
+const MAX_PLAYSTORE_PER_RUN = 2;
+const SYNC_ELAPSED_BUDGET_MS = 12000;
+const UPSTREAM_TIMEOUT_MS = 7000;
 
 const MONTHS = [
   "January",
@@ -45,7 +49,11 @@ function isAllowedOrigin(origin, env) {
   }
   try {
     const u = new URL(origin);
-    if (u.hostname.endsWith(".run.app") || u.hostname === "fe2rr.github.io") {
+    if (
+      u.hostname.endsWith(".run.app") ||
+      u.hostname === "fe2rr.github.io" ||
+      (u.protocol === "https:" && u.hostname.endsWith(".napl-admin.pages.dev"))
+    ) {
       return true;
     }
   } catch {
@@ -131,32 +139,55 @@ async function authenticated(req, env) {
 function toB64(str) {
   const bytes = new TextEncoder().encode(str);
   let bin = "";
-  for (let i = 0; i < bytes.length; i += 32768) {
-    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+  for (let i = 0; i < bytes.length; i += 16384) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 16384));
   }
   return btoa(bin);
 }
 
+const NORM_CACHE_MAX = 4096;
+const normHeadCache = new Map();
+const normCache = new Map();
+const slugifyCache = new Map();
+
 function normHead(v) {
-  return String(v || "")
+  const raw = String(v || "");
+  const cached = normHeadCache.get(raw);
+  if (cached !== undefined) return cached;
+  const out = raw
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, "");
+  if (normHeadCache.size >= NORM_CACHE_MAX) normHeadCache.clear();
+  normHeadCache.set(raw, out);
+  return out;
 }
 
 function norm(v) {
-  return String(v || "")
+  const raw = String(v || "");
+  const cached = normCache.get(raw);
+  if (cached !== undefined) return cached;
+  const out = raw
     .toLowerCase()
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]+/g, " ")
     .trim()
     .replace(/\s+/g, " ");
+  if (normCache.size >= NORM_CACHE_MAX) normCache.clear();
+  normCache.set(raw, out);
+  return out;
 }
 
 function slugify(v) {
-  return norm(v).replace(/\s+/g, "-");
+  const raw = String(v || "");
+  const cached = slugifyCache.get(raw);
+  if (cached !== undefined) return cached;
+  const out = norm(raw).replace(/\s+/g, "-");
+  if (slugifyCache.size >= NORM_CACHE_MAX) slugifyCache.clear();
+  slugifyCache.set(raw, out);
+  return out;
 }
 
 function formatNaplDate(isoDate) {
@@ -308,7 +339,16 @@ function resolvePortSyncTarget(port) {
   return { provider: "", target: "", githubRepo: "" };
 }
 
+function fetchWithTimeout(url, init = {}, timeoutMs = UPSTREAM_TIMEOUT_MS) {
+  const options = { ...init };
+  if (!options.signal && typeof AbortSignal !== "undefined" && typeof AbortSignal.timeout === "function") {
+    options.signal = AbortSignal.timeout(timeoutMs);
+  }
+  return fetch(url, options);
+}
+
 async function ghFetch(path, env, options = {}) {
+  if (options.budget) options.budget.subrequests++;
   const headers = {
     Accept: "application/vnd.github+json",
     "X-GitHub-Api-Version": "2022-11-28",
@@ -319,19 +359,25 @@ async function ghFetch(path, env, options = {}) {
   if (token) {
     headers.Authorization = `Bearer ${token}`;
   }
-  const res = await fetch(`https://api.github.com${path}`, {
-    method: options.method || "GET",
-    headers,
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const res = await fetchWithTimeout(
+    `https://api.github.com${path}`,
+    {
+      method: options.method || "GET",
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    },
+    options.timeoutMs || UPSTREAM_TIMEOUT_MS
+  );
   const text = await res.text();
   let data = {};
-  try {
-    data = text ? JSON.parse(text) : {};
-  } catch {
-    data = {};
+  if (!options.raw) {
+    try {
+      data = text ? JSON.parse(text) : {};
+    } catch {
+      data = {};
+    }
   }
-  return { res, data };
+  return { res, data, text };
 }
 
 async function gitBlobSha(content) {
@@ -371,43 +417,63 @@ async function ghCommitDataCatalog(catalog, env, message = "NAPL: publicar snaps
 function csvParse(csv) {
   const rows = [];
   let row = [];
-  let field = "";
+  let buf = "";
+  let start = 0;
   let q = false;
-  for (let i = 0; i < csv.length; i++) {
-    const c = csv[i];
-    if (c === '"') {
-      if (q && csv[i + 1] === '"') {
-        field += '"';
+  const len = csv.length;
+  for (let i = 0; i < len; i++) {
+    const code = csv.charCodeAt(i);
+    if (code === 34) { // '"'
+      if (i > start) buf += csv.slice(start, i);
+      if (q && csv.charCodeAt(i + 1) === 34) {
+        buf += '"';
         i++;
       } else {
         q = !q;
       }
-    } else if (c === "," && !q) {
-      row.push(field);
-      field = "";
-    } else if ((c === "\n" || c === "\r") && !q) {
-      if (c === "\r" && csv[i + 1] === "\n") i++;
-      row.push(field);
-      field = "";
-      if (row.some((v) => v.trim())) rows.push(row);
-      row = [];
-    } else {
-      field += c;
+      start = i + 1;
+    } else if (!q && (code === 44 || code === 10 || code === 13)) { // ',' or '\n' or '\r'
+      const val = buf ? buf + csv.slice(start, i) : csv.slice(start, i);
+      buf = "";
+      row.push(val);
+      if (code === 44) {
+        start = i + 1;
+      } else {
+        if (code === 13 && csv.charCodeAt(i + 1) === 10) i++;
+        start = i + 1;
+        for (let k = 0; k < row.length; k++) {
+          if (row[k].trim()) {
+            rows.push(row);
+            break;
+          }
+        }
+        row = [];
+      }
     }
   }
-  if (field.length || row.length) {
-    row.push(field);
-    if (row.some((v) => v.trim())) rows.push(row);
+  if (start < len || buf.length || row.length) {
+    const val = buf ? buf + csv.slice(start) : csv.slice(start);
+    row.push(val);
+    for (let k = 0; k < row.length; k++) {
+      if (row[k].trim()) {
+        rows.push(row);
+        break;
+      }
+    }
   }
   if (!rows.length) return [];
   const headers = rows.shift().map(normHead);
-  return rows.map((values) => {
+  const out = new Array(rows.length);
+  for (let r = 0; r < rows.length; r++) {
+    const values = rows[r];
     const o = {};
-    headers.forEach((h, i) => {
+    for (let i = 0; i < headers.length; i++) {
+      const h = headers[i];
       if (h) o[h] = String(values[i] || "").trim();
-    });
-    return o;
-  });
+    }
+    out[r] = o;
+  }
+  return out;
 }
 
 function col(row, names) {
@@ -475,7 +541,10 @@ function validateCatalog(input) {
 
 function decodeGitHubBase64(value) {
   const binary = atob(String(value || "").replace(/\s/g, ""));
-  const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0));
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) {
+    bytes[i] = binary.charCodeAt(i);
+  }
   return new TextDecoder().decode(bytes);
 }
 
@@ -483,16 +552,25 @@ async function readDataJsonFile(env, filePath) {
   const token = env.CATALOG_DATA_GITHUB_TOKEN;
   if (!token) throw new Error("Falta configurar CATALOG_DATA_GITHUB_TOKEN.");
   const apiPath = "/repos/" + DATA_REPO + "/contents/" + filePath + "?ref=" + DATA_BRANCH;
-  const result = await ghFetch(apiPath, env, { token });
-  if (!result.res.ok) throw new Error(result.data.message || ("No se pudo leer " + filePath + " (HTTP " + result.res.status + ")."));
-  let raw = result.data.content || "";
-  if (!raw && result.data.sha) {
-    const blob = await ghFetch("/repos/" + DATA_REPO + "/git/blobs/" + result.data.sha, env, { token });
-    if (!blob.res.ok || !blob.data.content) throw new Error(blob.data.message || ("No se pudo descargar " + filePath + "."));
-    raw = blob.data.content;
+  const result = await ghFetch(apiPath, env, {
+    token,
+    raw: true,
+    timeoutMs: 10000,
+    headers: { Accept: "application/vnd.github.raw+json" },
+  });
+  if (!result.res.ok) {
+    let errMsg = "";
+    try {
+      errMsg = JSON.parse(result.text || "{}")?.message || "";
+    } catch {}
+    throw new Error(errMsg || ("No se pudo leer " + filePath + " (HTTP " + result.res.status + ")."));
   }
-  if (!raw) throw new Error("El archivo " + filePath + " está vacío o GitHub no devolvió su contenido.");
-  return { value: JSON.parse(decodeGitHubBase64(raw)), sha: result.data.sha };
+  const rawText = result.text || "";
+  if (!rawText) throw new Error("El archivo " + filePath + " está vacío o GitHub no devolvió su contenido.");
+  const etag = result.res.headers.get("ETag") || "";
+  const etagMatch = etag.match(/^"([a-f0-9]{40})"$/i);
+  const sha = etagMatch ? etagMatch[1] : await gitBlobSha(rawText);
+  return { value: JSON.parse(rawText), sha };
 }
 
 async function writeDataJsonFile(env, filePath, value, expectedSha, message) {
@@ -501,7 +579,7 @@ async function writeDataJsonFile(env, filePath, value, expectedSha, message) {
   const apiPath = "/repos/" + DATA_REPO + "/contents/" + filePath;
   const payload = { message, content: toB64(JSON.stringify(value)), branch: DATA_BRANCH };
   if (expectedSha) payload.sha = expectedSha;
-  const result = await ghFetch(apiPath, env, { method: "PUT", body: payload, token });
+  const result = await ghFetch(apiPath, env, { method: "PUT", body: payload, token, timeoutMs: 12000 });
   if (!result.res.ok) {
     const conflict = result.res.status === 409 || result.res.status === 422;
     throw new Error(conflict
@@ -510,6 +588,8 @@ async function writeDataJsonFile(env, filePath, value, expectedSha, message) {
   }
   return { commit: result.data.commit?.html_url || "", sha: result.data.content?.sha || "" };
 }
+
+const VALID_POP_KEY_RE = /^[a-z0-9][a-z0-9-]{0,179}$/;
 
 async function readCatalogState(env) {
   const loaded = await readDataJsonFile(env, INTERNAL_STATE_PATH);
@@ -520,14 +600,17 @@ async function readCatalogState(env) {
   state.meta = state.meta && typeof state.meta === "object" ? state.meta : {};
   state.syncLogs = Array.isArray(state.syncLogs) ? state.syncLogs : [];
   state.catalog.platformOrder = Array.isArray(state.catalog.platformOrder) ? state.catalog.platformOrder : [];
-  // Avoid cloning every game on each read. The catalog is large and this
-  // endpoint runs before every admin mutation.
-  for (const game of state.catalog.games) {
+  const games = state.catalog.games;
+  for (let i = 0; i < games.length; i++) {
+    const game = games[i];
+    if (typeof game?.popularityKey === "string" && VALID_POP_KEY_RE.test(game.popularityKey)) {
+      continue;
+    }
     const popularityKey = String(game?.popularityKey || slugify(game?.name || "")).trim().toLowerCase();
-    if (!/^[a-z0-9][a-z0-9-]{0,179}$/.test(popularityKey)) {
+    if (!VALID_POP_KEY_RE.test(popularityKey)) {
       throw new Error("Clave de popularidad inválida en " + String(game?.name || "juego sin nombre"));
     }
-    if (game.popularityKey !== popularityKey) game.popularityKey = popularityKey;
+    games[i] = { ...game, popularityKey };
   }
   state._sha = loaded.sha;
   return state;
@@ -543,20 +626,17 @@ async function saveCatalogState(env, state, message) {
 
 function catalogStats(state) {
   const games = state.catalog.games || [];
-  let githubCount = 0, gitlabCount = 0, playstoreCount = 0, downCount = 0, portsCount = 0;
-  // Count in place instead of allocating a second array and cloning every port.
-  for (const game of games) {
-    for (const port of game.ports || []) {
-      portsCount++;
-      const source = resolvePortSyncTarget(port);
-      if (source.provider === "github") githubCount++;
-      else if (source.provider === "gitlab") gitlabCount++;
-      else if (source.provider === "playstore") playstoreCount++;
-      if (port.githubStatus === "down") downCount++;
-    }
+  const ports = games.flatMap((game) => (game.ports || []).map((port) => ({ ...port, gameSlug: game.slug })));
+  let githubCount = 0, gitlabCount = 0, playstoreCount = 0, downCount = 0;
+  for (const port of ports) {
+    const source = resolvePortSyncTarget(port);
+    if (source.provider === "github") githubCount++;
+    else if (source.provider === "gitlab") gitlabCount++;
+    else if (source.provider === "playstore") playstoreCount++;
+    if (port.githubStatus === "down") downCount++;
   }
   return {
-    gamesCount: games.length, portsCount, githubCount, gitlabCount, playstoreCount,
+    gamesCount: games.length, portsCount: ports.length, githubCount, gitlabCount, playstoreCount,
     syncableCount: githubCount + gitlabCount + playstoreCount, downCount,
     lastSyncAt: state.meta.last_sync_at || "",
     lastGitHubPublishAt: state.meta.last_github_publish_at || "",
@@ -642,7 +722,7 @@ function deleteGameFromJson(state, slug) {
   return { deleted: true, slug, updatedAt: now };
 }
 
-async function inspectGithubRepo(repoSlug, env) {
+async function inspectGithubRepo(repoSlug, env, budget = null) {
   const parsed = parseGithubRepo(repoSlug);
   if (!parsed) {
     throw new Error("URL de GitHub inválida.");
@@ -650,7 +730,8 @@ async function inspectGithubRepo(repoSlug, env) {
 
   const { res: repoRes, data: repoData } = await ghFetch(
     `/repos/${parsed.owner}/${parsed.repo}`,
-    env
+    env,
+    { budget }
   );
 
   if (repoRes.status === 404 || repoRes.status === 410) {
@@ -673,11 +754,11 @@ async function inspectGithubRepo(repoSlug, env) {
   const moved = canonicalRepo.toLowerCase() !== `${parsed.owner}/${parsed.repo}`.toLowerCase();
 
   let release = null;
-  const latest = await ghFetch(`/repos/${canonicalRepo}/releases/latest`, env);
+  const latest = await ghFetch(`/repos/${canonicalRepo}/releases/latest`, env, { budget });
   if (latest.res.ok && latest.data && latest.data.tag_name) {
     release = latest.data;
   } else {
-    const list = await ghFetch(`/repos/${canonicalRepo}/releases?per_page=1`, env);
+    const list = await ghFetch(`/repos/${canonicalRepo}/releases?per_page=1`, env, { budget });
     if (list.res.ok && Array.isArray(list.data) && list.data.length > 0) {
       release = list.data[0];
     }
@@ -685,7 +766,7 @@ async function inspectGithubRepo(repoSlug, env) {
 
   let tagFallback = null;
   if (!release) {
-    const tags = await ghFetch(`/repos/${canonicalRepo}/tags?per_page=1`, env);
+    const tags = await ghFetch(`/repos/${canonicalRepo}/tags?per_page=1`, env, { budget });
     if (tags.res.ok && Array.isArray(tags.data) && tags.data.length > 0) {
       tagFallback = tags.data[0];
     }
@@ -724,7 +805,8 @@ async function inspectGithubRepo(repoSlug, env) {
   };
 }
 
-async function glFetch(apiPath, env) {
+async function glFetch(apiPath, env, budget = null) {
+  if (budget) budget.subrequests++;
   const headers = {
     Accept: "application/json",
     "User-Agent": "NAPL-Catalog-Sync/2.0",
@@ -732,7 +814,7 @@ async function glFetch(apiPath, env) {
   if (env?.GITLAB_TOKEN) {
     headers["PRIVATE-TOKEN"] = env.GITLAB_TOKEN;
   }
-  const res = await fetch(`https://gitlab.com/api/v4${apiPath}`, { headers });
+  const res = await fetchWithTimeout(`https://gitlab.com/api/v4${apiPath}`, { headers });
   const text = await res.text();
   let data = {};
   try {
@@ -743,12 +825,12 @@ async function glFetch(apiPath, env) {
   return { res, data };
 }
 
-async function inspectGitlabProject(projectInput, env) {
+async function inspectGitlabProject(projectInput, env, budget = null) {
   const parsed = parseGitlabProject(projectInput);
   if (!parsed) throw new Error("URL de GitLab inválida.");
 
   const encoded = encodeURIComponent(parsed.projectPath);
-  const { res: projRes, data: projData } = await glFetch(`/projects/${encoded}`, env);
+  const { res: projRes, data: projData } = await glFetch(`/projects/${encoded}`, env, budget);
   if (projRes.status === 404 || projRes.status === 410) {
     return {
       provider: "gitlab",
@@ -770,14 +852,14 @@ async function inspectGitlabProject(projectInput, env) {
   const moved = canonicalPath.toLowerCase() !== parsed.projectPath.toLowerCase();
 
   let release = null;
-  const rels = await glFetch(`/projects/${canonicalEncoded}/releases?per_page=1`, env);
+  const rels = await glFetch(`/projects/${canonicalEncoded}/releases?per_page=1`, env, budget);
   if (rels.res.ok && Array.isArray(rels.data) && rels.data.length > 0) {
     release = rels.data[0];
   }
 
   let tagFallback = null;
   if (!release) {
-    const tags = await glFetch(`/projects/${canonicalEncoded}/repository/tags?per_page=1`, env);
+    const tags = await glFetch(`/projects/${canonicalEncoded}/repository/tags?per_page=1`, env, budget);
     if (tags.res.ok && Array.isArray(tags.data) && tags.data.length > 0) {
       tagFallback = tags.data[0];
     }
@@ -785,7 +867,7 @@ async function inspectGitlabProject(projectInput, env) {
 
   let commitFallback = null;
   if (!release && !tagFallback) {
-    const commits = await glFetch(`/projects/${canonicalEncoded}/repository/commits?per_page=1`, env);
+    const commits = await glFetch(`/projects/${canonicalEncoded}/repository/commits?per_page=1`, env, budget);
     if (commits.res.ok && Array.isArray(commits.data) && commits.data.length > 0) {
       commitFallback = commits.data[0];
     }
@@ -835,14 +917,19 @@ async function inspectGitlabProject(projectInput, env) {
   };
 }
 
-async function inspectPlayStoreApp(appInput) {
+async function inspectPlayStoreApp(appInput, budget = null) {
   const parsed = parsePlayStorePackage(appInput);
   if (!parsed) throw new Error("URL o ID de Google Play Store inválido.");
+
+  if (budget) {
+    budget.subrequests++;
+    budget.playstore++;
+  }
 
   const packageId = parsed.packageId;
   const storeUrl = `https://play.google.com/store/apps/details?id=${encodeURIComponent(packageId)}`;
   const fetchUrl = `${storeUrl}&hl=en&gl=US`;
-  const res = await fetch(fetchUrl, {
+  const res = await fetchWithTimeout(fetchUrl, {
     headers: {
       "User-Agent":
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
@@ -871,6 +958,7 @@ async function inspectPlayStoreApp(appInput) {
   let appInfo = null;
   const cbRegex = /AF_initDataCallback\(\{key:\s*['"](ds:\d+)['"][\s\S]*?data:([\s\S]*?),\s*sideChannel:/g;
   for (const m of html.matchAll(cbRegex)) {
+    if (m[1] !== "ds:5" && !m[2].includes(packageId)) continue;
     try {
       const parsedJson = JSON.parse(m[2]);
       const candidate = parsedJson?.[1]?.[2];
@@ -962,126 +1050,6 @@ function resolveLaunchboxImageUrl(fileName) {
     return `https://gamesdb-images.launchbox.gg/${clean}`;
   }
   return `https://images.launchbox-app.com//${clean}`;
-}
-
-function parseSteamAppId(rawUrl) {
-  const value = String(rawUrl || "").trim();
-  if (/^\d+$/.test(value)) return value;
-  let url;
-  try { url = new URL(value); } catch { throw new Error("Ingresá una URL válida de Steam Store."); }
-  if (url.hostname.toLowerCase() !== "store.steampowered.com") throw new Error("Solo se permiten enlaces de store.steampowered.com.");
-  const match = url.pathname.match(/^\/app\/(\d+)(?:\/|$)/i);
-  if (!match) throw new Error("No se encontró el AppID en el enlace de Steam.");
-  return match[1];
-}
-async function inspectSteamUrl(rawUrl) {
-  const appId = parseSteamAppId(rawUrl);
-  const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appId)}&l=english`, { headers: { Accept: "application/json" } });
-  if (!response.ok) throw new Error(`Steam respondió HTTP ${response.status}.`);
-  const payload = await response.json();
-  const result = payload?.[appId];
-  if (!result?.success || !result.data) throw new Error("Steam no devolvió datos para ese AppID.");
-  const data = result.data;
-
-  // Solo resolver la portada vertical. Los demás metadatos siguen viniendo de appdetails.
-  const allowedSteamHosts = new Set([
-    "shared.fastly.steamstatic.com",
-    "shared.akamai.steamstatic.com",
-    "cdn.cloudflare.steamstatic.com",
-    "steamcdn-a.akamaihd.net",
-  ]);
-  const candidates = [];
-  const addCandidate = (value) => {
-    const raw = String(value || "").trim();
-    if (!raw) return;
-    try {
-      const url = new URL(raw);
-      if (url.protocol !== "https:" || !allowedSteamHosts.has(url.hostname.toLowerCase())) return;
-      if (!candidates.includes(url.href)) candidates.push(url.href);
-    } catch {
-      // Ignorar rutas o URLs de assets mal formadas.
-    }
-  };
-
-  try {
-    const browseInput = {
-      ids: [{ appid: Number(appId) }],
-      context: { language: "english", country_code: "US", steam_realm: 1 },
-      data_request: { include_assets: true },
-    };
-    const browseUrl = new URL("https://api.steampowered.com/IStoreBrowseService/GetItems/v1/");
-    browseUrl.searchParams.set("input_json", JSON.stringify(browseInput));
-    const browseResponse = await fetch(browseUrl.toString(), { headers: { Accept: "application/json" } });
-    if (browseResponse.ok) {
-      const browsePayload = await browseResponse.json();
-      const item = browsePayload?.response?.store_items?.find((entry) => Number(entry?.appid) === Number(appId));
-      const assets = item?.assets || {};
-      const format = String(assets.asset_url_format || "").trim();
-      for (const key of ["library_capsule_2x", "library_capsule"]) {
-        const file = String(assets[key] || "").trim();
-        if (!file || !format) continue;
-        const encoded = file.split("/").map(encodeURIComponent).join("/");
-        const expanded = format.replace(/\$\{FILENAME\}|\{FILENAME\}/g, encoded);
-        addCandidate(expanded);
-      }
-    }
-  } catch {
-    // Continuar con las rutas verticales convencionales.
-  }
-
-  const baseHosts = [
-    "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps",
-    "https://shared.akamai.steamstatic.com/store_item_assets/steam/apps",
-    "https://cdn.cloudflare.steamstatic.com/steam/apps",
-    "https://steamcdn-a.akamaihd.net/steam/apps",
-  ];
-  const verticalFiles = [
-    "library_600x900_2x.jpg",
-    "library_600x900.jpg",
-    "library_capsule_2x.jpg",
-    "library_capsule.jpg",
-  ];
-  for (const base of baseHosts) {
-    for (const file of verticalFiles) addCandidate(`${base}/${appId}/${file}`);
-  }
-
-  let coverUrl = "";
-  for (const candidate of candidates) {
-    try {
-      const imageResponse = await fetch(candidate, {
-        method: "GET",
-        headers: { Accept: "image/avif,image/webp,image/*,*/*;q=0.8", Range: "bytes=0-0" },
-        redirect: "follow",
-      });
-      const finalUrl = new URL(imageResponse.url || candidate);
-      const contentType = String(imageResponse.headers.get("content-type") || "").toLowerCase();
-      const valid = imageResponse.ok
-        && finalUrl.protocol === "https:"
-        && allowedSteamHosts.has(finalUrl.hostname.toLowerCase())
-        && contentType.startsWith("image/");
-      if (imageResponse.body) await imageResponse.body.cancel();
-      if (valid) {
-        coverUrl = candidate;
-        break;
-      }
-    } catch {
-      // Probar la siguiente variante vertical.
-    }
-  }
-
-  const yearMatch = String(data.release_date?.date || "").match(/\b(19\d{2}|20\d{2})\b/);
-  const genres = Array.isArray(data.genres) ? data.genres.map(g => String(g?.description || "").trim()).filter(Boolean).slice(0, 2).join(", ") : "";
-  const developers = Array.isArray(data.developers) ? data.developers.map(v => String(v || "").trim()).filter(Boolean).join(", ") : "";
-  return {
-    appId,
-    name: String(data.name || "").trim(),
-    year: yearMatch ? yearMatch[1] : "",
-    genre: genres,
-    description: String(data.short_description || data.about_the_game || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(),
-    coverUrl,
-    developer: developers,
-    steamUrl: `https://store.steampowered.com/app/${appId}/`,
-  };
 }
 
 async function inspectLaunchboxUrl(rawUrl) {
@@ -1219,17 +1187,17 @@ async function inspectLaunchboxUrl(rawUrl) {
 }
 
 
-async function syncSinglePortWithSource(env, port) {
+async function syncSinglePortWithSource(env, port, budget = null) {
   const syncInfo = resolvePortSyncTarget(port);
   if (!syncInfo.provider || !syncInfo.target) return { portId: port.portId, status: "skipped", reason: "Sin fuente sincronizable", changed: false };
   const now = new Date().toISOString();
   const oldVersion = port.version;
   let info;
-  if (syncInfo.provider === "playstore") info = await inspectPlayStoreApp(syncInfo.target);
+  if (syncInfo.provider === "playstore") info = await inspectPlayStoreApp(syncInfo.target, budget);
   else if (syncInfo.provider === "gitlab") {
     const target = /^https?:\/\//i.test(syncInfo.target) ? syncInfo.target : "https://gitlab.com/" + syncInfo.target.replace(/^\/+/, "");
-    info = await inspectGitlabProject(target, env);
-  } else info = await inspectGithubRepo(syncInfo.target, env);
+    info = await inspectGitlabProject(target, env, budget);
+  } else info = await inspectGithubRepo(syncInfo.target, env, budget);
   if (info.status === "down") {
     const downLabel = syncInfo.provider === "playstore" ? "App Down" : "Repo Down";
     const changed = port.githubStatus !== "down" || port.link !== downLabel || port.syncProvider !== syncInfo.provider || port.syncTarget !== syncInfo.target;
@@ -1264,108 +1232,36 @@ async function syncSinglePortWithSource(env, port) {
 }
 
 
-const SYNC_STAGE_PATH = "private/sync-staging.json";
-
-async function readSyncStage(env) {
-  const token = env.CATALOG_DATA_GITHUB_TOKEN;
-  if (!token) throw new Error("Falta configurar CATALOG_DATA_GITHUB_TOKEN.");
-  const apiPath = "/repos/" + DATA_REPO + "/contents/" + SYNC_STAGE_PATH + "?ref=" + DATA_BRANCH;
-  const result = await ghFetch(apiPath, env, { token });
-  if (result.res.status === 404) return { value: null, sha: "" };
-  if (!result.res.ok) throw new Error(result.data.message || "No se pudo leer el progreso de sincronización.");
-  return { value: JSON.parse(decodeGitHubBase64(result.data.content || "")), sha: result.data.sha || "" };
-}
-
-async function writeSyncStage(env, stage, sha) {
-  return writeDataJsonFile(env, SYNC_STAGE_PATH, stage, sha, "NAPL: guardar progreso de revisión de fuentes");
-}
-
 async function runSyncBatch(env, options = {}) {
   const state = await readCatalogState(env);
   const limit = Math.min(Math.max(Number(options.limit) || DEFAULT_CRON_BATCH, 1), MAX_SYNC_BATCH);
   const offset = Math.max(Number(options.offset) || 0, 0);
   const source = options.source || "manual";
-  const ports = state.catalog.games.flatMap((game) => (game.ports || []).map((port) => ({
-    ...port, gameSlug: game.slug, _port: port
-  }))).filter((port) => {
-    const info = resolvePortSyncTarget(port);
-    return Boolean(info.provider && info.target);
-  });
-  const orderedAll = options.useOffset
-    ? ports.sort((a,b) => String(a.portId).localeCompare(String(b.portId)))
+  const ports = state.catalog.games.flatMap((game) => (game.ports || []).map((port) => {
+    const syncInfo = resolvePortSyncTarget(port);
+    return syncInfo.provider && syncInfo.target
+      ? { ...port, gameSlug: game.slug, _port: port, _syncInfo: syncInfo }
+      : null;
+  })).filter(Boolean);
+  const ordered = options.useOffset
+    ? ports.sort((a,b) => String(a.portId).localeCompare(String(b.portId))).slice(offset, offset + limit)
     : ports.sort((a,b) => String(a.lastCheckedAt || "").localeCompare(String(b.lastCheckedAt || "")) ||
-      String(a.portId).localeCompare(String(b.portId)));
-  const ordered = orderedAll.slice(offset, offset + limit);
-
-  if (options.stageOnly) {
-    const loaded = await readSyncStage(env);
-    let stage = offset > 0 ? loaded.value : null;
-    if (offset > 0 && (!stage || stage.status !== "scanning")) {
-      throw new Error("No hay una revisión pendiente para reanudar. Iniciá una nueva sincronización completa.");
-    }
-    if (!stage) {
-      stage = { version: 1, status: "scanning", startedAt: new Date().toISOString(),
-        totalSyncPorts: ports.length, nextOffset: 0, checkedCount: 0, updatedCount: 0,
-        downCount: 0, errorCount: 0, updates: {}, checkedAt: {}, details: [] };
-    }
-    if (stage.totalSyncPorts !== ports.length) {
-      throw new Error("El catálogo cambió durante la revisión. Recargá el panel e iniciá una nueva sincronización.");
-    }
-    if (offset !== Number(stage.nextOffset || 0)) {
-      throw new Error("El punto de reanudación no coincide con el progreso guardado. Consultá el estado de sincronización.");
-    }
-
-    stage.checkedAt = stage.checkedAt || {};
-    let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
-    const details = [];
-    const mutableKeys = ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link"];
-    for (const entry of ordered) {
-      checkedCount++;
-      const originalVersion = entry.version;
-      try {
-        const outcome = await syncSinglePortWithSource(env, entry);
-        stage.checkedAt[entry.portId] = entry.lastCheckedAt || new Date().toISOString();
-        if (outcome.status === "down") downCount++;
-        if (outcome.changed) {
-          updatedCount++;
-          outcome.oldVersion = originalVersion;
-          details.push(outcome);
-          const patch = {};
-          for (const key of mutableKeys) patch[key] = entry[key] ?? entry._port[key] ?? "";
-          stage.updates[entry.portId] = patch;
-        }
-      } catch (error) {
-        errorCount++;
-        stage.checkedAt[entry.portId] = new Date().toISOString();
-        details.push({ portId: entry.portId, gameSlug: entry.gameSlug, project: entry.project,
-          provider: resolvePortSyncTarget(entry).provider, status: "error",
-          error: error?.message || "Error consultando fuente externa" });
-      }
-    }
-    const now = new Date().toISOString();
-    stage.checkedCount += checkedCount;
-    stage.updatedCount += updatedCount;
-    stage.downCount += downCount;
-    stage.errorCount += errorCount;
-    stage.nextOffset = offset + checkedCount;
-    stage.details = [...(stage.details || []), ...details].slice(-300);
-    if (stage.nextOffset >= ports.length) {
-      stage.status = "completed";
-      stage.completedAt = now;
-    }
-    const savedStage = await writeSyncStage(env, stage, loaded.sha);
-    return { source, staged: true, stageStatus: stage.status, totalSyncPorts: ports.length,
-      checkedCount, updatedCount, downCount, errorCount, nextOffset: stage.nextOffset,
-      hasMore: stage.status !== "completed", details, syncedAt: now, stageCommit: savedStage.commit || "" };
-  }
-
+      String(a.portId).localeCompare(String(b.portId))).slice(0, limit);
+  const budget = { subrequests: 1, playstore: 0, startedAt: Date.now() };
   let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
   const details = [];
   for (const entry of ordered) {
+    if (budget.subrequests >= MAX_SUBREQUESTS_PER_RUN || (Date.now() - budget.startedAt) >= SYNC_ELAPSED_BUDGET_MS) {
+      break;
+    }
+    if (entry._syncInfo.provider === "playstore" && budget.playstore >= MAX_PLAYSTORE_PER_RUN) {
+      if (options.useOffset) break;
+      continue;
+    }
     checkedCount++;
     const originalVersion = entry.version;
     try {
-      const outcome = await syncSinglePortWithSource(env, entry);
+      const outcome = await syncSinglePortWithSource(env, entry, budget);
       const target = entry._port;
       for (const key of ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link","lastCheckedAt"]) {
         target[key] = entry[key] ?? target[key] ?? "";
@@ -1380,7 +1276,7 @@ async function runSyncBatch(env, options = {}) {
       errorCount++;
       entry._port.lastCheckedAt = new Date().toISOString();
       details.push({ portId: entry.portId, gameSlug: entry.gameSlug, project: entry.project,
-        provider: resolvePortSyncTarget(entry).provider, status: "error",
+        provider: entry._syncInfo.provider, status: "error",
         error: error?.message || "Error consultando fuente externa" });
     }
   }
@@ -1395,68 +1291,27 @@ async function runSyncBatch(env, options = {}) {
   state.syncLogs.unshift({ id: lastId + 1, source, checkedCount, updatedCount, downCount, errorCount,
     summary: details.slice(0, 40), createdAt: now });
   state.syncLogs = state.syncLogs.slice(0, 12);
-  await saveCatalogState(env, state, "NAPL: registrar sincronización " + source);
   let autoPublishedCommit = "", autoPublishedDataCommit = "";
   if (source === "cron" && (updatedCount > 0 || state.meta.pending_github_sync === "1") &&
       String(env.AUTO_PUBLISH_CRON || "true").toLowerCase() !== "false") {
     const published = await publishSavedCatalog(env, state);
     autoPublishedCommit = published.commit || "";
     autoPublishedDataCommit = published.dataCommit || "";
+  } else {
+    await saveCatalogState(env, state, "NAPL: registrar sincronización " + source);
   }
-  return { source, totalSyncPorts: ports.length, totalGithubPorts: ports.length, checkedCount, updatedCount,
+  const result = { source, totalSyncPorts: ports.length, totalGithubPorts: ports.length, checkedCount, updatedCount,
     downCount, errorCount, nextOffset: offset + checkedCount,
     hasMore: Boolean(options.useOffset && offset + checkedCount < ports.length),
     autoPublishedCommit, autoPublishedDataCommit, details, syncedAt: now };
-}
-
-async function applyStagedSync(env) {
-  const loaded = await readSyncStage(env);
-  const stage = loaded.value;
-  if (!stage || stage.status !== "completed") {
-    throw new Error("La revisión completa todavía no terminó. No hay actualizaciones listas para aplicar.");
-  }
-  const state = await readCatalogState(env);
-  const portsById = new Map();
-  for (const game of state.catalog.games) for (const port of game.ports || []) portsById.set(port.portId, port);
-  let appliedCount = 0;
-  for (const [portId, patch] of Object.entries(stage.updates || {})) {
-    const port = portsById.get(portId);
-    if (!port) continue;
-    Object.assign(port, patch);
-    appliedCount++;
-  }
-  for (const [portId, checkedAt] of Object.entries(stage.checkedAt || {})) {
-    const port = portsById.get(portId);
-    if (port && checkedAt) port.lastCheckedAt = checkedAt;
-  }
-  const now = new Date().toISOString();
-  state.meta.last_sync_at = now;
-  if (appliedCount) {
-    state.catalog.updatedAt = now;
-    state.meta.updated_at = now;
-    state.meta.pending_github_sync = "1";
-  }
-  const lastId = Math.max(0, ...state.syncLogs.map((log) => Number(log.id) || 0));
-  state.syncLogs.unshift({ id: lastId + 1, source: "manual", checkedCount: stage.checkedCount || 0,
-    updatedCount: appliedCount, downCount: stage.downCount || 0, errorCount: stage.errorCount || 0,
-    summary: (stage.details || []).filter((item) => item.status === "down" || item.changed).slice(0, 40),
-    createdAt: now });
-  state.syncLogs = state.syncLogs.slice(0, 12);
-  await saveCatalogState(env, state, "NAPL: aplicar actualizaciones revisadas de fuentes");
-  const cleared = { version: 1, status: "applied", appliedAt: now, checkedCount: stage.checkedCount || 0,
-    updatedCount: appliedCount, downCount: stage.downCount || 0, errorCount: stage.errorCount || 0,
-    nextOffset: stage.totalSyncPorts || 0, totalSyncPorts: stage.totalSyncPorts || 0, updates: {}, details: [] };
-  await writeSyncStage(env, cleared, loaded.sha);
-  return { success: true, appliedCount, stage: cleared, ...catalogStateResponse(state) };
+  if (options.returnState) return { sync: result, state };
+  return result;
 }
 
 async function publishSavedCatalog(env, state) {
   const now = new Date().toISOString();
   try {
     state = state || await readCatalogState(env);
-    state.meta.pending_github_sync = "1";
-    state.meta.last_pages_publish_error = "";
-    await saveCatalogState(env, state, "NAPL: guardar estado interno antes de publicar");
     const publicCatalog = toPublicCatalog(state.catalog);
     const dataPub = await ghCommitDataCatalog(publicCatalog, env, "NAPL: publicar catálogo JSON desde estado interno");
     state.meta.pending_github_sync = "0";
@@ -1523,14 +1378,22 @@ async function route(req, env) {
   }
   if (origin && !isAllowedOrigin(origin, env)) return json({ error: "Origen no autorizado." }, 403, headers);
   if (path === "/api/health" && req.method === "GET") {
-    // Health check liviano: no descargar ni parsear el catálogo privado.
-    // La lectura completa se reserva para /api/catalog tras autenticar.
     const health = {
-      ok: true, localMode: false, storage: "github-json", storageStatus: "configured", d1: false,
+      ok: true, localMode: false, storage: "github-json", d1: false,
       configured: { adminPassword: Boolean(env.ADMIN_PASSWORD), githubToken: Boolean(env.GITHUB_TOKEN),
         dataGithubToken: Boolean(env.CATALOG_DATA_GITHUB_TOKEN), sessionSecret: Boolean(env.SESSION_SECRET), d1: false }
     };
-    return json(health, 200, headers);
+    try {
+      const state = await readCatalogState(env);
+      health.storageStatus = "ok";
+      health.catalog = { games: state.catalog.games.length,
+        ports: state.catalog.games.reduce((sum, game) => sum + (game.ports || []).length, 0) };
+    } catch (error) {
+      health.storageStatus = "error";
+      health.storageError = error?.message || "No se pudo leer el estado JSON.";
+      health.ok = false;
+    }
+    return json(health, health.ok ? 200 : 503, headers);
   }
   if (path === "/api/login" && req.method === "POST") {
     if (!env.ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Faltan secretos ADMIN_PASSWORD o SESSION_SECRET en Cloudflare." }, 503, headers);
@@ -1542,14 +1405,6 @@ async function route(req, env) {
   if (!path.startsWith("/api/")) return json({ name: "NAPL JSON Catalog Worker", ok: true }, 200, headers);
   if (!(await authenticated(req, env))) return json({ error: "Sesión inválida o vencida. Iniciá sesión nuevamente." }, 401, headers);
   if (path === "/api/verify-session" && req.method === "GET") return json({ ok: true }, 200, headers);
-  if (path === "/api/sync-stage" && req.method === "GET") {
-    const loaded = await readSyncStage(env);
-    return json({ success: true, stage: loaded.value || null }, 200, headers);
-  }
-  if (path === "/api/sync-apply" && req.method === "POST") {
-    const result = await applyStagedSync(env);
-    return json(result, 200, headers);
-  }
   if (path === "/api/catalog" && req.method === "GET") {
     const state = await readCatalogState(env), data = catalogStateResponse(state);
     return json({ ...data, exists: data.catalog.games.length > 0 }, 200, headers);
@@ -1557,8 +1412,8 @@ async function route(req, env) {
   if (path === "/api/games" && req.method === "POST") {
     const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
     const saved = await saveSingleGameInJson(state, null, body.game || body, true);
-    await saveCatalogState(env, state, "NAPL: guardar juego y ports en catálogo privado");
-    return json({ success: true, saved, ...catalogStateResponse(state) }, 200, headers);
+    const publication = await publishSavedCatalog(env, state);
+    return json({ success: true, saved, ...publication, ...(publication.state || {}) }, 200, headers);
   }
   const gameMatch = path.match(/^\/api\/games\/([^/]+)$/);
   if (gameMatch) {
@@ -1566,13 +1421,13 @@ async function route(req, env) {
     if (req.method === "PUT") {
       const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
       const saved = await saveSingleGameInJson(state, slug, body.game || body, false);
-      await saveCatalogState(env, state, "NAPL: guardar cambios de juego y ports en catálogo privado");
-      return json({ success: true, saved, ...catalogStateResponse(state) }, 200, headers);
+      const publication = await publishSavedCatalog(env, state);
+      return json({ success: true, saved, ...publication, ...(publication.state || {}) }, 200, headers);
     }
     if (req.method === "DELETE") {
       const state = await readCatalogState(env), removed = deleteGameFromJson(state, slug);
-      await saveCatalogState(env, state, "NAPL: eliminar juego del catálogo privado");
-      return json({ success: true, removed, ...catalogStateResponse(state) }, 200, headers);
+      const publication = await publishSavedCatalog(env, state);
+      return json({ success: true, removed, ...publication, ...(publication.state || {}) }, 200, headers);
     }
   }
   if (path === "/api/lookup/github" && req.method === "POST") {
@@ -1583,12 +1438,6 @@ async function route(req, env) {
     const body = await req.json().catch(() => ({}));
     return json({ success: true, source: await inspectPortSource(body.url || body.repo || body.target, env) }, 200, headers);
   }
-  if (path === "/api/lookup/steam" && req.method === "POST") {
-    const body = await req.json().catch(() => ({}));
-    const data = await inspectSteamUrl(body.url || body.appId);
-    return json({ success: true, steam: data }, 200, headers);
-  }
-
   if (path === "/api/lookup/launchbox" && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
     return json({ success: true, launchbox: await inspectLaunchboxUrl(body.url) }, 200, headers);
@@ -1615,29 +1464,59 @@ async function route(req, env) {
   }
   if ((path === "/api/sync-github" || path === "/api/sync-sources") && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
-    const sync = await runSyncBatch(env, { source: "manual", limit: body.limit || 20, offset: body.offset || 0, useOffset: Boolean(body.useOffset), stageOnly: Boolean(body.stageOnly) });
-    if (body.stageOnly) return json({ success: true, sync }, 200, headers);
-    const state = await readCatalogState(env);
-    return json({ success: true, sync, ...catalogStateResponse(state) }, 200, headers);
+    const { sync, state } = await runSyncBatch(env, {
+      source: "manual",
+      limit: body.limit || DEFAULT_CRON_BATCH,
+      offset: body.offset || 0,
+      useOffset: Boolean(body.useOffset),
+      returnState: true,
+    });
+    const compact = body.includeCatalog === false || body.compact === true;
+    const statePayload = compact
+      ? { meta: state.meta, stats: catalogStats(state), syncLogs: state.syncLogs.slice(0, 12) }
+      : catalogStateResponse(state);
+    return json({ success: true, sync, ...statePayload }, 200, headers);
   }
   if (path === "/api/import-sheets" && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
     const state = await readCatalogState(env);
-    const res = await fetch(SHEET_URL, { headers: { Accept: "text/csv" } });
+    const res = await fetchWithTimeout(SHEET_URL, { headers: { Accept: "text/csv" } }, 10000);
     if (!res.ok) throw new Error("Google Sheets HTTP " + res.status);
     const csv = await res.text(), rows = csvParse(csv);
     if (!rows.length) throw new Error("CSV vacío.");
     const imported = fromRows(rows);
     if (!imported.games.length) throw new Error("No se encontraron juegos válidos.");
-    const oldGames = state.catalog.games, oldSet = new Set(oldGames.map((g) => g.slug));
+    const oldGames = state.catalog.games;
+    const oldSet = new Set();
+    const oldPorts = new Map();
+    const oldGamesBySlug = new Map();
+    const oldGamesByName = new Map();
+    const oldGamesByPortId = new Map();
+    for (const game of oldGames) {
+      oldSet.add(game.slug);
+      oldGamesBySlug.set(game.slug, game);
+      const nKey = norm(game.name);
+      if (nKey && !oldGamesByName.has(nKey)) oldGamesByName.set(nKey, game);
+      for (const p of game.ports || []) {
+        oldPorts.set(p.portId, p);
+        oldGamesByPortId.set(p.portId, game);
+      }
+    }
     const newSet = new Set(imported.games.map((g) => g.slug));
-    const oldPorts = new Map(oldGames.flatMap((g) => (g.ports || []).map((p) => [p.portId, p])));
-    const oldGamesBySlug = new Map(oldGames.map((game) => [game.slug, game]));
-    const oldGamesByPortId = new Map(oldGames.flatMap((g) => (g.ports || []).map((p) => [p.portId, g])));
+    let totalPorts = 0;
+    let addedGames = 0;
     for (const game of imported.games) {
-      const oldGame = oldGamesBySlug.get(game.slug)
-        || oldGames.find((item) => norm(item.name) === norm(game.name))
-        || (game.ports || []).map((port) => oldGamesByPortId.get(port.portId)).find(Boolean)
-        || null;
+      if (!oldSet.has(game.slug)) addedGames++;
+      let oldGame = oldGamesBySlug.get(game.slug) || oldGamesByName.get(norm(game.name)) || null;
+      if (!oldGame) {
+        for (const port of game.ports || []) {
+          const found = oldGamesByPortId.get(port.portId);
+          if (found) {
+            oldGame = found;
+            break;
+          }
+        }
+      }
       if (!game.popularityKey) game.popularityKey = oldGame?.popularityKey || slugify(oldGame?.name || game.name);
       if (oldGame) {
         game.steamUrl = oldGame.steamUrl || "";
@@ -1655,13 +1534,21 @@ async function route(req, env) {
           syncTarget: old.syncTarget || "", githubStatus: old.githubStatus || "", lastCheckedAt: old.lastCheckedAt || ""
         } : port;
       });
+      totalPorts += game.ports.length;
+    }
+    let removedGames = 0;
+    for (const oldSlug of oldSet) {
+      if (!newSet.has(oldSlug)) removedGames++;
     }
     state.catalog = imported; state.meta.updated_at = imported.updatedAt; state.meta.pending_github_sync = "1";
     await saveCatalogState(env, state, "NAPL: importar catálogo desde Google Sheets");
-    return json({ ...catalogStateResponse(state), summary: {
-      csvRows: rows.length, games: imported.games.length, ports: imported.games.reduce((n, g) => n + g.ports.length, 0),
-      addedGames: imported.games.filter((g) => !oldSet.has(g.slug)).length,
-      removedGames: Array.from(oldSet).filter((slug) => !newSet.has(slug)).length, characters: csv.length
+    const compact = body.includeCatalog === false || body.compact === true;
+    const statePayload = compact
+      ? { meta: state.meta, stats: catalogStats(state), syncLogs: state.syncLogs.slice(0, 12) }
+      : catalogStateResponse(state);
+    return json({ ...statePayload, summary: {
+      csvRows: rows.length, games: imported.games.length, ports: totalPorts,
+      addedGames, removedGames, characters: csv.length
     }}, 200, headers);
   }
   if (path === "/api/publish" && req.method === "POST") {
