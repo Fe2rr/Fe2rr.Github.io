@@ -1373,8 +1373,7 @@ async function runSyncBatch(env, options = {}) {
     summary: details.slice(0, 40), createdAt: now });
   state.syncLogs = state.syncLogs.slice(0, 12);
   let autoPublishedCommit = "", autoPublishedDataCommit = "";
-  if (source === "cron" && (updatedCount > 0 || state.meta.pending_github_sync === "1") &&
-      String(env.AUTO_PUBLISH_CRON || "true").toLowerCase() !== "false") {
+  if (source === "cron" && (updatedCount > 0 || state.meta.pending_github_sync === "1")) {
     const published = await publishSavedCatalog(env, state);
     autoPublishedCommit = published.commit || "";
     autoPublishedDataCommit = published.dataCommit || "";
@@ -1757,7 +1756,7 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const batchSize = Math.min(Math.max(Number(env.CRON_BATCH_SIZE) || DEFAULT_CRON_BATCH, 1), MAX_SYNC_BATCH);
+    const batchSize = MAX_SYNC_BATCH;
     ctx.waitUntil(
       runSyncBatch(env, {
         source: "cron",
