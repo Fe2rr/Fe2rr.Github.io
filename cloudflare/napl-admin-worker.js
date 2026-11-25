@@ -1320,6 +1320,9 @@ async function runSyncBatch(env, options = {}) {
       stage.status = "completed";
       stage.completedAt = now;
     }
+    delete stage.lastError;
+    delete stage.lastErrorAt;
+    delete stage.lastErrorOffset;
     const savedStage = await writeSyncStage(env, stage, loaded.sha);
     return { source, staged: true, stageStatus: stage.status, totalSyncPorts: ports.length,
       checkedCount, updatedCount, downCount, errorCount, nextOffset: stage.nextOffset,
