@@ -14,7 +14,7 @@ import {
     extractGameGenres,
     getDeveloperGameCounts,
 } from "../lib/helpers.js";
-import { loadCoverImage } from "../lib/cover-fallback.js";
+import { loadOptimizedCoverImage } from "../lib/cover-fallback.js";
 import {
     isMultiGameApp,
     isNonUniqueProjectName,
@@ -1554,10 +1554,15 @@ function displayGameSummary(game, parentElement) {
             { once: true }
         );
         media.appendChild(cover);
-        loadCoverImage(cover, coverUrl, () => {
-            syncBackdrop("");
-            cover.replaceWith(createCoverFallback(game.name));
-        });
+        loadOptimizedCoverImage(
+            cover,
+            coverUrl,
+            () => {
+                syncBackdrop("");
+                cover.replaceWith(createCoverFallback(game.name));
+            },
+            240
+        );
         if (cover.complete && cover.naturalWidth > 0) {
             syncBackdrop(cover.currentSrc || cover.src);
         }
@@ -1815,6 +1820,7 @@ function displayPortCard(
         arrow.setAttribute("aria-hidden", "true");
         arrow.textContent = "↗";
         link.appendChild(arrow);
+
         linkRow.appendChild(link);
 
         const reportTrigger = document.createElement("div");

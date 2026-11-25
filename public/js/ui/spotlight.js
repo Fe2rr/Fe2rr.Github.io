@@ -10,7 +10,10 @@ import {
     getPortDisplayName,
     getGamePlatformLabel,
 } from "./game-card.js";
-import { loadCoverImage } from "../lib/cover-fallback.js";
+import {
+    loadOptimizedCoverImage,
+    getOptimizedCoverUrl,
+} from "../lib/cover-fallback.js";
 import {
     getCachedResolvedCoverUrl,
     getMemoryCachedImageSrc,
@@ -24,8 +27,8 @@ import {
     getPopularVisits,
 } from "../lib/popularity.js";
 import {
-    parseDateAdded,
-    parseLastUpdate,
+    getLatestUpdate,
+    getDateAdded,
     clearHeroViewTransitions,
 } from "../lib/helpers.js";
 
@@ -43,15 +46,6 @@ function shuffleInPlace(list) {
         [list[i], list[j]] = [list[j], list[i]];
     }
     return list;
-}
-
-function getLatestGameDate(game, field) {
-    return (Array.isArray(game?.ports) ? game.ports : [])
-        .map((port) => field === "lastUpdate"
-            ? parseLastUpdate(port?.lastUpdate)
-            : parseDateAdded(port?.dateAdded))
-        .filter(Boolean)
-        .reduce((latest, date) => !latest || date > latest ? date : latest, null);
 }
 
 function buildEligibleEntries(games) {
@@ -80,7 +74,7 @@ function buildSpotlightQueue(games) {
 
     // Rising: ranking de los últimos 50 juegos agregados, ponderando semana y mes.
     const newest50 = [...eligible]
-        .map((item) => ({ ...item, addedAt: getLatestGameDate(item.game, "dateAdded") }))
+        .map((item) => ({ ...item, addedAt: getDateAdded(item.game) }))
         .filter((item) => item.addedAt)
         .sort((a, b) => b.addedAt - a.addedAt)
         .slice(0, 50);
@@ -104,7 +98,7 @@ function buildSpotlightQueue(games) {
     // Recently Updated: solo juegos del Top 50 histórico; ventana 24 h y fallback hasta 48 h.
     const now = Date.now();
     const updatedCandidates = top50
-        .map((item) => ({ ...item, updatedAt: getLatestGameDate(item.game, "lastUpdate") }))
+        .map((item) => ({ ...item, updatedAt: getLatestUpdate(item.game) }))
         .filter((item) => item.updatedAt && item.updatedAt.getTime() <= now)
         .sort((a, b) => b.updatedAt - a.updatedAt);
     const within24h = updatedCandidates.filter((item) => now - item.updatedAt.getTime() <= 24 * 60 * 60 * 1000);
@@ -125,8 +119,7 @@ function buildFallbackPool(games) {
     const candidates = buildEligibleEntries(games).map((item) => {
         const hasDescription = Boolean(String(item.game.description || "").trim());
         const portCount = item.game.ports.length;
-        const latestDate = getLatestGameDate(item.game, "lastUpdate") ||
-            getLatestGameDate(item.game, "dateAdded");
+        const latestDate = getLatestUpdate(item.game) || getDateAdded(item.game);
         const recencyScore = latestDate ? latestDate.getTime() / 1e12 : 0;
         return {
             ...item,
@@ -141,7 +134,10 @@ function preloadSpotlightCover(game) {
     const rawUrl = String(game?.coverUrl || "").trim();
     if (!rawUrl || isCoverUrlFailed(rawUrl)) return;
 
-    const effectiveUrl = getCachedResolvedCoverUrl(rawUrl) || rawUrl;
+    const effectiveUrl =
+        getOptimizedCoverUrl(rawUrl, 200) ||
+        getCachedResolvedCoverUrl(rawUrl) ||
+        rawUrl;
     if (getMemoryCachedImageSrc(effectiveUrl)) return;
 
     if (isCacheableImageUrl(effectiveUrl)) {
@@ -185,7 +181,6 @@ export function createSpotlightController() {
     let progressAnimation = null;
     let renderToken = 0;
     let hasResolvedPool = false;
-    let userManuallyStepped = false;
     let swapResetTimer = 0;
 
     const reducedMotionQuery = window.matchMedia?.(
@@ -313,7 +308,7 @@ export function createSpotlightController() {
             cycleStartedAt = 0;
             remainingMs = SPOTLIGHT_INTERVAL_MS;
             if (!canAutoCycle()) return;
-            stepSlide(1, false);
+            stepSlide(1);
         }, waitMs);
     }
 
@@ -465,16 +460,21 @@ export function createSpotlightController() {
             };
             coverImg.addEventListener("load", onLoaded, { once: true });
 
-            loadCoverImage(coverImg, String(game.coverUrl || "").trim(), () => {
-                if (token !== renderToken) return;
-                coverImg.hidden = true;
-                coverFrame?.classList.remove("is-loaded");
-                coverFrame?.classList.add("cover-unavailable");
-                syncBackdropCover("");
-                if (queue.length > 1) {
-                    handleBrokenCurrentEntry(game.slug, direction);
-                }
-            });
+            loadOptimizedCoverImage(
+                coverImg,
+                String(game.coverUrl || "").trim(),
+                () => {
+                    if (token !== renderToken) return;
+                    coverImg.hidden = true;
+                    coverFrame?.classList.remove("is-loaded");
+                    coverFrame?.classList.add("cover-unavailable");
+                    syncBackdropCover("");
+                    if (queue.length > 1) {
+                        handleBrokenCurrentEntry(game.slug, direction);
+                    }
+                },
+                200
+            );
 
             if (coverImg.complete && coverImg.naturalWidth > 0) {
                 coverFrame?.classList.add("is-loaded");
@@ -497,11 +497,8 @@ export function createSpotlightController() {
         scheduleIdleCycle();
     }
 
-    function stepSlide(delta, isManual = true) {
+    function stepSlide(delta) {
         if (queue.length <= 1) return;
-        if (isManual) {
-            userManuallyStepped = true;
-        }
         currentIndex = (currentIndex + delta + queue.length) % queue.length;
         renderCurrentEntry(delta, true);
     }
@@ -549,12 +546,12 @@ export function createSpotlightController() {
 
     prevButton?.addEventListener("click", (event) => {
         event.stopPropagation();
-        stepSlide(-1, true);
+        stepSlide(-1);
     });
 
     nextButton?.addEventListener("click", (event) => {
         event.stopPropagation();
-        stepSlide(1, true);
+        stepSlide(1);
     });
 
     titleLink?.addEventListener("click", (event) => {

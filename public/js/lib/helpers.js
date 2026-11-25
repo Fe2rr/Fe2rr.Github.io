@@ -18,13 +18,31 @@ export function createSlug(name) {
         .replace(/^-+|-+$/g, "");
 }
 
-export function normalizeHeader(value) {
-    return String(value ?? "")
-        .replace(/^\uFEFF/, "")
+export function normalizeSearchText(value) {
+    return normalizeText(value)
+        .replace(/[^a-z0-9]+/g, " ")
         .trim()
-        .toUpperCase()
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "");
+        .replace(/\s+/g, " ");
+}
+
+export function filterAndSortByQuery(
+    items,
+    getName,
+    query,
+    normalizeFn = normalizeText
+) {
+    const normalizedQuery = normalizeFn(query);
+    if (!normalizedQuery) return [];
+    return (Array.isArray(items) ? items : [])
+        .filter((item) => normalizeFn(getName(item)).includes(normalizedQuery))
+        .sort((a, b) => {
+            const nameA = normalizeFn(getName(a));
+            const nameB = normalizeFn(getName(b));
+            const startsA = nameA.startsWith(normalizedQuery);
+            const startsB = nameB.startsWith(normalizedQuery);
+            if (startsA !== startsB) return startsA ? -1 : 1;
+            return nameA.localeCompare(nameB, "en", { sensitivity: "base" });
+        });
 }
 
 export function normalizePlatformLabel(value) {

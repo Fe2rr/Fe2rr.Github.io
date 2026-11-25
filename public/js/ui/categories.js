@@ -14,6 +14,7 @@ import {
     parseDateAdded,
     getLatestUpdate,
     getDateAdded,
+    filterAndSortByQuery,
 } from "../lib/helpers.js";
 import {
     ensurePopularPeriod,
@@ -1059,19 +1060,6 @@ export function createCategoryController(state, options = {}) {
         }
 
         appendNextBatch();
-    }
-
-    function filterAndSortByQuery(items, getName, query) {
-        return items
-            .filter((item) => normalizeText(getName(item)).includes(query))
-            .sort((a, b) => {
-                const nameA = normalizeText(getName(a));
-                const nameB = normalizeText(getName(b));
-                const startsA = nameA.startsWith(query);
-                const startsB = nameB.startsWith(query);
-                if (startsA !== startsB) return startsA ? -1 : 1;
-                return nameA.localeCompare(nameB, "en", { sensitivity: "base" });
-            });
     }
 
     function normalizePlatformForFilter(value) {

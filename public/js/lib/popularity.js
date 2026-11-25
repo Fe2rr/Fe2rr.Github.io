@@ -48,14 +48,6 @@ export function getPopularVisits(popularityKey, period = "alltime") {
  const key = normalizePopularityKey(popularityKey);
  return popularByPeriod.get(String(period || "alltime").trim().toLowerCase())?.get(key) || 0;
 }
-export async function refreshPopularPeriod(period = "alltime") {
- const normalized = String(period || "alltime").trim().toLowerCase();
- if (!["week", "month", "alltime"].includes(normalized)) return new Map();
- const map = buildPopularityMap(await requestPopularity(normalized));
- popularByPeriod.set(normalized, map);
- popularFetchedAt.set(normalized, Date.now());
- return map;
-}
 export async function ensureAllTimePopular() { return ensurePopularPeriod("alltime"); }
 export function getAllTimeVisits(popularityKey) { return getPopularVisits(popularityKey, "alltime"); }
 export function registerGameVisit(popularityKey) {

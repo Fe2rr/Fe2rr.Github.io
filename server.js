@@ -22,7 +22,6 @@ function readCliArg(name, fallback) {
 const app = express();
 const PORT = Number(readCliArg('--port', '3000')) || 3000;
 const HOST = readCliArg('--host', '0.0.0.0') || '0.0.0.0';
-const RATINGS_TARGET = 'https://ports-ratings-worker.federicoxastro.workers.dev';
 const CATALOG_PATH = path.join(__dirname, '.local', 'catalog-seed.json');
 const CATALOG_SEED_URL = 'https://napl-catalog.pages.dev/assets/data/catalog.json';
 const SCHEMA_PATH = path.join(__dirname, 'cloudflare', 'schema.sql');
@@ -253,6 +252,49 @@ app.get('/api/catalog-meta', (req, res) => {
   }
 });
 
+let publicCatalogCache = { data: null, fetchedAt: 0 };
+const PUBLIC_CATALOG_UPSTREAM = 'https://napl-admin-api.federicoxastro.workers.dev/api/public-catalog';
+
+app.get('/api/public-catalog', async (req, res) => {
+  try {
+    const { catalog } = localD1.readCatalog({ includeInternal: false });
+    if (Array.isArray(catalog?.games) && catalog.games.length > 0) {
+      res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+      return res.json(catalog);
+    }
+
+    const freshEnough =
+      publicCatalogCache.data && Date.now() - publicCatalogCache.fetchedAt < 60_000;
+    if (freshEnough) {
+      res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+      return res.json(publicCatalogCache.data);
+    }
+
+    const upstreamRes = await fetch(PUBLIC_CATALOG_UPSTREAM, {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    });
+    if (!upstreamRes.ok) {
+      throw new Error(`Upstream catalog HTTP ${upstreamRes.status}`);
+    }
+    const upstreamJson = await upstreamRes.json();
+    if (!upstreamJson || !Array.isArray(upstreamJson.games)) {
+      throw new Error('Upstream catalog JSON is invalid.');
+    }
+    publicCatalogCache = { data: upstreamJson, fetchedAt: Date.now() };
+    res.setHeader('Cache-Control', 'public, max-age=30, stale-while-revalidate=60');
+    return res.json(upstreamJson);
+  } catch (error) {
+    if (publicCatalogCache.data) {
+      res.setHeader('Cache-Control', 'public, max-age=10');
+      return res.json(publicCatalogCache.data);
+    }
+    return res.status(502).json({
+      error: error?.message || 'Could not load public catalog.',
+    });
+  }
+});
+
 // Admin + D1 parity endpoints (mirroring Cloudflare Worker API; D1 requires admin auth)
 function requireAdminAuth(req, res, next) {
   if (!localD1.verifyToken(req.headers.authorization)) {
@@ -442,36 +484,6 @@ function buildPortSummary(portId) {
   return summary;
 }
 
-// Proxy ratings API in preview to avoid Worker CORS origin restrictions
-app.all('/api/ratings/*', async (req, res) => {
-  try {
-    const subPath = req.originalUrl.replace(/^\/api\/ratings/, '');
-    const targetUrl = `${RATINGS_TARGET}${subPath}`;
-
-    const fetchOptions = {
-      method: req.method,
-      headers: {
-        'Content-Type': 'application/json',
-        'Origin': 'https://fe2rr.github.io',
-      },
-    };
-
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      fetchOptions.body = JSON.stringify(req.body ?? {});
-    }
-
-    const upstream = await fetch(targetUrl, fetchOptions);
-    const bodyText = await upstream.text();
-
-    res.status(upstream.status);
-    res.setHeader('Content-Type', upstream.headers.get('content-type') || 'application/json');
-    res.send(bodyText);
-  } catch (error) {
-    console.error('Ratings proxy error:', error);
-    res.status(502).json({ error: 'Could not reach the ratings server.' });
-  }
-});
-
 // Compatibility reports API (preview backend matching Supabase Edge Function contract)
 app.get('/api/compatibility', (req, res) => {
   const action = String(req.query.action || '');
@@ -640,87 +652,6 @@ app.post('/api/report-link', (req, res) => {
   return res.json({ success: true, portId, reason: reason || note, note });
 });
 
-// Sheet proxy endpoint for preview mode (avoids browser iframe CORS / redirect blocks)
-let sheetCache = null;
-let sheetCacheTime = 0;
-const SPREADSHEET_CSV_URL =
-  'https://docs.google.com/spreadsheets/d/1CO7dH7mbj9sl67g4e94wczHESp0NAsOa7_chKKii9OA/export?format=csv';
-
-app.get('/api/sheet', async (req, res) => {
-  try {
-    const now = Date.now();
-    if (sheetCache && now - sheetCacheTime < 120000) {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      return res.send(sheetCache);
-    }
-    const upstream = await fetch(SPREADSHEET_CSV_URL);
-    if (!upstream.ok) {
-      throw new Error(`Google Sheets HTTP ${upstream.status}`);
-    }
-    const csv = await upstream.text();
-    sheetCache = csv;
-    sheetCacheTime = now;
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    return res.send(csv);
-  } catch (error) {
-    console.error('Sheet proxy error:', error);
-    if (sheetCache) {
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      return res.send(sheetCache);
-    }
-    return res.status(502).json({ error: 'Could not fetch Google Sheet catalog.' });
-  }
-});
-
-// Visit tracking proxy for preview mode
-const POPULAR_URL =
-  'https://script.google.com/macros/s/AKfycbxio6DGpBJRkYdceeFVXk3gSOFcBe5KZJtHU8F2j66DDYx_G_az01p7rnsuCq0KPHY/exec';
-
-const popularCache = new Map();
-
-app.get('/api/popular', async (req, res) => {
-  const period = String(req.query.popular || 'week').trim();
-  const cached = popularCache.get(period);
-  const now = Date.now();
-
-  if (cached && now - cached.time < 60000) {
-    return res.json(cached.data);
-  }
-
-  try {
-    const url = new URL(POPULAR_URL);
-    url.searchParams.set('popular', period);
-    const upstream = await fetch(url.toString());
-    const data = await upstream.json();
-    popularCache.set(period, { time: now, data });
-    return res.json(data);
-  } catch (error) {
-    console.error('Popular proxy error:', error);
-    if (cached) {
-      return res.json(cached.data);
-    }
-    return res.status(502).json({ success: false, error: 'Could not fetch popular games.' });
-  }
-});
-
-app.post('/api/visit', async (req, res) => {
-  const slug = String(req.body?.slug || '').trim();
-  if (!slug) {
-    return res.status(400).json({ success: false, error: 'slug is required.' });
-  }
-
-  try {
-    const url = new URL(POPULAR_URL);
-    url.searchParams.set('game', slug);
-    url.searchParams.set('_', String(Date.now()));
-    await fetch(url.toString(), { method: 'GET' });
-  } catch {
-    // Non-critical telemetry; do not fail the client request
-  }
-
-  return res.json({ success: true, slug });
-});
-
 // Steam cover resolver/proxy for hashed Store asset paths (IStoreBrowseService)
 const steamCoverUrlCache = new Map();
 const STEAM_COVER_TTL_MS = 24 * 60 * 60 * 1000;
@@ -845,9 +776,7 @@ app.use(
     etag: true,
     lastModified: true,
     setHeaders(res, filePath) {
-      if (/catalog\.json$/i.test(filePath)) {
-        res.setHeader('Cache-Control', 'public, max-age=60, must-revalidate');
-      } else if (/\.json$/i.test(filePath)) {
+      if (/\.json$/i.test(filePath)) {
         res.setHeader('Cache-Control', 'public, max-age=3600, must-revalidate');
       } else if (/\.(html|css|js)$/i.test(filePath)) {
         res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');

@@ -17,6 +17,32 @@ import {
     getCachedOrFetchImageSrc,
 } from "./image-cache.js";
 
+const COVER_OPTIMIZER_URL =
+    "https://napl-image-optimizer.federicoxastro.workers.dev/image";
+const OPTIMIZABLE_COVER_HOSTS = new Set([
+    "images.launchbox-app.com",
+    "gamesdb-images.launchbox.gg",
+]);
+
+export function getOptimizedCoverUrl(rawUrl, width = 180) {
+    try {
+        const source = new URL(String(rawUrl || "").trim());
+        if (
+            !["http:", "https:"].includes(source.protocol) ||
+            !OPTIMIZABLE_COVER_HOSTS.has(source.hostname.toLowerCase())
+        ) {
+            return "";
+        }
+        source.protocol = "https:";
+        const optimized = new URL(COVER_OPTIMIZER_URL);
+        optimized.searchParams.set("url", source.toString());
+        optimized.searchParams.set("w", String(width));
+        return optimized.toString();
+    } catch {
+        return "";
+    }
+}
+
 function extractSteamAppId(coverUrl) {
     const raw = String(coverUrl || "").trim();
     if (!raw) return "";
@@ -182,3 +208,18 @@ export async function loadCoverImage(imgElement, coverUrl, onUnavailable) {
     imgElement.src = effectiveUrl;
 }
 
+export async function loadOptimizedCoverImage(
+    imgElement,
+    coverUrl,
+    onUnavailable,
+    width = 180
+) {
+    const rawUrl = String(coverUrl || "").trim();
+    const optimizedUrl = getOptimizedCoverUrl(rawUrl, width);
+    if (optimizedUrl) {
+        return loadCoverImage(imgElement, optimizedUrl, () =>
+            loadCoverImage(imgElement, rawUrl, onUnavailable)
+        );
+    }
+    return loadCoverImage(imgElement, rawUrl, onUnavailable);
+}

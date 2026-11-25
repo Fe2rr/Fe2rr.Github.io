@@ -11,24 +11,6 @@ const CATALOG_JSON_URL = "https://napl-admin-api.federicoxastro.workers.dev/api/
 
 let catalogPromise = null;
 
-function clearLegacyCatalogCache() {
-    try {
-        if (typeof window !== "undefined" && "caches" in window) {
-            window.caches.delete("napl-catalog-v4").catch(() => {});
-        }
-    } catch {
-        // Ignore unavailable CacheStorage.
-    }
-
-    try {
-        if (typeof localStorage !== "undefined") {
-            localStorage.removeItem("napl_catalog_cache_meta_v4");
-        }
-    } catch {
-        // Ignore unavailable localStorage.
-    }
-}
-
 async function fetchStaticJsonCatalog() {
     const response = await fetch(CATALOG_JSON_URL, {
         method: "GET",
@@ -49,8 +31,6 @@ async function fetchStaticJsonCatalog() {
 
 export async function loadCatalog() {
     if (catalogPromise) return catalogPromise;
-
-    clearLegacyCatalogCache();
 
     catalogPromise = fetchStaticJsonCatalog()
         .then((doc) => hydrateCatalog(doc))

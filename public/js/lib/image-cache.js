@@ -136,7 +136,11 @@ export function isCacheableImageUrl(url) {
         if (parsed.origin === window.location.origin) {
             return true;
         }
-        return /(?:^|\.)steamstatic\.com$/i.test(parsed.hostname);
+        const host = parsed.hostname.toLowerCase();
+        return (
+            /(?:^|\.)steamstatic\.com$/i.test(host) ||
+            host === "napl-image-optimizer.federicoxastro.workers.dev"
+        );
     } catch {
         return false;
     }

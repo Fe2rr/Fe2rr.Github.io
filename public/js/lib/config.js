@@ -14,7 +14,6 @@ export const COMPATIBILITY_API_URL =
 export const REPORT_LINK_API_URL =
     "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/report-link";
 
-
 export const WORKER_API_BASE =
     "https://napl-admin-api.federicoxastro.workers.dev";
 

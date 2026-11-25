@@ -595,6 +595,7 @@ export function createCompatViewController() {
                     arrow.setAttribute("aria-hidden", "true");
                     arrow.textContent = "↗";
                     downloadLink.appendChild(arrow);
+
                     portRight.appendChild(downloadLink);
                 }
 
