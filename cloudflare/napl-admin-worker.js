@@ -1428,9 +1428,8 @@ async function route(req, env) {
   if (path === "/api/games" && req.method === "POST") {
     const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
     const saved = await saveSingleGameInJson(state, null, body.game || body, true);
-    const publication = await publishSavedCatalog(env, state);
-    const { state: snapshot, ...publicationResult } = publication;
-    return json({ success: true, saved, ...publicationResult, ...(snapshot || {}) }, 200, headers);
+    await saveCatalogState(env, state, "NAPL: guardar juego y ports en catálogo privado");
+    return json({ success: true, saved, ...catalogStateResponse(state) }, 200, headers);
   }
   const gameMatch = path.match(/^\/api\/games\/([^/]+)$/);
   if (gameMatch) {
@@ -1438,15 +1437,13 @@ async function route(req, env) {
     if (req.method === "PUT") {
       const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
       const saved = await saveSingleGameInJson(state, slug, body.game || body, false);
-      const publication = await publishSavedCatalog(env, state);
-      const { state: snapshot, ...publicationResult } = publication;
-      return json({ success: true, saved, ...publicationResult, ...(snapshot || {}) }, 200, headers);
+      await saveCatalogState(env, state, "NAPL: guardar cambios de juego y ports en catálogo privado");
+      return json({ success: true, saved, ...catalogStateResponse(state) }, 200, headers);
     }
     if (req.method === "DELETE") {
       const state = await readCatalogState(env), removed = deleteGameFromJson(state, slug);
-      const publication = await publishSavedCatalog(env, state);
-      const { state: snapshot, ...publicationResult } = publication;
-      return json({ success: true, removed, ...publicationResult, ...(snapshot || {}) }, 200, headers);
+      await saveCatalogState(env, state, "NAPL: eliminar juego del catálogo privado");
+      return json({ success: true, removed, ...catalogStateResponse(state) }, 200, headers);
     }
   }
   if (path === "/api/lookup/github" && req.method === "POST") {
