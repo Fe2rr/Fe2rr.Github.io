@@ -1270,9 +1270,10 @@ async function runSyncBatch(env, options = {}) {
       throw new Error("No hay una revisión pendiente para reanudar. Iniciá una nueva sincronización completa.");
     }
     if (!stage) {
-      stage = { version: 1, status: "scanning", startedAt: new Date().toISOString(),
-        totalSyncPorts: ports.length, nextOffset: 0, checkedCount: 0, updatedCount: 0,
-        downCount: 0, errorCount: 0, updates: {}, checkedAt: {}, details: [] };
+      stage = { version: 1, status: "scanning", source, automation: Boolean(options.automation),
+        startedAt: new Date().toISOString(), totalSyncPorts: ports.length, nextOffset: 0,
+        checkedCount: 0, updatedCount: 0, downCount: 0, errorCount: 0,
+        updates: {}, checkedAt: {}, details: [] };
     }
     if (stage.totalSyncPorts !== ports.length) {
       throw new Error("El catálogo cambió durante la revisión. Recargá el panel e iniciá una nueva sincronización.");
@@ -1416,7 +1417,7 @@ async function applyStagedSync(env) {
     state.meta.pending_github_sync = "1";
   }
   const lastId = Math.max(0, ...state.syncLogs.map((log) => Number(log.id) || 0));
-  state.syncLogs.unshift({ id: lastId + 1, source: "manual", checkedCount: stage.checkedCount || 0,
+  state.syncLogs.unshift({ id: lastId + 1, source: stage.source || "manual", checkedCount: stage.checkedCount || 0,
     updatedCount: appliedCount, downCount: stage.downCount || 0, errorCount: stage.errorCount || 0,
     summary: (stage.details || []).filter((item) => item.status === "down" || item.changed).slice(0, 40),
     createdAt: now });
@@ -1726,8 +1727,21 @@ async function consumeSyncQueue(batch, env) {
       const savedOffset = stage?.status === "scanning" ? Number(stage.nextOffset || 0) : 0;
       if (savedOffset > offset) offset = savedOffset;
       if (savedOffset < offset) throw new Error("La tarea de cola está adelantada respecto al progreso guardado.");
-      const result = await runSyncBatch(env, { source: "manual", limit: 10, offset, useOffset: true, stageOnly: true });
-      if (result.hasMore && !message.body?.testOnly) await env.SYNC_QUEUE.send({ offset: result.nextOffset });
+      const automated = Boolean(message.body?.autoPublish);
+      const result = await runSyncBatch(env, {
+        source: automated ? "cron" : "manual", automation: automated,
+        limit: 10, offset, useOffset: true, stageOnly: true,
+      });
+      if (result.hasMore && !message.body?.testOnly) {
+        await env.SYNC_QUEUE.send({ offset: result.nextOffset, autoPublish: automated });
+      } else if (automated && result.stageStatus === "completed") {
+        await applyStagedSync(env);
+        const state = await readCatalogState(env);
+        if (state.meta.pending_github_sync === "1") {
+          const published = await publishSavedCatalog(env, state);
+          if (published.dataPublishError) console.error("NAPL automatic publish pending:", published.dataPublishError);
+        }
+      }
       message.ack();
     } catch (error) {
       const failure = { offset, attempts: Number(message?.attempts || 0), id: String(message?.id || ""), error: String(error?.message || error || "Error desconocido") };
@@ -1756,15 +1770,40 @@ export default {
   },
 
   async scheduled(event, env, ctx) {
-    const batchSize = MAX_SYNC_BATCH;
-    ctx.waitUntil(
-      runSyncBatch(env, {
-        source: "cron",
-        limit: batchSize,
-        useOffset: false,
-      }).catch((error) => {
-        console.error("NAPL cron sync failed:", error?.message || error);
-      })
-    );
+    const cron = String(event?.cron || "");
+    if (cron === "0 */2 * * *") {
+      ctx.waitUntil((async () => {
+        if (!env.SYNC_QUEUE) throw new Error("Falta el binding SYNC_QUEUE.");
+        let loaded = await readSyncStage(env);
+        let stage = loaded.value;
+        if (stage?.status === "scanning") {
+          console.log("NAPL automatic sync skipped: a sync is already running.");
+          return;
+        }
+        if (stage?.status === "completed") {
+          await applyStagedSync(env);
+          const previousState = await readCatalogState(env);
+          if (previousState.meta.pending_github_sync === "1") await publishSavedCatalog(env, previousState);
+        }
+        await env.SYNC_QUEUE.send({ offset: 0, autoPublish: true });
+        console.log("NAPL full catalog sync queued.");
+      })().catch((error) => {
+        console.error("NAPL scheduled full sync failed:", error?.message || error);
+      }));
+      return;
+    }
+    if (cron === "0 * * * *") {
+      ctx.waitUntil((async () => {
+        const loaded = await readSyncStage(env);
+        if (loaded.value?.status === "scanning") return;
+        const state = await readCatalogState(env);
+        if (state.meta.pending_github_sync === "1") {
+          const published = await publishSavedCatalog(env, state);
+          if (published.dataPublishError) console.error("NAPL hourly publish pending:", published.dataPublishError);
+        }
+      })().catch((error) => {
+        console.error("NAPL hourly publish failed:", error?.message || error);
+      }));
+    }
   },
 };
