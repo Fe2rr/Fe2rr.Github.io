@@ -566,11 +566,7 @@ async function initHomePage() {
             }
         };
 
-        const catalog = await loadCatalog(false, {
-            onBackgroundUpdate: (freshCatalog) => {
-                applyCatalog(freshCatalog, { isBackgroundUpdate: true });
-            },
-        });
+        const catalog = await loadCatalog();
         applyCatalog(catalog);
     } catch (error) {
         console.error("NAPL: could not load games.", error);
