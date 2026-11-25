@@ -980,12 +980,36 @@ async function inspectSteamUrl(rawUrl) {
   const yearMatch = String(data.release_date?.date || "").match(/\b(19\d{2}|20\d{2})\b/);
   const genres = Array.isArray(data.genres) ? data.genres.map(g => String(g?.description || "").trim()).filter(Boolean).slice(0, 2).join(", ") : "";
   const developers = Array.isArray(data.developers) ? data.developers.map(v => String(v || "").trim()).filter(Boolean).join(", ") : "";
-  // Steam may publish portrait capsules under a content-hash directory.
-  // This verified asset is used for Casualties: Unknown; never use wide banners.
-  const verifiedPortraitAssets = {
-    "4576490": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4576490/2876bd25f1c82af501ba6e1befa7c8cc5178ce07/library_capsule.jpg",
-  };
-  const coverUrl = verifiedPortraitAssets[appId] || `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
+  // Resolve Steam's current hash-based Store assets. Newer apps do not
+  // reliably expose images at predictable /{appid}/library_600x900.jpg paths.
+  let coverUrl = "";
+  try {
+    const browseInput = {
+      ids: [{ appid: Number(appId) }],
+      context: { language: "english", country_code: "US", steam_realm: 1 },
+      data_request: { include_assets: true },
+    };
+    const browseUrl = new URL("https://api.steampowered.com/IStoreBrowseService/GetItems/v1/");
+    browseUrl.searchParams.set("input_json", JSON.stringify(browseInput));
+    const browseResponse = await fetch(browseUrl.toString(), { headers: { Accept: "application/json" } });
+    if (browseResponse.ok) {
+      const browsePayload = await browseResponse.json();
+      const item = browsePayload?.response?.store_items?.find((entry) => Number(entry?.appid) === Number(appId));
+      const assets = item?.assets || {};
+      const assetPath = String(assets.library_capsule_2x || assets.library_capsule || "").trim();
+      const assetFormat = String(assets.asset_url_format || "").trim();
+      if (assetPath && assetFormat.includes("${FILENAME}")) {
+        const assetPathEncoded = assetPath.split("/").map(encodeURIComponent).join("/");
+        const resolvedPath = assetFormat.replace("${FILENAME}", assetPathEncoded);
+        coverUrl = `https://shared.fastly.steamstatic.com/store_item_assets/${resolvedPath}`;
+      }
+    }
+  } catch (error) {
+    // Fall back to legacy Steam assets below if StoreBrowse is unavailable.
+  }
+  if (!coverUrl) {
+    coverUrl = `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
+  }
   return { appId, name: String(data.name || "").trim(), year: yearMatch ? yearMatch[1] : "", genre: genres, description: String(data.short_description || data.about_the_game || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(), coverUrl, developer: developers, steamUrl: `https://store.steampowered.com/app/${appId}/` };
 }
 
