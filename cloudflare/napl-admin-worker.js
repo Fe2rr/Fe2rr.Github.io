@@ -1306,7 +1306,7 @@ async function runSyncBatch(env, options = {}) {
     if (!stage) {
       stage = { version: 1, status: "scanning", startedAt: new Date().toISOString(),
         totalSyncPorts: ports.length, nextOffset: 0, checkedCount: 0, updatedCount: 0,
-        downCount: 0, errorCount: 0, updates: {}, details: [] };
+        downCount: 0, errorCount: 0, updates: {}, checkedAt: {}, details: [] };
     }
     if (stage.totalSyncPorts !== ports.length) {
       throw new Error("El catálogo cambió durante la revisión. Recargá el panel e iniciá una nueva sincronización.");
@@ -1315,6 +1315,7 @@ async function runSyncBatch(env, options = {}) {
       throw new Error("El punto de reanudación no coincide con el progreso guardado. Consultá el estado de sincronización.");
     }
 
+    stage.checkedAt = stage.checkedAt || {};
     let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
     const details = [];
     const mutableKeys = ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link"];
@@ -1323,7 +1324,7 @@ async function runSyncBatch(env, options = {}) {
       const originalVersion = entry.version;
       try {
         const outcome = await syncSinglePortWithSource(env, entry);
-        entry._port.lastCheckedAt = entry.lastCheckedAt || new Date().toISOString();
+        stage.checkedAt[entry.portId] = entry.lastCheckedAt || new Date().toISOString();
         if (outcome.status === "down") downCount++;
         if (outcome.changed) {
           updatedCount++;
@@ -1335,7 +1336,7 @@ async function runSyncBatch(env, options = {}) {
         }
       } catch (error) {
         errorCount++;
-        entry._port.lastCheckedAt = new Date().toISOString();
+        stage.checkedAt[entry.portId] = new Date().toISOString();
         details.push({ portId: entry.portId, gameSlug: entry.gameSlug, project: entry.project,
           provider: resolvePortSyncTarget(entry).provider, status: "error",
           error: error?.message || "Error consultando fuente externa" });
@@ -1352,8 +1353,6 @@ async function runSyncBatch(env, options = {}) {
       stage.status = "completed";
       stage.completedAt = now;
     }
-    state.meta.last_sync_at = now;
-    await saveCatalogState(env, state, "NAPL: guardar fechas de revisión de fuentes");
     const savedStage = await writeSyncStage(env, stage, loaded.sha);
     return { source, staged: true, stageStatus: stage.status, totalSyncPorts: ports.length,
       checkedCount, updatedCount, downCount, errorCount, nextOffset: stage.nextOffset,
@@ -1426,7 +1425,12 @@ async function applyStagedSync(env) {
     Object.assign(port, patch);
     appliedCount++;
   }
+  for (const [portId, checkedAt] of Object.entries(stage.checkedAt || {})) {
+    const port = portsById.get(portId);
+    if (port && checkedAt) port.lastCheckedAt = checkedAt;
+  }
   const now = new Date().toISOString();
+  state.meta.last_sync_at = now;
   if (appliedCount) {
     state.catalog.updatedAt = now;
     state.meta.updated_at = now;
