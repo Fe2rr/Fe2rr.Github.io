@@ -1,4 +1,4 @@
-const ALLOWED_HOSTS = new Set(["images.launchbox-app.com", "gamesdb-images.launchbox.gg"]);
+const ALLOWED_HOSTS = new Set(["images.launchbox-app.com", "gamesdb-images.launchbox.gg", "shared.fastly.steamstatic.com", "shared.akamai.steamstatic.com", "cdn.cloudflare.steamstatic.com", "steamcdn-a.akamaihd.net"]);
 const MAX_SOURCE_BYTES = 20 * 1024 * 1024;
 
 function json(data, status = 200) {
