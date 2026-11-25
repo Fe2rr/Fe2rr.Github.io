@@ -1530,8 +1530,9 @@ async function route(req, env) {
     const loaded = await readSyncStage(env);
     const stage = loaded.value;
     if (stage?.status === "completed") return json({ success: true, queued: false, stage }, 200, headers);
+    const body = await req.json().catch(() => ({}));
     const offset = stage?.status === "scanning" ? Number(stage.nextOffset || 0) : 0;
-    await env.SYNC_QUEUE.send({ offset });
+    await env.SYNC_QUEUE.send({ offset, testOnly: Boolean(body.testOnly) });
     return json({ success: true, queued: true, offset, stage: stage || null }, 202, headers);
   }
   if (path === "/api/sync-stage" && req.method === "GET") {
@@ -1718,7 +1719,7 @@ async function consumeSyncQueue(batch, env) {
         useOffset: true,
         stageOnly: true,
       });
-      if (result.hasMore) {
+      if (result.hasMore && !message.body?.testOnly) {
         await env.SYNC_QUEUE.send({ offset: result.nextOffset });
       }
       message.ack();
