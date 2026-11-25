@@ -1397,22 +1397,14 @@ async function route(req, env) {
   }
   if (origin && !isAllowedOrigin(origin, env)) return json({ error: "Origen no autorizado." }, 403, headers);
   if (path === "/api/health" && req.method === "GET") {
+    // Health check liviano: no descargar ni parsear el catálogo privado.
+    // La lectura completa se reserva para /api/catalog tras autenticar.
     const health = {
-      ok: true, localMode: false, storage: "github-json", d1: false,
+      ok: true, localMode: false, storage: "github-json", storageStatus: "configured", d1: false,
       configured: { adminPassword: Boolean(env.ADMIN_PASSWORD), githubToken: Boolean(env.GITHUB_TOKEN),
         dataGithubToken: Boolean(env.CATALOG_DATA_GITHUB_TOKEN), sessionSecret: Boolean(env.SESSION_SECRET), d1: false }
     };
-    try {
-      const state = await readCatalogState(env);
-      health.storageStatus = "ok";
-      health.catalog = { games: state.catalog.games.length,
-        ports: state.catalog.games.reduce((sum, game) => sum + (game.ports || []).length, 0) };
-    } catch (error) {
-      health.storageStatus = "error";
-      health.storageError = error?.message || "No se pudo leer el estado JSON.";
-      health.ok = false;
-    }
-    return json(health, health.ok ? 200 : 503, headers);
+    return json(health, 200, headers);
   }
   if (path === "/api/login" && req.method === "POST") {
     if (!env.ADMIN_PASSWORD || !env.SESSION_SECRET) return json({ error: "Faltan secretos ADMIN_PASSWORD o SESSION_SECRET en Cloudflare." }, 503, headers);
