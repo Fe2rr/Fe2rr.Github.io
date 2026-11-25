@@ -22,6 +22,10 @@ const COVER_OPTIMIZER_URL =
 const OPTIMIZABLE_COVER_HOSTS = new Set([
     "images.launchbox-app.com",
     "gamesdb-images.launchbox.gg",
+    "shared.fastly.steamstatic.com",
+    "shared.akamai.steamstatic.com",
+    "cdn.cloudflare.steamstatic.com",
+    "steamcdn-a.akamaihd.net",
 ]);
 
 export function getOptimizedCoverUrl(rawUrl, width = 180) {
@@ -68,8 +72,10 @@ function buildSteamFallbackUrls(appId, excludeUrls = []) {
     const candidates = [
         `/api/steam-cover/${encodeURIComponent(appId)}`,
         `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`,
+        `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`,
+        `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`,
+        `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_capsule_2x.jpg`,
         `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_capsule.jpg`,
-        `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/header.jpg`,
         `https://cdn.cloudflare.steamstatic.com/steam/apps/${appId}/library_600x900.jpg`,
     ];
 
