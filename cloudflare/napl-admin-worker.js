@@ -1525,6 +1525,15 @@ async function route(req, env) {
   if (!path.startsWith("/api/")) return json({ name: "NAPL JSON Catalog Worker", ok: true }, 200, headers);
   if (!(await authenticated(req, env))) return json({ error: "Sesión inválida o vencida. Iniciá sesión nuevamente." }, 401, headers);
   if (path === "/api/verify-session" && req.method === "GET") return json({ ok: true }, 200, headers);
+  if (path === "/api/sync-queue" && req.method === "POST") {
+    if (!env.SYNC_QUEUE) return json({ error: "La cola de sincronización no está configurada." }, 503, headers);
+    const loaded = await readSyncStage(env);
+    const stage = loaded.value;
+    if (stage?.status === "completed") return json({ success: true, queued: false, stage }, 200, headers);
+    const offset = stage?.status === "scanning" ? Number(stage.nextOffset || 0) : 0;
+    await env.SYNC_QUEUE.send({ offset });
+    return json({ success: true, queued: true, offset, stage: stage || null }, 202, headers);
+  }
   if (path === "/api/sync-stage" && req.method === "GET") {
     const loaded = await readSyncStage(env);
     return json({ success: true, stage: loaded.value || null }, 200, headers);
@@ -1597,6 +1606,7 @@ async function route(req, env) {
       limit: body.limit || DEFAULT_CRON_BATCH,
       offset: body.offset || 0,
       useOffset: Boolean(body.useOffset),
+      stageOnly: Boolean(body.stageOnly),
       returnState: true,
     });
     const compact = body.includeCatalog === false || body.compact === true;
@@ -1687,6 +1697,38 @@ async function route(req, env) {
   return json({ error: "Ruta no encontrada." }, 404, headers);
 }
 
+async function consumeSyncQueue(batch, env) {
+  for (const message of batch.messages) {
+    try {
+      if (!env.SYNC_QUEUE) throw new Error("Falta el binding SYNC_QUEUE.");
+      const loaded = await readSyncStage(env);
+      const stage = loaded.value;
+      if (stage?.status === "completed") {
+        message.ack();
+        continue;
+      }
+      let offset = Number(message.body?.offset || 0);
+      const savedOffset = stage?.status === "scanning" ? Number(stage.nextOffset || 0) : 0;
+      if (savedOffset > offset) offset = savedOffset;
+      if (savedOffset < offset) throw new Error("La tarea de cola está adelantada respecto al progreso guardado.");
+      const result = await runSyncBatch(env, {
+        source: "manual",
+        limit: 10,
+        offset,
+        useOffset: true,
+        stageOnly: true,
+      });
+      if (result.hasMore) {
+        await env.SYNC_QUEUE.send({ offset: result.nextOffset });
+      }
+      message.ack();
+    } catch (error) {
+      console.error("NAPL queued sync task failed:", error?.message || error);
+      message.retry({ delaySeconds: 30 });
+    }
+  }
+}
+
 export default {
   async fetch(request, env) {
     try {
@@ -1698,6 +1740,10 @@ export default {
         cors(request, env)
       );
     }
+  },
+
+  async queue(batch, env) {
+    await consumeSyncQueue(batch, env);
   },
 
   async scheduled(event, env, ctx) {
