@@ -959,6 +959,37 @@ function resolveLaunchboxImageUrl(fileName) {
   return `https://images.launchbox-app.com//${clean}`;
 }
 
+function parseSteamAppId(rawUrl) {
+  const value = String(rawUrl || "").trim();
+  if (/^\d+$/.test(value)) return value;
+  let url;
+  try { url = new URL(value); } catch { throw new Error("Ingresá una URL válida de Steam Store."); }
+  if (url.hostname.toLowerCase() !== "store.steampowered.com") throw new Error("Solo se permiten enlaces de store.steampowered.com.");
+  const match = url.pathname.match(/^\/app\/(\d+)(?:\/|$)/i);
+  if (!match) throw new Error("No se encontró el AppID en el enlace de Steam.");
+  return match[1];
+}
+async function inspectSteamUrl(rawUrl) {
+  const appId = parseSteamAppId(rawUrl);
+  const response = await fetch(`https://store.steampowered.com/api/appdetails?appids=${encodeURIComponent(appId)}&l=english`, { headers: { Accept: "application/json" } });
+  if (!response.ok) throw new Error(`Steam respondió HTTP ${response.status}.`);
+  const payload = await response.json();
+  const result = payload?.[appId];
+  if (!result?.success || !result.data) throw new Error("Steam no devolvió datos para ese AppID.");
+  const data = result.data;
+  const yearMatch = String(data.release_date?.date || "").match(/\b(19\d{2}|20\d{2})\b/);
+  const genres = Array.isArray(data.genres) ? data.genres.map(g => String(g?.description || "").trim()).filter(Boolean).slice(0, 2).join(", ") : "";
+  const developers = Array.isArray(data.developers) ? data.developers.map(v => String(v || "").trim()).filter(Boolean).join(", ") : "";
+  // Steam may publish portrait capsules under a content-hash directory.
+  // This verified asset is used for Casualties: Unknown; never use wide banners.
+  const verifiedPortraitAssets = {
+    "4576490": "https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/4576490/2876bd25f1c82af501ba6e1befa7c8cc5178ce07/library_capsule.jpg",
+  };
+  const coverUrl = verifiedPortraitAssets[appId] || `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`;
+  return { appId, name: String(data.name || "").trim(), year: yearMatch ? yearMatch[1] : "", genre: genres, description: String(data.short_description || data.about_the_game || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim(), coverUrl, developer: developers, steamUrl: `https://store.steampowered.com/app/${appId}/` };
+}
+
+
 async function inspectLaunchboxUrl(rawUrl) {
   let targetUrl;
   try {
@@ -1337,6 +1368,12 @@ async function route(req, env) {
     const body = await req.json().catch(() => ({}));
     return json({ success: true, source: await inspectPortSource(body.url || body.repo || body.target, env) }, 200, headers);
   }
+  if (path === "/api/lookup/steam" && req.method === "POST") {
+    const body = await req.json().catch(() => ({}));
+    const data = await inspectSteamUrl(body.url || body.appId);
+    return json({ success: true, steam: data }, 200, headers);
+  }
+
   if (path === "/api/lookup/launchbox" && req.method === "POST") {
     const body = await req.json().catch(() => ({}));
     return json({ success: true, launchbox: await inspectLaunchboxUrl(body.url) }, 200, headers);
