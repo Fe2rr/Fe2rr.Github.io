@@ -1724,6 +1724,7 @@ async function consumeSyncQueue(batch, env) {
       if (!env.SYNC_QUEUE) throw new Error("Falta el binding SYNC_QUEUE.");
       const loaded = await readSyncStage(env); const stage = loaded.value;
       if (stage?.status === "completed") { message.ack(); continue; }
+      if (stage?.status === "applied" && message.body?.autoPublish) { message.ack(); continue; }
       const savedOffset = stage?.status === "scanning" ? Number(stage.nextOffset || 0) : 0;
       if (savedOffset > offset) offset = savedOffset;
       if (savedOffset < offset) throw new Error("La tarea de cola está adelantada respecto al progreso guardado.");
