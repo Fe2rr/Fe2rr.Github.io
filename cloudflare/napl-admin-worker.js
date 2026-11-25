@@ -1550,8 +1550,8 @@ async function route(req, env) {
   if (path === "/api/games" && req.method === "POST") {
     const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
     const saved = await saveSingleGameInJson(state, null, body.game || body, true);
-    const publication = await publishSavedCatalog(env, state);
-    return json({ success: true, saved, ...publication, ...(publication.state || {}) }, 200, headers);
+    await saveCatalogState(env, state, "NAPL: guardar juego y ports en catálogo privado");
+    return json({ success: true, saved, ...catalogStateResponse(state) }, 200, headers);
   }
   const gameMatch = path.match(/^\/api\/games\/([^/]+)$/);
   if (gameMatch) {
@@ -1559,13 +1559,13 @@ async function route(req, env) {
     if (req.method === "PUT") {
       const state = await readCatalogState(env), body = await req.json().catch(() => ({}));
       const saved = await saveSingleGameInJson(state, slug, body.game || body, false);
-      const publication = await publishSavedCatalog(env, state);
-      return json({ success: true, saved, ...publication, ...(publication.state || {}) }, 200, headers);
+      await saveCatalogState(env, state, "NAPL: editar juego y ports en catálogo privado");
+      return json({ success: true, saved, ...catalogStateResponse(state) }, 200, headers);
     }
     if (req.method === "DELETE") {
       const state = await readCatalogState(env), removed = deleteGameFromJson(state, slug);
-      const publication = await publishSavedCatalog(env, state);
-      return json({ success: true, removed, ...publication, ...(publication.state || {}) }, 200, headers);
+      await saveCatalogState(env, state, "NAPL: eliminar juego del catálogo privado");
+      return json({ success: true, removed, ...catalogStateResponse(state) }, 200, headers);
     }
   }
   if (path === "/api/lookup/github" && req.method === "POST") {
@@ -1698,33 +1698,39 @@ async function route(req, env) {
   return json({ error: "Ruta no encontrada." }, 404, headers);
 }
 
+async function recordSyncQueueFailure(env, error, message) {
+  const failure = { at: new Date().toISOString(), message: String(error?.message || error || "Error desconocido").slice(0, 1200),
+    offset: Number(message?.body?.offset || 0), attempts: Number(message?.attempts || 0), messageId: String(message?.id || "") };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const loaded = await readSyncStage(env);
+      if (!loaded.value || loaded.value.status === "completed") return false;
+      const stage = loaded.value;
+      stage.lastError = failure; stage.lastErrorAt = failure.at; stage.lastErrorOffset = failure.offset;
+      await writeSyncStage(env, stage, loaded.sha);
+      return true;
+    } catch (persistError) { console.error("NAPL could not persist queue failure:", persistError?.message || persistError); }
+  }
+  return false;
+}
+
 async function consumeSyncQueue(batch, env) {
   for (const message of batch.messages) {
+    let offset = Number(message.body?.offset || 0);
     try {
       if (!env.SYNC_QUEUE) throw new Error("Falta el binding SYNC_QUEUE.");
-      const loaded = await readSyncStage(env);
-      const stage = loaded.value;
-      if (stage?.status === "completed") {
-        message.ack();
-        continue;
-      }
-      let offset = Number(message.body?.offset || 0);
+      const loaded = await readSyncStage(env); const stage = loaded.value;
+      if (stage?.status === "completed") { message.ack(); continue; }
       const savedOffset = stage?.status === "scanning" ? Number(stage.nextOffset || 0) : 0;
       if (savedOffset > offset) offset = savedOffset;
       if (savedOffset < offset) throw new Error("La tarea de cola está adelantada respecto al progreso guardado.");
-      const result = await runSyncBatch(env, {
-        source: "manual",
-        limit: 10,
-        offset,
-        useOffset: true,
-        stageOnly: true,
-      });
-      if (result.hasMore && !message.body?.testOnly) {
-        await env.SYNC_QUEUE.send({ offset: result.nextOffset });
-      }
+      const result = await runSyncBatch(env, { source: "manual", limit: 10, offset, useOffset: true, stageOnly: true });
+      if (result.hasMore && !message.body?.testOnly) await env.SYNC_QUEUE.send({ offset: result.nextOffset });
       message.ack();
     } catch (error) {
-      console.error("NAPL queued sync task failed:", error?.message || error);
+      const failure = { offset, attempts: Number(message?.attempts || 0), id: String(message?.id || ""), error: String(error?.message || error || "Error desconocido") };
+      console.error("NAPL queued sync task failed:", JSON.stringify(failure));
+      await recordSyncQueueFailure(env, error, { id: message.id, attempts: message.attempts, body: { ...(message.body || {}), offset } });
       message.retry({ delaySeconds: 30 });
     }
   }
