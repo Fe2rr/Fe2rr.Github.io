@@ -22,7 +22,7 @@ async function github(path,options={}){const token=process.env.GH_ACTIONS_TOKEN|
 async function dispatchWorkflow(importSheets=false){
  const runs=await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/runs?per_page=5`);
  const active=(runs.workflow_runs||[]).find(r=>r.status==="queued"||r.status==="in_progress");
- if(active)return {alreadyRunning:true,runId:active.id,runUrl:active.html_url};
+ if(active)return {queued:true,alreadyRunning:true,runId:active.id,runUrl:active.html_url};
  await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs:{import_sheets:String(Boolean(importSheets))}})});
  return {alreadyRunning:false,queued:true,workflow:WORKFLOW};
 }
