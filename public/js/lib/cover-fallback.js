@@ -28,7 +28,7 @@ async function getStaticCoverUrl(rawUrl) {
     if (!isVercelHost()) return "";
     try {
         if (!coverManifestPromise) {
-            coverManifestPromise = fetch("https://napl-catalog.pages.dev/assets/covers/manifest.json", { cache: "force-cache" })
+            coverManifestPromise = fetch("/api/cover-manifest", { cache: "force-cache" })
                 .then((response) => response.ok ? response.json() : {})
                 .catch(() => ({}));
         }
