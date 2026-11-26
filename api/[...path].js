@@ -4,7 +4,19 @@ const WORKFLOW=process.env.NAPL_SYNC_WORKFLOW||"sync-catalog.yml";
 const ORIGIN_DEFAULTS=["https://fe2rr.github.io","https://napl-admin.pages.dev"];
 function envForWorker(){return {ADMIN_PASSWORD:process.env.ADMIN_PASSWORD,SESSION_SECRET:process.env.SESSION_SECRET,GITHUB_TOKEN:process.env.GITHUB_TOKEN,CATALOG_DATA_GITHUB_TOKEN:process.env.CATALOG_DATA_GITHUB_TOKEN,ADMIN_ORIGIN:process.env.ALLOWED_ORIGINS||ORIGIN_DEFAULTS.join(","),AUTO_PUBLISH_CRON:"",CRON_BATCH_SIZE:"10"}}
 function pathOf(req){const p=req.query?.path;return Array.isArray(p)?p.join("/"):String(p||"")}
-function setSecurity(res){res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("X-Frame-Options","DENY");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("Permissions-Policy","camera=(), microphone=(), geolocation=()")}
+function setSecurity(res){res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("X-Frame-Options","DENY");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("Permissions-Policy","camera=(), microphone=(), geolocation=()");res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains")}
+function setCors(req,res){
+ const origin=String(req.headers.origin||"");
+ const allowed=(process.env.ALLOWED_ORIGINS||ORIGIN_DEFAULTS.join(",")).split(",").map(x=>x.trim()).filter(Boolean);
+ res.setHeader("Vary","Origin");
+ res.setHeader("Access-Control-Allow-Methods","GET,POST,PUT,DELETE,OPTIONS");
+ res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");
+ res.setHeader("Access-Control-Max-Age","86400");
+ if(origin&&allowed.includes(origin))res.setHeader("Access-Control-Allow-Origin",origin);
+ if(req.method==="OPTIONS"){res.status(204).end();return true}
+ if(origin&&!allowed.includes(origin)){res.status(403).json({error:"Origin not allowed"});return true}
+ return false;
+}
 async function workerCall(req,path,token,method=req.method){const headers=new Headers({Origin:String(req.headers.origin||"https://napl-admin.pages.dev"),"Content-Type":"application/json"});if(token)headers.set("Authorization",token.startsWith("Bearer ")?token:`Bearer ${token}`);const body=["GET","HEAD"].includes(req.method)?undefined:JSON.stringify(req.body||{});const request=new Request(`https://napl-internal/api/${path}`,{method,headers,body:method==="GET"||method==="HEAD"?undefined:body});return worker.fetch(request,envForWorker())}
 async function github(path,options={}){const token=process.env.GH_ACTIONS_TOKEN||process.env.GITHUB_TOKEN;if(!token)throw new Error("GH_ACTIONS_TOKEN is not configured");const r=await fetch(`https://api.github.com${path}`,{...options,headers:{Accept:"application/vnd.github+json",Authorization:`Bearer ${token}`,"X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw new Error(data.message||`GitHub API HTTP ${r.status}`);return data}
 async function dispatchWorkflow(importSheets=false){
@@ -16,6 +28,7 @@ async function dispatchWorkflow(importSheets=false){
 }
 export default async function handler(req,res){
  setSecurity(res);
+ if(setCors(req,res))return;
  const path=pathOf(req);
  try{
   if(path==="sync-trigger"&&req.method==="POST"){
