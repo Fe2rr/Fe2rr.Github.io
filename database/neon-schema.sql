@@ -79,7 +79,7 @@ CREATE INDEX IF NOT EXISTS popularity_rank_month_idx ON game_popularity(month_vi
 CREATE INDEX IF NOT EXISTS popularity_rank_all_idx ON game_popularity(all_time_visits DESC);
 
 CREATE OR REPLACE FUNCTION napl_register_game_visit(p_game_key text,p_ip_hash text)
-RETURNS boolean LANGUAGE plpgsql AS $$
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $
 DECLARE v_now timestamptz:=now(); v_week date:=date_trunc('week',now())::date;
 v_month date:=date_trunc('month',now())::date; v_allowed text;
 BEGIN
@@ -98,7 +98,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION napl_get_popularity(p_period text DEFAULT 'week')
-RETURNS TABLE(slug text,visits bigint) LANGUAGE sql STABLE AS $$
+RETURNS TABLE(slug text,visits bigint) LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO public AS $
  SELECT game_key,CASE WHEN lower(coalesce(p_period,'week'))='alltime' THEN all_time_visits
  WHEN lower(coalesce(p_period,'week'))='month' THEN CASE WHEN month_start=date_trunc('month',now())::date THEN month_visits ELSE 0 END
  ELSE CASE WHEN week_start=date_trunc('week',now())::date THEN week_visits ELSE 0 END END
@@ -127,7 +127,7 @@ CREATE OR REPLACE FUNCTION napl_submit_vote(p_port_id text,p_token_hash text,p_s
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE n integer; existed boolean;
 BEGIN
- IF length(coalesce(p_port_id,'')) NOT BETWEEN 1 AND 120 OR length(coalesce(p_token_hash,''))<>64 OR p_stars NOT BETWEEN 1 AND 5 THEN RAISE EXCEPTION 'invalid_vote'; END IF;
+ IF length(coalesce(p_port_id,'')) NOT BETWEEN 1 AND 120 OR length(coalesce(p_token_hash,''))<>64 OR p_stars IS NULL OR p_stars NOT BETWEEN 1 AND 5 THEN RAISE EXCEPTION 'invalid_vote'; END IF;
  PERFORM pg_advisory_xact_lock(hashtextextended(p_token_hash,0));
  SELECT EXISTS(SELECT 1 FROM rating_votes WHERE port_id=p_port_id AND token_hash=p_token_hash) INTO existed;
  IF NOT existed THEN
@@ -194,4 +194,15 @@ BEGIN
  INSERT INTO compatibility_reports(port_id,token_hash,device_id,device_name,works,status) VALUES(p_port_id,p_token_hash,p_device_id,d.name,s IN('playable_30','playable_60'),s)
  ON CONFLICT(port_id,token_hash,device_id) DO UPDATE SET device_name=excluded.device_name,works=excluded.works,status=excluded.status,updated_at=now() RETURNING * INTO saved;
  RETURN jsonb_build_object('report',jsonb_build_object('portId',saved.port_id,'deviceId',saved.device_id,'deviceName',coalesce(nullif(d.model,''),saved.device_name),'deviceSoc',coalesce(d.soc,''),'deviceType',coalesce(nullif(d.device_type,''),'phone'),'status',saved.status,'works',saved.works,'updatedAt',saved.updated_at),'summary',get_compatibility_for_ports(ARRAY[p_port_id])->p_port_id);
+END $$;
+
+CREATE OR REPLACE FUNCTION napl_remove_vote(p_port_id text,p_token_hash text)
+RETURNS jsonb LANGUAGE plpgsql SET search_path TO public, pg_temp AS $$
+BEGIN
+ IF p_port_id IS NULL OR length(p_port_id)<1 OR length(p_port_id)>120
+    OR p_token_hash IS NULL OR length(p_token_hash)<>64 THEN
+  RAISE EXCEPTION 'invalid_vote' USING ERRCODE='22023';
+ END IF;
+ DELETE FROM public.rating_votes WHERE port_id=p_port_id AND token_hash=p_token_hash;
+ RETURN jsonb_build_object('ok',true,'port_id',p_port_id);
 END $$;
