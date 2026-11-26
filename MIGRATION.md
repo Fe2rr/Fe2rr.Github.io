@@ -24,7 +24,7 @@ This repository is the integration target for the Vercel API and GitHub Actions 
 8. Only after successful parity checks, change the stable frontend to Vercel and disable Supabase/Cloudflare services.
 
 ## Vercel environment variables
-See .env.vercel.example. Required values: NEON_DATABASE_URL, ADMIN_PASSWORD, SESSION_SECRET, RATE_LIMIT_SECRET, GITHUB_TOKEN, CATALOG_DATA_GITHUB_TOKEN, GH_ACTIONS_TOKEN, ALLOWED_ORIGINS, DISCORD_WEBHOOK_URL, NAPL_DATA_REPO and NAPL_SYNC_WORKFLOW.
+See .env.vercel.example. Required values: NEON_DATABASE_URL, ADMIN_PASSWORD, SESSION_SECRET, GITHUB_TOKEN, CATALOG_DATA_GITHUB_TOKEN, GH_ACTIONS_TOKEN, ALLOWED_ORIGINS, DISCORD_WEBHOOK_URL, NAPL_DATA_REPO and NAPL_SYNC_WORKFLOW.
 
 ## Important
 The current Supabase database contains nine tables and the export script includes all of them. The export includes pseudonymous hashes and rating-token hashes; keep it private and delete local export copies after verified import. Copy the current Supabase service-role key (or the default secret key used by the Edge Functions) into Vercel as REPORTER_HASH_SECRET before cutover: report-link uses that key for HMAC reporter identities, so this preserves existing rate-limit identity continuity. Do not turn off Supabase or Cloudflare until all tests pass.
