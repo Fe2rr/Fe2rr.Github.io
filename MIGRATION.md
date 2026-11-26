@@ -1,0 +1,32 @@
+# NAPL infrastructure migration — development
+
+This repository is the integration target for the Vercel API and GitHub Actions migration. The stable GitHub Pages deployment is not changed by these commits.
+
+## Implemented in this branch
+- Neon schema and full nine-table Supabase export/import scripts.
+- Vercel Node API routes for community ratings, popularity, compatibility and broken-link reports.
+- Admin API compatibility adapter running the existing catalog logic inside Vercel Node Functions (not Cloudflare Workers).
+- GitHub Actions workflow for scheduled and manual full-catalog sync. It runs the same catalog code in Node, in batches, then applies and publishes the result to Fe2rr/NAPL-Data.
+- WebP cover cache generation via wsrv.nl into NAPL-Data/public/assets/covers, plus a manifest consumed by the Vercel frontend.
+- Frontend API selection uses the new routes on Vercel hosts; GitHub Pages remains on the old services until the production cutover.
+
+## Required setup
+1. Create Neon project/database; run database/neon-schema.sql.
+2. Export Supabase and import into Neon:
+   SUPABASE_DB_URL='...' node scripts/export-supabase.mjs
+   NEON_DATABASE_URL='...' node scripts/import-neon.mjs napl-supabase-export.json
+   NEON_DATABASE_URL='...' node scripts/verify-neon-import.mjs
+3. Deploy this repository to Vercel with root directory /, framework preset Vite, build npm run build, output dist.
+4. Configure Vercel environment variables from .env.vercel.example in Production and Preview. Never expose secrets with VITE_ prefixes.
+5. Configure GitHub repository Actions secrets in Fe2rr/Napl-prueba: NAPL_ADMIN_PASSWORD, NAPL_SESSION_SECRET, NAPL_DATA_GITHUB_TOKEN (Contents read/write on Fe2rr/NAPL-Data).
+6. Run workflow NAPL catalog sync manually with import_sheets=true; inspect all batch logs and confirm catalog publication and cover manifest commit.
+7. Test community API and admin endpoints on the Vercel deployment before changing the stable frontend.
+8. Only after successful parity checks, change the stable frontend to Vercel and disable Supabase/Cloudflare services.
+
+## Vercel environment variables
+See .env.vercel.example. Required values: NEON_DATABASE_URL, ADMIN_PASSWORD, SESSION_SECRET, RATE_LIMIT_SECRET, GITHUB_TOKEN, CATALOG_DATA_GITHUB_TOKEN, GH_ACTIONS_TOKEN, ALLOWED_ORIGINS, DISCORD_WEBHOOK_URL, NAPL_DATA_REPO and NAPL_SYNC_WORKFLOW.
+
+## Important
+The current Supabase database contains nine tables and the export script includes all of them. The export includes pseudonymous hashes and rating-token hashes; keep it private and delete local export copies after verified import. Do not turn off Supabase or Cloudflare until all tests pass.
+
+The GitHub Actions job uses the existing Worker implementation as a pure Node module to preserve its import/merge/sync rules. The code is executed by the Actions runner, not deployed to Cloudflare Workers or Queues.
