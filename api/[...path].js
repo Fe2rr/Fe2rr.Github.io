@@ -7,6 +7,13 @@ function pathOf(req){const p=req.query?.path;return Array.isArray(p)?p.join("/")
 function setSecurity(res){res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("X-Frame-Options","DENY");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("Permissions-Policy","camera=(), microphone=(), geolocation=()")}
 async function workerCall(req,path,token,method=req.method){const headers=new Headers({Origin:String(req.headers.origin||"https://napl-admin.pages.dev"),"Content-Type":"application/json"});if(token)headers.set("Authorization",token.startsWith("Bearer ")?token:`Bearer ${token}`);const body=["GET","HEAD"].includes(req.method)?undefined:JSON.stringify(req.body||{});const request=new Request(`https://napl-internal/api/${path}`,{method,headers,body:method==="GET"||method==="HEAD"?undefined:body});return worker.fetch(request,envForWorker())}
 async function github(path,options={}){const token=process.env.GH_ACTIONS_TOKEN||process.env.GITHUB_TOKEN;if(!token)throw new Error("GH_ACTIONS_TOKEN is not configured");const r=await fetch(`https://api.github.com${path}`,{...options,headers:{Accept:"application/vnd.github+json",Authorization:`Bearer ${token}`,"X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw new Error(data.message||`GitHub API HTTP ${r.status}`);return data}
+async function dispatchWorkflow(importSheets=false){
+ const runs=await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/runs?per_page=5`);
+ const active=(runs.workflow_runs||[]).find(r=>r.status==="queued"||r.status==="in_progress");
+ if(active)return {alreadyRunning:true,runId:active.id,runUrl:active.html_url};
+ await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs:{import_sheets:String(Boolean(importSheets))}})});
+ return {alreadyRunning:false,queued:true,workflow:WORKFLOW};
+}
 export default async function handler(req,res){
  setSecurity(res);
  const path=pathOf(req);
@@ -14,9 +21,8 @@ export default async function handler(req,res){
   if(path==="sync-trigger"&&req.method==="POST"){
    const auth=await workerCall(req,"verify-session",req.headers.authorization||"","GET");
    if(!auth.ok)return res.status(auth.status).json(await auth.json());
-   const inputs={import_sheets:String(req.body?.import_sheets!==false)};
-   await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs})});
-   return res.status(202).json({success:true,queued:true,workflow:WORKFLOW});
+   const result=await dispatchWorkflow(req.body?.import_sheets===true);
+   return res.status(202).json({success:true,...result});
   }
   if(path==="sync-status"&&req.method==="GET"){
    const auth=await workerCall(req,"verify-session",req.headers.authorization||"");
@@ -24,10 +30,11 @@ export default async function handler(req,res){
    const runs=await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/runs?per_page=5`);
    return res.json({success:true,runs:(runs.workflow_runs||[]).map(r=>({id:r.id,status:r.status,conclusion:r.conclusion,html_url:r.html_url,created_at:r.created_at,updated_at:r.updated_at}))});
   }
-  if(path==="sync-sources"||path==="sync-github"||path==="sync-queue"){
-   const auth=await workerCall(req,"verify-session",req.headers.authorization||"");
+  if((path==="sync-sources"||path==="sync-github"||path==="sync-queue")&&req.method==="POST"){
+   const auth=await workerCall(req,"verify-session",req.headers.authorization||"","GET");
    if(!auth.ok)return res.status(auth.status).json(await auth.json());
-   return res.status(409).json({success:false,error:"La sincronización completa ahora se ejecuta mediante GitHub Actions. Usa /api/sync-trigger."});
+   const result=await dispatchWorkflow(req.body?.import_sheets===true);
+   return res.status(202).json({success:true,...result});
   }
   const upstream=await workerCall(req,path,req.headers.authorization||"");
   const raw=await upstream.text();
