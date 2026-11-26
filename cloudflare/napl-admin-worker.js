@@ -1263,6 +1263,19 @@ async function runSyncBatch(env, options = {}) {
     : ports.sort((a,b) => String(a.lastCheckedAt || "").localeCompare(String(b.lastCheckedAt || "")) ||
       String(a.portId).localeCompare(String(b.portId))).slice(0, limit);
   const budget = { subrequests: 1, playstore: 0, startedAt: Date.now() };
+  async function syncWithRetries(entry) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        return await syncWithRetries(entry);
+      } catch (error) {
+        const message = String(error?.message || error || "");
+        const transient = /429|HTTP 5\\d\\d|timeout|timed out|network|fetch failed|aborted|rate limit|temporarily unavailable/i.test(message);
+        if (!transient || attempt === 2) throw error;
+        await new Promise((resolve) => setTimeout(resolve, 400 * (2 ** attempt)));
+      }
+    }
+    throw new Error("Source sync retry limit reached.");
+  }
   if (options.stageOnly) {
     const loaded = await readSyncStage(env);
     let stage = offset > 0 ? loaded.value : null;
@@ -1302,7 +1315,7 @@ async function runSyncBatch(env, options = {}) {
       checkedCount++;
       const originalVersion = entry.version;
       try {
-        const outcome = await syncSinglePortWithSource(env, entry, budget);
+        const outcome = await syncWithRetries(entry);
         stage.checkedAt[entry.portId] = entry.lastCheckedAt || new Date().toISOString();
         if (outcome.status === "down") downCount++;
         if (outcome.changed) {
@@ -1362,7 +1375,7 @@ async function runSyncBatch(env, options = {}) {
     checkedCount++;
     const originalVersion = entry.version;
     try {
-      const outcome = await syncSinglePortWithSource(env, entry, budget);
+      const outcome = await syncWithRetries(entry);
       const target = entry._port;
       for (const key of ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link","lastCheckedAt"]) {
         target[key] = entry[key] ?? target[key] ?? "";
