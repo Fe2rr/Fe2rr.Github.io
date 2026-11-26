@@ -25,6 +25,13 @@ jobs:
     steps:
       - name: Checkout NAPL-Prueba
         uses: actions/checkout@v4
+      - name: Checkout NAPL-Data assets repository
+        uses: actions/checkout@v4
+        with:
+          repository: Fe2rr/NAPL-Data
+          ref: main
+          path: data
+          token: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
       - name: Configure Node.js
         uses: actions/setup-node@v4
         with:
@@ -36,4 +43,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
           CATALOG_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
           IMPORT_SHEETS: ${{ github.event_name == 'schedule' && 'true' || inputs.import_sheets }}
+          NAPL_DATA_DIR: data
         run: node scripts/sync-catalog.mjs
+      - name: Commit static WebP covers
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add public/assets/covers
+          if ! git diff --cached --quiet; then
+            git commit -m "NAPL: update optimized WebP cover cache"
+            git push origin HEAD:main
+          else
+            echo "No cover assets changed."
+          fi
