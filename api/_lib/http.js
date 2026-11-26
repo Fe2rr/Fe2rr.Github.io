@@ -17,7 +17,7 @@ export function cors(req,res){
  return false;
 }
 export function method(req,res,allowed){if(!allowed.includes(req.method)){res.setHeader("Allow",allowed.join(", "));res.status(405).json({success:false,error:"Method not allowed"});return false}return true}
-export function ipOf(req){return String(req.headers["x-forwarded-for"]||req.headers["x-real-ip"]||"unknown").split(",")[0].trim()}
+export function ipOf(req){return String(req.headers["cf-connecting-ip"]||req.headers["x-real-ip"]||req.headers["x-forwarded-for"]||"unknown").split(",")[0].trim()}
 export async function sha256(value){const b=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(value));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
-export async function hmac(value){const secret=process.env.RATE_LIMIT_SECRET||process.env.SESSION_SECRET;if(!secret)throw new Error("RATE_LIMIT_SECRET is not configured");const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const b=await crypto.subtle.sign("HMAC",k,new TextEncoder().encode(value));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
+export async function hmac(value){const secret=process.env.REPORTER_HASH_SECRET||process.env.RATE_LIMIT_SECRET||process.env.SESSION_SECRET;if(!secret)throw new Error("RATE_LIMIT_SECRET is not configured");const k=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);const b=await crypto.subtle.sign("HMAC",k,new TextEncoder().encode(value));return [...new Uint8Array(b)].map(x=>x.toString(16).padStart(2,"0")).join("")}
 export function body(req){return req.body&&typeof req.body==="object"?req.body:{}}
