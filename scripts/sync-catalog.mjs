@@ -90,7 +90,7 @@ if(dataDir){
  const workers=Array.from({length:4},async()=>{while(cursor<queue.length){const source=queue[cursor++];await optimize(source)}});
  await Promise.all(workers);
  const manifestPath=path.join(coversDir,"manifest.json");
- await fs.writeFile(manifestPath,JSON.stringify({version:1,generatedAt:new Date().toISOString(),covers},null,2)+"\\n");
+ await fs.writeFile(manifestPath,JSON.stringify({version:1,generatedAt:new Date().toISOString(),covers},null,2)+"\n");
  console.log(`Cover pipeline: ${generated} generated, ${skipped} cached, ${failed} failed, ${sources.size} source URLs.`);
 }
 console.log(JSON.stringify({batches,totalChecked,totalUpdated,totalErrors,completedAt:new Date().toISOString()},null,2));
