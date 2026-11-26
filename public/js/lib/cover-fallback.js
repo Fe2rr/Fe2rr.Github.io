@@ -43,6 +43,7 @@ const OPTIMIZABLE_COVER_HOSTS = new Set([
     "gamesdb-images.launchbox.gg",
     "shared.fastly.steamstatic.com",
     "shared.akamai.steamstatic.com",
+    "cdn.akamai.steamstatic.com",
     "cdn.cloudflare.steamstatic.com",
     "steamcdn-a.akamaihd.net",
     "img.itch.zone",
