@@ -8,7 +8,7 @@ if(dump.format!=="napl-supabase-export-v1") throw new Error("Unsupported export 
 const order=["devices","rating_tokens","rating_token_issues","rating_votes","game_popularity","game_popularity_visit_limits","compatibility_reports","link_reports","link_report_rate_limits"];
 const identityTables=new Set(["rating_token_issues","rating_votes","compatibility_reports"]);
 const sequenceTables=[...identityTables,"link_reports"];
-const c=new Client({connectionString:url,ssl:{rejectUnauthorized:false}});
+const c=new Client({connectionString:url,ssl:{rejectUnauthorized:true}});
 await c.connect();
 try{
  await c.query("BEGIN");
