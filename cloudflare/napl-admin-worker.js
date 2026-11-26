@@ -1484,6 +1484,7 @@ function toPublicCatalog(catalog) {
     games: catalog.games.map((game) => ({
       name: game.name,
       slug: game.slug,
+      popularityKey: game.popularityKey || slugify(game.name),
       year: game.year,
       coverUrl: game.coverUrl,
       genre: game.genre,
