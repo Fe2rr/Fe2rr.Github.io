@@ -7,6 +7,7 @@ const dump=JSON.parse(await fs.readFile(process.argv[2]||"napl-supabase-export.j
 if(dump.format!=="napl-supabase-export-v1") throw new Error("Unsupported export format.");
 const order=["devices","rating_tokens","rating_token_issues","rating_votes","game_popularity","game_popularity_visit_limits","compatibility_reports","link_reports","link_report_rate_limits"];
 const identityTables=new Set(["rating_token_issues","rating_votes","compatibility_reports"]);
+const sequenceTables=[...identityTables,"link_reports"];
 const c=new Client({connectionString:url,ssl:{rejectUnauthorized:false}});
 await c.connect();
 try{
@@ -23,7 +24,7 @@ try{
   }
   console.log(`${t}: ${rows.length}`);
  }
- for(const t of identityTables){
+ for(const t of sequenceTables){
   await c.query(`SELECT setval(pg_get_serial_sequence('public."${t}"','id'),GREATEST(COALESCE((SELECT max(id) FROM public."${t}"),1),1),true)`);
  }
  await c.query("COMMIT");
