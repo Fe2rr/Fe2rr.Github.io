@@ -23,6 +23,21 @@ function isVercelHost() {
     const host = typeof window === "undefined" ? "" : String(window.location.hostname || "").toLowerCase();
     return host.endsWith(".vercel.app") || host === "napl.app" || host === "www.napl.app";
 }
+let coverManifestPromise = null;
+async function getStaticCoverUrl(rawUrl) {
+    if (!isVercelHost()) return "";
+    try {
+        if (!coverManifestPromise) {
+            coverManifestPromise = fetch("https://napl-catalog.pages.dev/assets/covers/manifest.json", { cache: "force-cache" })
+                .then((response) => response.ok ? response.json() : {})
+                .catch(() => ({}));
+        }
+        const manifest = await coverManifestPromise;
+        return String(manifest?.covers?.[String(rawUrl || "").trim()] || "");
+    } catch {
+        return "";
+    }
+}
 const OPTIMIZABLE_COVER_HOSTS = new Set([
     "images.launchbox-app.com",
     "gamesdb-images.launchbox.gg",
@@ -236,6 +251,15 @@ export async function loadOptimizedCoverImage(
     width = 180
 ) {
     const rawUrl = String(coverUrl || "").trim();
+    const staticUrl = await getStaticCoverUrl(rawUrl);
+    if (staticUrl) {
+        const fallbackUrl = getOptimizedCoverUrl(rawUrl, width) || rawUrl;
+        return loadCoverImage(imgElement, staticUrl, () =>
+            loadCoverImage(imgElement, fallbackUrl, () =>
+                loadCoverImage(imgElement, rawUrl, onUnavailable)
+            )
+        );
+    }
     const optimizedUrl = getOptimizedCoverUrl(rawUrl, width);
     if (optimizedUrl) {
         return loadCoverImage(imgElement, optimizedUrl, () =>
