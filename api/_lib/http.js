@@ -8,6 +8,8 @@ export function cors(req,res){
  res.setHeader("Access-Control-Allow-Headers","Content-Type,Authorization");
  res.setHeader("Access-Control-Max-Age","86400");
  res.setHeader("X-Content-Type-Options","nosniff");
+ res.setHeader("X-Frame-Options","DENY");
+ res.setHeader("Strict-Transport-Security","max-age=31536000; includeSubDomains");
  res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");
  res.setHeader("Cache-Control","no-store");
  if(req.method==="OPTIONS"){res.status(204).end();return true}
