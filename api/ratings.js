@@ -9,7 +9,7 @@ export default async function handler(req,res){
    if(action==="my-votes"){const raw=String(req.query.token||"");if(!raw)return res.status(400).json({success:false,error:"token_required"});const h=await sha256(raw);const {rows}=await p.query("select napl_is_valid_rating_token($1) valid, napl_get_my_votes($1) votes",[h]);if(!rows[0].valid)return res.status(401).json({success:false,error:"invalid_token"});return res.json({success:true,votes:rows[0].votes||{}})}
    const {rows}=await p.query("select napl_get_ratings() data");return res.json(rows[0].data||{ports:[],global_avg:0});
   }
-  const b=body(req),action=String(b.action||req.query.action||"");
+  const b=body(req),action=String(b.action||req.query.action||req.query.path?.[0]||"");
   if(action==="token"){
    const raw=token(),th=await sha256(raw),ih=await sha256(ipOf(req));
    const {rows}=await p.query("select napl_issue_rating_token($1,$2) allowed",[ih,th]);
@@ -19,7 +19,7 @@ export default async function handler(req,res){
   if(action==="my-votes"){
    const raw=String(b.token||"");if(!raw)return res.status(400).json({success:false,error:"token_required"});
    const h=await sha256(raw);const {rows}=await p.query("select napl_is_valid_rating_token($1) valid,napl_get_my_votes($1) votes",[h]);
-   return res.json({success:true,valid:rows[0].valid,votes:rows[0].votes||{}});
+   if(!rows[0].valid)return res.status(401).json({success:false,error:"invalid_token"});return res.json({success:true,votes:rows[0].votes||{}});
   }
   if(action==="vote"){
    const raw=String(b.token||"");const port=String(b.port_id||b.portId||"");const stars=Number(b.stars);
