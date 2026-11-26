@@ -1266,7 +1266,7 @@ async function runSyncBatch(env, options = {}) {
   async function syncWithRetries(entry) {
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
-        return await syncWithRetries(entry);
+        return await syncSinglePortWithSource(env, entry, budget);
       } catch (error) {
         const message = String(error?.message || error || "");
         const transient = /429|HTTP 5\\d\\d|timeout|timed out|network|fetch failed|aborted|rate limit|temporarily unavailable/i.test(message);
