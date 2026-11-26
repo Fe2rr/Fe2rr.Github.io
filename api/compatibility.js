@@ -4,7 +4,7 @@ export default async function handler(req,res){
  if(cors(req,res))return;if(!method(req,res,["GET","POST"]))return;
  try{const p=db();if(req.method==="GET"){
  const action=String(req.query.action||"");
- if(action==="devices"){const {rows}=await p.query("select get_compatibility_devices() data");return res.json({success:true,devices:rows[0].data||[]})}
+ if(action==="devices")return res.status(410).json({success:false,error:"The device catalog is served from static JSON."})
  if(action==="search"){const id=String(req.query.device_id||"").slice(0,200),soc=String(req.query.soc||"").slice(0,120),q=String(req.query.q||"").slice(0,120),limit=Math.min(Math.max(Number(req.query.limit)||500,1),1000);const {rows}=await p.query("select get_compatibility_by_hardware($1,$2,$3,$4) data",[id||null,soc||null,q||null,limit]);return res.json({success:true,reports:rows[0].data||[]})}
  const ids=[...new Set(String(req.query.port_ids||"").split(",").map(x=>x.trim()).filter(Boolean))].slice(0,50);if(ids.some(x=>x.length>120))return res.status(400).json({success:false,error:"Invalid port ID."});const {rows}=await p.query("select get_compatibility_for_ports($1::text[]) data",[ids]);return res.json({success:true,compatibility:rows[0].data||{}});
  }
