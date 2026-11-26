@@ -1269,7 +1269,7 @@ async function runSyncBatch(env, options = {}) {
         return await syncSinglePortWithSource(env, entry, budget);
       } catch (error) {
         const message = String(error?.message || error || "");
-        const transient = /429|HTTP 5\\d\\d|timeout|timed out|network|fetch failed|aborted|rate limit|temporarily unavailable/i.test(message);
+        const transient = /429|HTTP 5\d\d|timeout|timed out|network|fetch failed|aborted|rate limit|temporarily unavailable/i.test(message);
         if (!transient || attempt === 2) throw error;
         await new Promise((resolve) => setTimeout(resolve, 400 * (2 ** attempt)));
       }
