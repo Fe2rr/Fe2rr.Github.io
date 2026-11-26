@@ -2,7 +2,7 @@ name: NAPL catalog sync
 
 on:
   schedule:
-    - cron: "17 */2 * * *"
+    - cron: "17 4 * * *"
   workflow_dispatch:
     inputs:
       import_sheets:
@@ -44,6 +44,8 @@ jobs:
           CATALOG_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
           IMPORT_SHEETS: ${{ github.event_name == 'schedule' && 'true' || inputs.import_sheets }}
           NAPL_DATA_DIR: data
+          GITHUB_ACTIONS: "true"
+          SYNC_CONCURRENCY: "4"
         run: node scripts/sync-catalog.mjs
       - name: Commit static WebP covers
         working-directory: data
