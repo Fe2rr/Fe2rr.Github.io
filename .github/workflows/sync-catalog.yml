@@ -1,0 +1,39 @@
+name: NAPL catalog sync
+
+on:
+  schedule:
+    - cron: "17 */2 * * *"
+  workflow_dispatch:
+    inputs:
+      import_sheets:
+        description: "Import the latest Google Sheets CSV before syncing"
+        required: false
+        type: boolean
+        default: true
+
+concurrency:
+  group: napl-catalog-sync
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - name: Checkout NAPL-Prueba
+        uses: actions/checkout@v4
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run full catalog synchronization
+        env:
+          ADMIN_PASSWORD: ${{ secrets.NAPL_ADMIN_PASSWORD }}
+          SESSION_SECRET: ${{ secrets.NAPL_SESSION_SECRET }}
+          GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+          CATALOG_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+          IMPORT_SHEETS: ${{ github.event_name == 'schedule' && 'true' || inputs.import_sheets }}
+        run: node scripts/sync-catalog.mjs
