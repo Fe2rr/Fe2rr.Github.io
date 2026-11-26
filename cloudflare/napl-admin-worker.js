@@ -1285,9 +1285,20 @@ async function runSyncBatch(env, options = {}) {
     let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
     const details = [];
     const mutableKeys = ["githubRepo","syncProvider","syncTarget","githubStatus","version","lastUpdate","url","link"];
+    const actionRunner = env.GITHUB_ACTIONS === "true";
+    const maxSubrequests = actionRunner ? 500 : MAX_SUBREQUESTS_PER_RUN;
+    const maxElapsed = actionRunner ? 600000 : SYNC_ELAPSED_BUDGET_MS;
+    const maxPlaystore = actionRunner ? limit : MAX_PLAYSTORE_PER_RUN;
+    const candidates = [];
+    let playstoreCandidates = 0;
     for (const entry of ordered) {
-      if (budget.subrequests >= MAX_SUBREQUESTS_PER_RUN || (Date.now() - budget.startedAt) >= SYNC_ELAPSED_BUDGET_MS) break;
-      if (entry._syncInfo.provider === "playstore" && budget.playstore >= MAX_PLAYSTORE_PER_RUN) break;
+      if (entry._syncInfo.provider === "playstore" && playstoreCandidates >= maxPlaystore) break;
+      if (entry._syncInfo.provider === "playstore") playstoreCandidates++;
+      candidates.push(entry);
+    }
+    let cursor = 0;
+    const concurrency = actionRunner ? Math.min(Math.max(Number(env.SYNC_CONCURRENCY) || 4, 1), 8) : 1;
+    async function processEntry(entry) {
       checkedCount++;
       const originalVersion = entry.version;
       try {
@@ -1310,6 +1321,14 @@ async function runSyncBatch(env, options = {}) {
           error: error?.message || "Error consultando fuente externa" });
       }
     }
+    await Promise.all(Array.from({ length: Math.min(concurrency, candidates.length) }, async () => {
+      while (true) {
+        if (budget.subrequests >= maxSubrequests || (Date.now() - budget.startedAt) >= maxElapsed) break;
+        const index = cursor++;
+        if (index >= candidates.length) break;
+        await processEntry(candidates[index]);
+      }
+    }));
     const now = new Date().toISOString();
     stage.checkedCount += checkedCount;
     stage.updatedCount += updatedCount;
