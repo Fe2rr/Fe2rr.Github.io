@@ -9,7 +9,7 @@ const env={
   GITHUB_TOKEN:process.env.GITHUB_TOKEN||process.env.CATALOG_DATA_GITHUB_TOKEN,
   CATALOG_DATA_GITHUB_TOKEN:process.env.CATALOG_DATA_GITHUB_TOKEN,
   ADMIN_ORIGIN:"https://napl-admin.pages.dev",
-  CRON_BATCH_SIZE:"10",
+  CRON_BATCH_SIZE:"15",
   AUTO_PUBLISH_CRON:""
 };
 for(const key of ["ADMIN_PASSWORD","SESSION_SECRET","GITHUB_TOKEN","CATALOG_DATA_GITHUB_TOKEN"])if(!env[key])throw new Error(`Missing required secret: ${key}`);
@@ -42,7 +42,7 @@ if(process.env.IMPORT_SHEETS!=="false"){
 
 let offset=0,totalChecked=0,totalUpdated=0,totalErrors=0,batches=0;
 while(true){
- const result=await retry(()=>call("sync-sources","POST",{source:"github-actions",limit:10,offset,useOffset:true,stageOnly:true,compact:true,includeCatalog:false}),`sync batch at offset ${offset}`);
+ const result=await retry(()=>call("sync-sources","POST",{source:"github-actions",limit:15,offset,useOffset:true,stageOnly:true,compact:true,includeCatalog:false}),`sync batch at offset ${offset}`);
  const s=result.sync||{};
  batches++;totalChecked+=Number(s.checkedCount)||0;totalUpdated+=Number(s.updatedCount)||0;totalErrors+=Number(s.errorCount)||0;
  console.log(`Batch ${batches}: checked=${s.checkedCount||0}, updated=${s.updatedCount||0}, errors=${s.errorCount||0}, next=${s.nextOffset}, more=${Boolean(s.hasMore)}`);
