@@ -5,14 +5,14 @@ const ORIGIN_DEFAULTS=["https://fe2rr.github.io","https://napl-admin.pages.dev"]
 function envForWorker(){return {ADMIN_PASSWORD:process.env.ADMIN_PASSWORD,SESSION_SECRET:process.env.SESSION_SECRET,GITHUB_TOKEN:process.env.GITHUB_TOKEN,CATALOG_DATA_GITHUB_TOKEN:process.env.CATALOG_DATA_GITHUB_TOKEN,ADMIN_ORIGIN:process.env.ALLOWED_ORIGINS||ORIGIN_DEFAULTS.join(","),AUTO_PUBLISH_CRON:"",CRON_BATCH_SIZE:"10"}}
 function pathOf(req){const p=req.query?.path;return Array.isArray(p)?p.join("/"):String(p||"")}
 function setSecurity(res){res.setHeader("X-Content-Type-Options","nosniff");res.setHeader("X-Frame-Options","DENY");res.setHeader("Referrer-Policy","strict-origin-when-cross-origin");res.setHeader("Permissions-Policy","camera=(), microphone=(), geolocation=()")}
-async function workerCall(req,path,token){const headers=new Headers({Origin:String(req.headers.origin||"https://napl-admin.pages.dev"),"Content-Type":"application/json"});if(token)headers.set("Authorization",token.startsWith("Bearer ")?token:`Bearer ${token}`);const body=["GET","HEAD"].includes(req.method)?undefined:JSON.stringify(req.body||{});const request=new Request(`https://napl-internal/api/${path}`,{method:req.method,headers,body});return worker.fetch(request,envForWorker())}
+async function workerCall(req,path,token,method=req.method){const headers=new Headers({Origin:String(req.headers.origin||"https://napl-admin.pages.dev"),"Content-Type":"application/json"});if(token)headers.set("Authorization",token.startsWith("Bearer ")?token:`Bearer ${token}`);const body=["GET","HEAD"].includes(req.method)?undefined:JSON.stringify(req.body||{});const request=new Request(`https://napl-internal/api/${path}`,{method,headers,body:method==="GET"||method==="HEAD"?undefined:body});return worker.fetch(request,envForWorker())}
 async function github(path,options={}){const token=process.env.GH_ACTIONS_TOKEN||process.env.GITHUB_TOKEN;if(!token)throw new Error("GH_ACTIONS_TOKEN is not configured");const r=await fetch(`https://api.github.com${path}`,{...options,headers:{Accept:"application/vnd.github+json",Authorization:`Bearer ${token}`,"X-GitHub-Api-Version":"2022-11-28","Content-Type":"application/json",...(options.headers||{})}});const text=await r.text();let data={};try{data=text?JSON.parse(text):{}}catch{}if(!r.ok)throw new Error(data.message||`GitHub API HTTP ${r.status}`);return data}
 export default async function handler(req,res){
  setSecurity(res);
  const path=pathOf(req);
  try{
   if(path==="sync-trigger"&&req.method==="POST"){
-   const auth=await workerCall(req,"verify-session",req.headers.authorization||"");
+   const auth=await workerCall(req,"verify-session",req.headers.authorization||"","GET");
    if(!auth.ok)return res.status(auth.status).json(await auth.json());
    const inputs={import_sheets:String(req.body?.import_sheets!==false)};
    await github(`/repos/Fe2rr/Napl-prueba/actions/workflows/${WORKFLOW}/dispatches`,{method:"POST",body:JSON.stringify({ref:"main",inputs})});
