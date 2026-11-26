@@ -17,8 +17,12 @@ import {
     getCachedOrFetchImageSrc,
 } from "./image-cache.js";
 
-const COVER_OPTIMIZER_URL =
+const LEGACY_COVER_OPTIMIZER_URL =
     "https://napl-image-optimizer.federicoxastro.workers.dev/image";
+function isVercelHost() {
+    const host = typeof window === "undefined" ? "" : String(window.location.hostname || "").toLowerCase();
+    return host.endsWith(".vercel.app") || host === "napl.app" || host === "www.napl.app";
+}
 const OPTIMIZABLE_COVER_HOSTS = new Set([
     "images.launchbox-app.com",
     "gamesdb-images.launchbox.gg",
@@ -26,6 +30,9 @@ const OPTIMIZABLE_COVER_HOSTS = new Set([
     "shared.akamai.steamstatic.com",
     "cdn.cloudflare.steamstatic.com",
     "steamcdn-a.akamaihd.net",
+    "img.itch.zone",
+    "itch.zone",
+    "static.itch.io",
 ]);
 
 export function getOptimizedCoverUrl(rawUrl, width = 180) {
@@ -38,7 +45,15 @@ export function getOptimizedCoverUrl(rawUrl, width = 180) {
             return "";
         }
         source.protocol = "https:";
-        const optimized = new URL(COVER_OPTIMIZER_URL);
+        if (isVercelHost()) {
+            const optimized = new URL("https://wsrv.nl/");
+            optimized.searchParams.set("url", source.toString());
+            optimized.searchParams.set("output", "webp");
+            optimized.searchParams.set("w", String(width));
+            optimized.searchParams.set("q", "82");
+            return optimized.toString();
+        }
+        const optimized = new URL(LEGACY_COVER_OPTIMIZER_URL);
         optimized.searchParams.set("url", source.toString());
         optimized.searchParams.set("w", String(width));
         return optimized.toString();
