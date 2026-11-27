@@ -393,7 +393,19 @@ async function handleRatings(req, url, env, origin) {
         .bind(voteDelta, starDelta, nowIso),
     ]);
 
-    return json(origin, env, 200, { ok: true, port_id: portId, stars });
+    const [portStats, globalMeta] = await Promise.all([
+      db.prepare("SELECT votes, sum_stars FROM rating_port_stats WHERE port_id = ?").bind(portId).first(),
+      db.prepare("SELECT total_votes, total_sum FROM rating_global_meta WHERE id = 1").first(),
+    ]);
+    const votes = Number(portStats?.votes || 0);
+    const avg = votes > 0 ? Number(portStats?.sum_stars || 0) / votes : 0;
+    const totalVotes = Number(globalMeta?.total_votes || 0);
+    const globalAvg = totalVotes > 0 ? Number(globalMeta?.total_sum || 0) / totalVotes : 0;
+    const score = votes > 0 ? (votes / (votes + 5)) * avg + (5 / (votes + 5)) * globalAvg : 0;
+    return json(origin, env, 200, {
+      ok: true, port_id: portId, stars,
+      rating: { avg: Number(avg.toFixed(2)), votes, score: Number(score.toFixed(2)) },
+    });
   }
 
   return json(origin, env, 404, { error: "not_found" });
