@@ -74,52 +74,67 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
-function gameSyncStatus(game) {
+let activeConsoleByMaker = {};\nfunction gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
-function platformManufacturer(game) {
-  if (game.manufacturer) return game.manufacturer;
-  const platform = String(game.platform || "").toLowerCase();
+function platformManufacturer(platform) {
+  const value = String(platform || "").toLowerCase().replace(/[_-]+/g, " ");
   const rules = [
-    [/nintendo|\\bnes\\b|\\bsnes\\b|super famicom|game ?boy|gamecube|wii|switch/, "Nintendo"],
-    [/playstation|\bps[1-5]\b|psp|vita/, "Sony"],
+    [/nintendo|\\bnes\\b|\\bsnes\\b|super famicom|game ?boy|gamecube|wii|switch|virtual boy/, "Nintendo"],
+    [/playstation|\\bps[1-5]\\b|\\bpsp\\b|vita|ps vita/, "Sony"],
     [/xbox/, "Microsoft"],
-    [/sega|megadrive|mega drive|dreamcast|saturn|game gear/, "Sega"],
-    [/atari/, "Atari"], [/neogeo|neo geo|snk/, "SNK"], [/pc|windows|steam/, "PC"]
+    [/sega|megadrive|mega drive|genesis|dreamcast|saturn|game gear|master system/, "Sega"],
+    [/atari|lynx|jaguar/, "Atari"], [/neogeo|neo geo|\\bsnk\\b/, "SNK"],
+    [/pc|windows|steam|dos|linux/, "PC"], [/commodore|amiga|c64/, "Commodore"], [/nec|pc engine|turbografx/, "NEC"]
   ];
-  return rules.find(([pattern]) => pattern.test(platform))?.[1] || "Otros";
+  return rules.find(([pattern]) => pattern.test(value))?.[1] || "Otros";
 }
 function renderGameList() {
   const games = state?.catalog?.games || [];
   const q = $("search").value.trim().toLowerCase();
   const mode = $("sync-filter")?.value || "all";
-  const filtered = games.filter((game) => {
+  const platforms = [...new Set([...(state?.catalog?.platformOrder || []), ...games.map(g=>g.platform).filter(Boolean)])];
+  const filtered = games.filter(game => {
     const synced = gameSyncStatus(game);
     if (mode === "synced" && !synced) return false;
     if (mode === "unsynced" && synced) return false;
-    const haystack = [game.name, game.slug, game.manufacturer, game.platform, ...(game.ports || []).flatMap((p) => [p.project, p.developer, p.portId, p.url, p.githubRepo])].join(" ").toLowerCase();
-    return haystack.includes(q);
+    return [game.name,game.slug,game.platform,...(game.ports||[]).flatMap(p=>[p.project,p.developer,p.portId,p.url,p.githubRepo])].join(" ").toLowerCase().includes(q);
   });
-  $("catalog-count").textContent = filtered.length + " / " + games.length + " juegos · " + games.reduce((n, g) => n + (g.ports || []).length, 0) + " ports";
-  const makers = new Map();
-  for (const game of filtered) {
-    const maker = platformManufacturer(game);
-    if (!makers.has(maker)) makers.set(maker, new Map());
-    const consoles = makers.get(maker);
-    const platform = game.platform || "Sin consola";
-    if (!consoles.has(platform)) consoles.set(platform, []);
-    consoles.get(platform).push(game);
+  $("catalog-count").textContent = filtered.length + " / " + games.length + " juegos · " + games.reduce((n,g)=>n+(g.ports||[]).length,0) + " ports";
+  const groups = new Map();
+  for (const platform of platforms) {
+    const maker = platformManufacturer(platform);
+    if (!groups.has(maker)) groups.set(maker, []);
+    groups.get(maker).push(platform);
   }
-  $("game-list").innerHTML = [...makers.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([maker, consoles]) => `
-    <section class="maker-group"><h3 class="maker-heading">${esc(maker)}</h3>
-    ${[...consoles.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([platform, entries]) => {
-      const ordered = [...entries].sort((a,b)=>Number(gameSyncStatus(a))-Number(gameSyncStatus(b)) || String(a.name).localeCompare(String(b.name)));
-      return `<section class="console-group"><div class="console-heading"><strong>${esc(platform)}</strong><button type="button" class="button secondary category-add" data-add-category="${esc(platform)}">+ Juego</button></div>
-      ${ordered.map(game => `<button type="button" class="game-item ${game.slug === selectedSlug ? "active" : ""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name || "Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game) ? "is-synced" : ""}"></span>${gameSyncStatus(game) ? "Con sync" : "Sin sync"} · ${(game.ports || []).length} ports</small></button>`).join("")}
-      </section>`;
-    }).join("")}</section>`).join("") || '<p class="muted">No hay resultados.</p>';
-  const platforms = [...new Set([...(state?.catalog?.platformOrder || []), ...games.map((g) => g.platform).filter(Boolean)])];
-  $("platform-options").innerHTML = platforms.map((p) => `<option value="${esc(p)}"></option>`).join("");
+  for (const game of filtered) {
+    const platform = game.platform || "Sin consola";
+    const maker = platformManufacturer(platform);
+    if (!groups.has(maker)) groups.set(maker, []);
+    if (!groups.get(maker).includes(platform)) groups.get(maker).push(platform);
+  }
+  $("game-list").innerHTML = [...groups.entries()].map(([maker, consoles]) => {
+    const active = consoles.includes(activeConsoleByMaker[maker]) ? activeConsoleByMaker[maker] : consoles[0];
+    activeConsoleByMaker[maker] = active;
+    const tabs = consoles.map(platform=>`<button type="button" role="tab" aria-selected="${platform===active}" class="console-tab ${platform===active?"active":""}" data-console-tab="${esc(platform)}" data-maker="${esc(maker)}">${esc(platform)}</button>`).join("");
+    const entries = filtered.filter(game=>(game.platform||"Sin consola")===active);
+    const ordered = [...entries].sort((x,y)=>Number(gameSyncStatus(x))-Number(gameSyncStatus(y))||String(x.name).localeCompare(String(y.name)));
+    return `<section class="maker-group"><h3 class="maker-heading">${esc(maker)}</h3>
+      <div class="console-tabs" role="tablist" aria-label="${esc(maker)}">${tabs}</div>
+      <div class="console-tab-content"><div class="console-content-heading"><strong>${esc(active)}</strong><button type="button" class="button secondary category-add" data-add-category="${esc(active)}">+ Juego</button></div>
+      ${ordered.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Con sync":"Sin sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta consola.</p>'}
+      </div></section>`;
+  }).join("") || '<p class="muted">No hay resultados.</p>';
+  $("platform-options").innerHTML = platforms.map(p=>`<option value="${esc(p)}"></option>`).join("");
+}
+function detectMetadataSource(rawUrl) {
+  let url;
+  try { url = new URL(rawUrl); } catch { throw new Error("El enlace no es una URL válida."); }
+  const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+  if (host === "store.steampowered.com" || host === "steamcommunity.com") return "steam";
+  if (host === "launchbox-app.com" || host.endsWith(".launchbox-app.com")) return "launchbox";
+  if (host === "itch.io" || host.endsWith(".itch.io")) return "itch";
+  throw new Error("No reconozco el sitio. Usá un enlace de Steam, LaunchBox o itch.io.");
 }
 function renderEditor() {
   const game = currentGame();
@@ -128,7 +143,7 @@ function renderEditor() {
   if (!game) return;
   $("editor-title").textContent = game.name || "Nuevo juego";
   const form = $("game-form");
-  for (const key of ["name","slug","manufacturer","platform","year","genre","coverUrl","steamUrl","launchboxUrl","description"]) {
+  for (const key of ["name","slug","platform","year","genre","coverUrl","steamUrl","launchboxUrl","description"]) {
     const field = form.elements.namedItem(key);
     if (field) field.value = game[key] ?? "";
   }
@@ -291,7 +306,7 @@ $("game-list").addEventListener("click", (event) => {
   if (addButton) {
     if (currentGame()) readDraft();
     const platform = addButton.dataset.addCategory;
-    const base = {name:"Nuevo juego",slug:"nuevo-juego",manufacturer:platformManufacturer({platform}),platform,year:"",coverUrl:"",genre:"",description:"",ports:[]};
+    const base = {name:"Nuevo juego",slug:"nuevo-juego",platform,year:"",coverUrl:"",genre:"",description:"",ports:[]};
     let slug=base.slug,n=2; while(state.catalog.games.some(g=>g.slug===slug)) slug=base.slug+"-"+n++;
     base.slug=slug; state.catalog.games.unshift(base); selectedSlug=slug; renderAll(); return;
   }
@@ -302,7 +317,7 @@ $("game-list").addEventListener("click", (event) => {
   renderAll();
 });
 $("new-game").addEventListener("click", () => {
-  const base = { name:"Nuevo juego", slug:"nuevo-juego", manufacturer:"", platform:"", year:"", coverUrl:"", genre:"", description:"", ports:[] };
+  const base = { name:"Nuevo juego", slug:"nuevo-juego", platform:"", year:"", coverUrl:"", genre:"", description:"", ports:[] };
   let slug = base.slug, n = 2;
   while (state.catalog.games.some(g=>g.slug===slug)) slug = base.slug + "-" + n++;
   base.slug = slug;
@@ -367,7 +382,7 @@ $("close-community").addEventListener("click", () => $("community-dialog").close
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
   if (!url) return notice("Ingresá la URL del juego.", "error");
-  const mode = $("metadata-source").value;
+  const mode = detectMetadataSource(url);
   setBusy(true, "Consultando metadatos con GitHub Actions…");
   try {
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
