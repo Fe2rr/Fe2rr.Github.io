@@ -95,7 +95,7 @@ function renderGameList() {
   });
   $("catalog-count").textContent = filtered.length + " / " + games.length + " juegos · " + games.reduce((n,g)=>n+(g.ports||[]).length,0) + " ports";
   const orderedPlatforms = [...platforms, ...[...new Set(filtered.map(g=>g.platform).filter(Boolean))].filter(p=>!platforms.includes(p))];
-  $("game-list").innerHTML = orderedPlatforms.map(platform => {
+  const renderPlatform = platform => {
     const entries = filtered.filter(game=>game.platform===platform);
     const isOpen = openPlatforms.has(platform);
     return `<details class="platform-accordion" data-platform-accordion="${esc(platform)}" ${isOpen?"open":""}>
@@ -104,7 +104,11 @@ function renderGameList() {
         <div class="platform-content-heading"><strong>${esc(platform)}</strong><button type="button" class="button secondary category-add" data-add-port-platform="${esc(platform)}">+ Port</button></div>
         ${entries.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Sync":"No sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta plataforma.</p>'}
       </div></details>`;
-  }).join("") || '<p class="muted">No hay resultados.</p>';
+  };
+  const segaPlatforms = orderedPlatforms.filter(platform => /sega/i.test(platform));
+  const otherPlatforms = orderedPlatforms.filter(platform => !/sega/i.test(platform));
+  const segaGroup = segaPlatforms.length ? `<section class="admin-maker-group"><h3>SEGA</h3>${segaPlatforms.map(renderPlatform).join("")}</section>` : "";
+  $("game-list").innerHTML = otherPlatforms.map(renderPlatform).join("") + segaGroup || '<p class="muted">No hay resultados.</p>';
 }
 
 function detectMetadataSource(rawUrl) {
@@ -137,7 +141,11 @@ function renderEditor() {
   $("port-count").textContent = (game.ports || []).length + " ports";
   const platformSelect = form.elements.namedItem("platform");
   const platforms = [...new Set([...(state?.catalog?.platformOrder||[]),...(state?.catalog?.games||[]).map(g=>g.platform).filter(Boolean)])];
-  platformSelect.innerHTML = platforms.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("") + '<option value="__add_new__">＋ Agregar nueva plataforma…</option>';
+  const segaPlatforms = platforms.filter(p => /sega/i.test(p));
+  const otherPlatforms = platforms.filter(p => !/sega/i.test(p));
+  platformSelect.innerHTML = otherPlatforms.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("")
+    + (segaPlatforms.length ? `<optgroup label="SEGA">${segaPlatforms.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("")}</optgroup>` : "")
+    + '<option value="__add_new__">＋ Agregar nueva plataforma…</option>';
   if (game.platform && !platforms.includes(game.platform)) platformSelect.insertAdjacentHTML("afterbegin",`<option value="${esc(game.platform)}">${esc(game.platform)}</option>`);
   platformSelect.value = game.platform || "";
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
