@@ -5,7 +5,7 @@
 // Single external community microservice URL (Cloudflare Workers + D1 in cloudflare-community/).
 // Replace with your Workers/custom domain (or set <meta name="napl-community-api" content="https://..."> in HTML).
 const DEFAULT_COMMUNITY_API_BASE =
-    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
+    "https://napl-community-api.federicoxastro.workers.dev";
 
 function isLocalPreviewHost() {
     if (typeof window === "undefined") return false;
