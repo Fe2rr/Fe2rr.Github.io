@@ -163,21 +163,18 @@ Deno.serve(async (request: Request) => {
 
   try {
     if (request.method === "GET" && url.pathname.endsWith("/admin-dashboard")) {
-      const [snapshotResponse, pendingResponse] = await Promise.all([
+      const [snapshotResponse, reports] = await Promise.all([
         handleSnapshot(),
-        handlePendingReports(),
+        dbRequest("link_reports?select=id,port_id,reason,note,url,created_at,updated_at,discord_notified_at&order=updated_at.desc&limit=100"),
       ]);
-      if (!snapshotResponse.ok || !pendingResponse.ok) {
+      if (!snapshotResponse.ok) {
         throw new Error("Could not assemble community dashboard.");
       }
-      const [snapshot, pending] = await Promise.all([
-        snapshotResponse.json(),
-        pendingResponse.json(),
-      ]);
+      const snapshot = await snapshotResponse.json();
       return json({
         success: true,
         snapshot,
-        reports: Array.isArray(pending?.reports) ? pending.reports : [],
+        reports: Array.isArray(reports) ? reports : [],
       }, 200, { "Cache-Control": "no-store" });
     }
     if (request.method === "GET" && url.pathname.endsWith("/community-snapshot")) {
