@@ -1,6 +1,6 @@
 # NAPL — arquitectura actual
 
-NAPL funciona con GitHub como plataforma principal. La versión activa es la publicada desde `Fe2rr/Fe2rr.github.io`, rama `main`. El repositorio `archive` es un respaldo separado y no forma parte del despliegue.
+NAPL funciona con GitHub como plataforma principal. La versión activa se publica desde `Fe2rr/Fe2rr.github.io`, rama `main`. El respaldo `archive` queda fuera del flujo de trabajo y no se modifica.
 
 ## Componentes
 
