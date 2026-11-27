@@ -5,7 +5,7 @@ on:
     paths:
       - ".github/workflows/sync-community-summary.yml"
   schedule:
-    - cron: "17 * * * *"
+    - cron: "17 */6 * * *"
   workflow_dispatch:
 
 concurrency:
@@ -21,18 +21,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Checkout NAPL-Prueba
+      - name: Checkout NAPL site
         uses: actions/checkout@v4
 
       - name: Check required secrets
         id: check_env
         env:
           NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
-          NAPL_COMMUNITY_API_BASE: ${{ secrets.NAPL_COMMUNITY_API_BASE }}
         run: |
-          if [ -z "$NAPL_DATA_GITHUB_TOKEN" ] || [ -z "$NAPL_COMMUNITY_API_BASE" ]; then
+          if [ -z "$NAPL_DATA_GITHUB_TOKEN" ]; then
             echo "ready=false" >> "$GITHUB_OUTPUT"
-            echo "NAPL_DATA_GITHUB_TOKEN or NAPL_COMMUNITY_API_BASE is not set yet; skipping."
+            echo "NAPL_DATA_GITHUB_TOKEN is not set yet; skipping."
           else
             echo "ready=true" >> "$GITHUB_OUTPUT"
           fi
@@ -56,7 +55,7 @@ jobs:
         if: steps.check_env.outputs.ready == 'true'
         env:
           NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
-          NAPL_COMMUNITY_API_BASE: ${{ secrets.NAPL_COMMUNITY_API_BASE }}
+          NAPL_COMMUNITY_API_BASE: https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/community-sync
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
           NAPL_DATA_DIR: data
         run: node scripts/sync-community-summary.mjs
