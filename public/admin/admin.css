@@ -1435,3 +1435,16 @@ button {
 @media(max-width:1050px){.admin-port-grid,.ports-list{grid-template-columns:1fr}.admin-game-meta-grid,.fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:900px){.topbar{flex-wrap:wrap;gap:10px;padding:12px}.topbar-actions{width:100%;overflow:auto;margin:0}.workspace{grid-template-columns:260px minmax(0,1fr)}}
 @media(max-width:640px){.workspace{display:flex;flex-direction:column}.catalog-panel{border-right:0;border-bottom:1px solid var(--line);max-height:42vh;overflow:auto}.admin-game-meta-grid,.fields,.port-fields{grid-template-columns:1fr}.autofill-row,.lookup-row{align-items:stretch;flex-direction:column}.save-row{align-items:stretch;flex-direction:column}.community-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+
+/* Catálogo agrupado por fabricante y consola */
+.sync-filter{width:100%;margin:0 0 12px;padding:10px 12px;border:1px solid var(--line);border-radius:8px;background:#0c1916;color:var(--text);font:inherit;font-size:12px}
+.maker-group{margin:0 0 18px}.maker-heading{margin:14px 4px 8px;color:#91c9a9;font:700 11px "JetBrains Mono",monospace;text-transform:uppercase;letter-spacing:.12em}
+.console-group{margin:0 0 12px;padding:9px;border:1px solid rgba(167,243,208,.13);border-radius:9px;background:rgba(10,24,19,.36)}
+.console-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 8px;padding:0 2px 7px;border-bottom:1px solid var(--line)}
+.console-heading strong{font:700 13px "Outfit",sans-serif;color:#e2f2e9}.category-add{padding:5px 8px;font-size:10px}
+.sync-dot{display:inline-block;width:7px;height:7px;margin-right:6px;border-radius:50%;background:#d59b62;vertical-align:middle}.sync-dot.is-synced{background:#6ee7a0}
+.game-cover-editor{display:flex;align-items:center;gap:18px;margin:16px 0}.game-cover-editor img{width:112px;max-height:160px;object-fit:contain;border-radius:8px;background:#101b18}.game-cover-editor img[hidden]{display:none}
+.game-title-fields{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;flex:1;min-width:0}
+.game-data-details{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.game-data-details summary{cursor:pointer;color:#9ccbb0;font-weight:700;margin-bottom:12px}
+#metadata-source{min-width:115px;padding:10px;border:1px solid var(--line);border-radius:7px;background:#0c1916;color:var(--text)}
+@media(max-width:680px){.game-title-fields{grid-template-columns:1fr}.game-cover-editor{align-items:flex-start}}
