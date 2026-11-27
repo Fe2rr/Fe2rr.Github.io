@@ -253,7 +253,7 @@ app.get('/api/catalog-meta', (req, res) => {
 });
 
 let publicCatalogCache = { data: null, fetchedAt: 0 };
-const PUBLIC_CATALOG_UPSTREAM = 'https://napl-admin-api.federicoxastro.workers.dev/api/public-catalog';
+const PUBLIC_CATALOG_UPSTREAM = 'https://napl-catalog.pages.dev/assets/data/catalog.json';
 
 app.get('/api/public-catalog', async (req, res) => {
   try {
