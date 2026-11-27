@@ -2,8 +2,9 @@
  * NAPL — CORE CONFIGURATION
  */
 
-// Community interactions are served by the single Cloudflare Worker + D1 service.
-const DEFAULT_COMMUNITY_API_BASE = "https://napl-community-api.federicoxastro.workers.dev";
+// Dynamic community actions use the existing Supabase Edge Functions.
+// Public reads are served from GitHub snapshots; Supabase is only used for writes and detailed queries.
+const DEFAULT_COMMUNITY_API_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
 
 export function resolveCommunityApiBase() {
     if (typeof window !== "undefined") {
