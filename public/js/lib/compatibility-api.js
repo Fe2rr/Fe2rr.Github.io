@@ -17,7 +17,7 @@ let devicesCache = null;
 let devicesPromise = null;
 
 const COMPATIBILITY_CACHE_PREFIX = "napl_compatibility_v2:";
-const COMPATIBILITY_CACHE_TTL = 60_000;
+const COMPATIBILITY_CACHE_TTL = 15 * 60_000;
 
 export const COMPAT_STATUSES = [
     {
