@@ -11,7 +11,7 @@
 ## Functions
 
 - `ratings`: token issuance, own-vote lookup, vote submission; public ratings are read from GitHub snapshots.
-- `compatibility`: detailed compatibility reads and report submissions; device catalog is static JSON on GitHub.
+- `compatibility`: hardware search and report submissions; compatibility details are served from GitHub snapshots during passive page loads.
 - `popularity`: visit registration; public rankings are read from GitHub snapshots.
 - `report-link`: stores link reports and queues them for the scheduled digest.
 - `community-sync`: validates a GitHub PAT with push access to `Fe2rr/NAPL-Data`, then serves the static snapshot source and pending report digest endpoints.
@@ -22,7 +22,7 @@ All browser-facing functions validate inputs and use server-side database keys. 
 
 - Passive page loads use static JSON and should cause zero Supabase or Cloudflare requests.
 - Popularity submissions are deduplicated in local storage per game/day; the database also enforces IP/game/day deduplication.
-- Compatibility reads are cached in local storage for 15 minutes; report submissions refresh their own game's summary.
+- Compatibility details are included in the six-hour GitHub snapshot; local cache lasts 15 minutes. Supabase is used for user-initiated hardware search and fresh post-submit reads.
 - Community snapshots run every six hours and are committed only when content changes.
 - Link reports are batched by GitHub Actions; the Edge Function does not send one Discord webhook per report.
 
