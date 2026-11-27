@@ -1453,3 +1453,10 @@ button {
 .port-source-row label{flex:1;min-width:0}.port-data-details{padding:10px 14px}
 .port-data-details summary{cursor:pointer;color:#9ccbb0;font-size:12px;font-weight:700;margin-bottom:10px}
 @media(max-width:640px){.port-source-row{align-items:stretch;flex-direction:column}}
+
+.console-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--line);scrollbar-width:thin}
+.console-tab{flex:0 0 auto;border:1px solid rgba(167,243,208,.16);border-radius:7px;padding:7px 11px;background:rgba(10,24,19,.45);color:#a9c6b6;font:600 11px "Plus Jakarta Sans",sans-serif;cursor:pointer;white-space:nowrap}
+.console-tab:hover{border-color:rgba(167,243,208,.4);color:#e2f2e9}.console-tab.active{background:rgba(74,151,111,.22);border-color:#65ad85;color:#d7f4e2}
+.console-tab-content{padding:4px 8px 10px;border:1px solid rgba(167,243,208,.12);border-radius:9px;background:rgba(10,24,19,.24)}
+.console-content-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 2px 8px;margin-bottom:6px;border-bottom:1px solid var(--line)}
+.console-content-heading strong{font-size:12px;color:#e2f2e9}
