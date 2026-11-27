@@ -15,4 +15,7 @@ verify_jwt = false
 [functions.community-sync]
 verify_jwt = false
 
-# admin-dashboard is a legacy function. The current admin uses GitHub directly.
+[functions.admin-dashboard]
+verify_jwt = false
+
+# admin-dashboard returns HTTP 410; the current admin uses GitHub directly.
