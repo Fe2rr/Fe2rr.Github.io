@@ -19,7 +19,7 @@ jobs:
           node-version: 22
       - name: Check JavaScript syntax
         run: |
-          find public/js public/admin scripts lib -type f \\( -name '*.js' -o -name '*.mjs' \\) -print0 | xargs -0 -r -n1 node --check
+          find public/js public/admin scripts lib -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -r -n1 node --check
       - name: Verify admin module imports and active architecture
         run: |
           node --input-type=module -e "import('./public/js/lib/github-admin.js').then(m => { if (typeof m.fetchCommunityAdminDashboard !== 'function') process.exit(1); })"
