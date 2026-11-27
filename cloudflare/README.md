@@ -1,19 +1,24 @@
-# Cloudflare legacy resources
+# Cloudflare en NAPL
 
-El sitio de desarrollo `Fe2rr/Napl-prueba` ya usa GitHub Pages + GitHub Actions para el catálogo y el nuevo panel administrativo. Cloudflare queda como backend comunitario dinámico y conserva recursos legacy requeridos por la versión v5 de producción.
+La web activa se ejecuta con GitHub Pages y GitHub Actions. GitHub mantiene el catálogo, los dispositivos, las portadas estáticas, la sincronización, la edición y la publicación.
 
-## Recursos que siguen activos temporalmente
+Cloudflare conserva únicamente las operaciones comunitarias dinámicas y dos compatibilidades necesarias para la copia estable v5.
 
-- Worker `napl-admin-api`: compatibilidad con `Fe2rr/Fe2rr.Github.io`, rama `v5`. Su endpoint `GET /api/public-catalog` redirige al JSON público de `Fe2rr/NAPL-Data`.
-- Worker `napl-image-optimizer`: todavía referenciado por la versión v5; retirarlo solo después de migrar producción a portadas WebP estáticas.
-- Queue `napl-sync-tasks`: legado de sincronización manual; revisar y retirar junto con las rutas administrativas antiguas cuando v5 deje de depender de ellas.
-- Pages `napl-admin`: panel anterior. El reemplazo estático está en `https://fe2rr.github.io/Napl-prueba/admin/`. Mantener el proyecto anterior hasta comprobar acceso, edición, sincronización y dashboard en el nuevo panel.
+## Recursos activos
+
+- **Worker `napl-community-api` + D1 `napl-community`:** valoraciones, votos propios, registro de popularidad, compatibilidad de dispositivos, reportes de enlaces y dashboard comunitario protegido por GitHub PAT. Los snapshots públicos se generan y publican con GitHub Actions.
+- **Worker `napl-admin-api`:** quedó reducido a un endpoint de compatibilidad `GET /api/public-catalog` para la versión archivada v5. Redirige al catálogo estático de `https://fe2rr.github.io/assets/data/catalog.json`. Ya no contiene login, administración, sincronización ni procesamiento de colas.
+- **Worker `napl-image-optimizer`:** se conserva únicamente porque la versión archivada v5 todavía lo referencia. La web activa usa portadas WebP estáticas generadas por GitHub Actions y fallback externo.
 
 ## Recursos retirados
 
-- Pages `napl-catalog`.
-- Cron triggers del Worker `napl-admin-api`.
+- Pages `napl-admin`: reemplazado por `https://fe2rr.github.io/admin/`.
+- Queue `napl-sync-tasks` y dead-letter queue `napl-sync-dlq`: la sincronización pasó a GitHub Actions.
+- Secrets de sincronización y administración del Worker `napl-admin-api`: ya no son necesarios.
 
-## Regla de despliegue
+## Límites de arquitectura
 
-No volver a agregar cron triggers al Worker legacy. Las sincronizaciones periódicas corresponden a GitHub Actions. No borrar Workers ni Pages legacy hasta validar el reemplazo en producción.
+- No volver a implementar sincronización del catálogo en Workers o Queues.
+- No usar D1 para servir el catálogo, las portadas ni los snapshots públicos.
+- Mantener las lecturas D1 para operaciones comunitarias que realmente necesiten datos dinámicos.
+- No retirar `napl-admin-api` ni `napl-image-optimizer` mientras se quiera conservar la funcionalidad de la copia estable v5.
