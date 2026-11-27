@@ -163,6 +163,7 @@ async function login(raw) {
   try {
     const result = await loginWithGithubPat(raw);
     pat = raw.trim();
+    $("github-pat").value = "";
     await loadState();
     showAdmin();
     notice("Conectado como " + (result.user?.login || "administrador") + ".", "success");
