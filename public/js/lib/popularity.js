@@ -4,11 +4,40 @@ import { POPULARITY_API_BASE } from "./config.js";
 import { loadCommunitySummary } from "./community-summary.js";
 
 const POPULARITY_CACHE_TTL_MS = 15 * 60 * 1000;
-const VISIT_CLIENT_DEDUP_MS = 20 * 1000;
+const VISIT_CLIENT_RETRY_MS = 60 * 1000;
+const VISIT_DEDUP_STORAGE_KEY = "napl_popularity_visit_dedup_v1";
 const popularByPeriod = new Map();
 const popularFetchedAt = new Map();
 const popularPromises = new Map();
 const recentVisitSentAt = new Map();
+
+function hasStoredVisitToday(game) {
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        const stored = JSON.parse(localStorage.getItem(VISIT_DEDUP_STORAGE_KEY) || "{}");
+        return stored?.day === today && stored?.games?.[game] === true;
+    } catch {
+        return false;
+    }
+}
+
+function markStoredVisitToday(game) {
+    try {
+        const today = new Date().toISOString().slice(0, 10);
+        let stored = JSON.parse(localStorage.getItem(VISIT_DEDUP_STORAGE_KEY) || "{}");
+        if (!stored || stored.day !== today || typeof stored.games !== "object") {
+            stored = { day: today, games: {} };
+        }
+        stored.games[game] = true;
+        const keys = Object.keys(stored.games);
+        if (keys.length > 1500) {
+            for (const key of keys.slice(0, keys.length - 1500)) delete stored.games[key];
+        }
+        localStorage.setItem(VISIT_DEDUP_STORAGE_KEY, JSON.stringify(stored));
+    } catch {
+        // Continue without persistent dedup when storage is unavailable.
+    }
+}
 
 function normalizePopularityKey(value) {
     const key = createSlug(value || "");
@@ -93,11 +122,11 @@ export function registerGameVisit(popularityKey) {
     const game = normalizePopularityKey(popularityKey);
     if (!game) return;
 
+    if (hasStoredVisitToday(game)) return;
+
     const now = Date.now();
     const lastSent = recentVisitSentAt.get(game) || 0;
-    if (now - lastSent < VISIT_CLIENT_DEDUP_MS) {
-        return;
-    }
+    if (now - lastSent < VISIT_CLIENT_RETRY_MS) return;
     recentVisitSentAt.set(game, now);
 
     fetch(POPULARITY_API_BASE, {
@@ -112,6 +141,7 @@ export function registerGameVisit(popularityKey) {
             return response.json();
         })
         .then((result) => {
+            markStoredVisitToday(game);
             if (result?.counted) {
                 for (const period of ["week", "month", "alltime"]) {
                     const map = popularByPeriod.get(period);
