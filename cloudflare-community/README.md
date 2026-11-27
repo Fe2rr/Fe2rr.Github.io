@@ -1,34 +1,95 @@
-# NAPL Community Worker + Cloudflare D1 (Sin tarjeta de crédito)
+# NAPL Community Worker + Cloudflare D1
 
-Micro-worker ligero en Cloudflare Workers + D1 dedicado **exclusivamente a interacciones comunitarias en tiempo real** (`/ratings`, `/popularity`, `/compatibility`, `/report-link`), sin cron triggers, sin proxy de imágenes y sin catálogo público.
+Backend externo único para las cuatro funciones comunitarias en tiempo real: ratings, popularidad, compatibilidad y reportes de enlaces.
 
-Toda la carga pasiva de la web (catálogo JSON, portadas WebP y resúmenes de calificaciones/popularidad/compatibilidad) se sirve estáticamente desde GitHub Pages con **0 peticiones a Cloudflare** y **<= 250 filas leídas** incluso en consultas interactivas complejas.
+El catálogo, las portadas WebP, la sincronización, los resúmenes públicos y el panel de edición se mantienen en GitHub Actions + GitHub Pages. Las visitas normales consumen archivos estáticos; no consultan D1. Las consultas interactivas están acotadas a un máximo de 250 filas por petición pública.
 
-## 1. Crear D1 y desplegar el Worker (sin tarjeta)
+## Estado de despliegue
+
+- D1: `napl-community`
+- Database ID: `10427055-5b66-414b-9087-332631601bc1`
+- Worker: `https://napl-community-api.federicoxastro.workers.dev`
+- Subdominio `workers.dev`: habilitado
+- Esquema e índices: aplicados
+- Snapshot inicial de datos de Supabase: importado
+- Pendiente para activar todas las funciones: configurar el secreto original `REPORTER_HASH_SECRET` y el secreto de GitHub Actions `NAPL_COMMUNITY_API_BASE`.
+
+## 1. Configuración del Worker
+
+El Worker ya está desplegado y enlazado a D1. Las variables públicas están configuradas:
+
+- `ALLOWED_ORIGINS`: GitHub Pages de NAPL, panel admin y localhost.
+- `GITHUB_DATA_REPO`: `Fe2rr/NAPL-Data`.
+- Binding D1: `DB`.
+
+Configura `REPORTER_HASH_SECRET` como **Secret** del Worker. Debe ser exactamente el mismo valor que utilizaba Supabase para conservar la continuidad de los hashes y los límites anti-spam.
+
+Desde el directorio `cloudflare-community` se puede establecer con:
+
 ```bash
-cd cloudflare-community
-npx wrangler login
-Base D1 `napl-community` creada y vinculada en `wrangler.toml`.
-npx wrangler d1 execute napl-community --remote --file=./schema.sql
 npx wrangler secret put REPORTER_HASH_SECRET
-npx wrangler deploy
 ```
 
-## 2. Cargar dispositivos e historial de Supabase en D1
+También se puede agregar desde Cloudflare Dashboard → Workers & Pages → `napl-community-api` → Settings → Variables and Secrets → Add → Secret.
+
+## 2. Exportar e importar Supabase en otra instalación
+
+Desde la raíz del repositorio:
+
 ```bash
 SUPABASE_DB_URL="postgresql://..." node scripts/export-supabase.mjs
 node cloudflare-community/export-to-d1-sql.mjs napl-supabase-export.json cloudflare-community/d1-import
-npx wrangler d1 execute napl-community --remote --file=./cloudflare-community/d1-import/01-devices.sql
-npx wrangler d1 execute napl-community --remote --file=./cloudflare-community/d1-import/02-community.sql
-
-El exportador incluye `rating_token_issues` y `game_popularity_visit_limits` para conservar los límites anti-spam y la deduplicación histórica de visitas. Los INSERT se agrupan en lotes de 200 filas para acelerar la importación.
 ```
-*(Borra `napl-supabase-export.json` y `cloudflare-community/d1-import/` después de verificar.)*
 
-## 3. Conectar GitHub Actions y Frontend
-1. En **Actions secrets & variables** de `Fe2rr/Napl-prueba`, agrega:
-   - Secret `NAPL_DATA_GITHUB_TOKEN` (Fine-grained PAT con `Contents: Read and write` sobre `Fe2rr/NAPL-Data`).
-   - Secret `DISCORD_WEBHOOK_URL` *(opcional, para digest periódico de enlaces rotos)*.
-   - Secret `NAPL_COMMUNITY_API_BASE` con la URL `https://napl-community-api.federicoxastro.workers.dev`.
-2. El workflow `NAPL community summary & Discord digest` corre cada hora y solo publica cuando detecta cambios.
-3. En `public/index.html` (o `public/js/lib/config.js`), apunta `<meta name="napl-community-api" content="https://napl-community-api.<tu-subdominio>.workers.dev">`.
+Después, desde `cloudflare-community`:
+
+```bash
+npx wrangler d1 execute napl-community --remote --file=./schema.sql
+npx wrangler d1 execute napl-community --remote --file=./d1-import/01-devices.sql
+npx wrangler d1 execute napl-community --remote --file=./d1-import/02-community.sql
+```
+
+El exportador incluye todas las tablas comunitarias, incluyendo `rating_token_issues` y `game_popularity_visit_limits`. Estas conservan los límites anti-spam y la deduplicación histórica de visitas. Los INSERT se agrupan en lotes para reducir el tiempo de importación.
+
+No borres el archivo exportado ni los SQL de importación hasta verificar los conteos de las tablas en D1.
+
+## 3. GitHub Actions
+
+En `Fe2rr/Napl-prueba` → Settings → Secrets and variables → Actions → Repository secrets:
+
+- `NAPL_DATA_GITHUB_TOKEN`: ya está configurado y funciona con el workflow de catálogo. Fine-grained PAT con Contents Read and write sobre `Fe2rr/NAPL-Data`.
+- `NAPL_COMMUNITY_API_BASE`: `https://napl-community-api.federicoxastro.workers.dev`.
+- `DISCORD_WEBHOOK_URL`: opcional; solo si se quiere enviar el digest de reportes a Discord.
+
+Los workflows no declaran un Environment; por eso estos secretos deben estar en **Repository secrets**, no solamente dentro de un Environment.
+
+El workflow `NAPL community summary & Discord digest` corre cada hora y solo actualiza el JSON estático cuando detecta cambios. Luego solicita el redeploy de GitHub Pages.
+
+## 4. Frontend
+
+La URL del Worker ya está configurada en:
+
+- `public/index.html` mediante `meta[name="napl-community-api"]`.
+- `public/js/lib/config.js` como fallback.
+
+El catálogo se carga desde los archivos de GitHub Pages. No se usa el antiguo fallback `napl-catalog.pages.dev`.
+
+## 5. Presupuesto de lecturas
+
+| Operación pública | Máximo de filas |
+|---|---:|
+| Ratings | 250 |
+| Popularidad | 250 |
+| Búsqueda de compatibilidad | 200 |
+| Compatibilidad de hasta 10 juegos | 220 |
+| Registro de visita | 0 lecturas previas (upsert condicional) |
+
+Los resúmenes estáticos públicos no consumen lecturas D1. El snapshot administrativo ejecutado por GitHub Actions es una tarea de fondo, no una petición de visitante.
+
+## 6. Verificación
+
+```bash
+curl -fsS https://napl-community-api.federicoxastro.workers.dev/health
+```
+
+La respuesta de health comprueba también que el binding D1 está accesible. Mantén Supabase activo hasta completar las pruebas de ratings, popularidad, compatibilidad y reportes en el sitio y realizar una última sincronización de los cambios recientes.
