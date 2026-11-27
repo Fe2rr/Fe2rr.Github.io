@@ -1,0 +1,21 @@
+[Unit]
+Description=NAPL Community API (Node.js 22 + SQLite WAL)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=napl
+Group=napl
+WorkingDirectory=/opt/napl/community-server
+EnvironmentFile=/opt/napl/community-server/.env
+ExecStart=/usr/bin/node /opt/napl/community-server/server.mjs
+Restart=always
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/napl/community-server/data
+
+[Install]
+WantedBy=multi-user.target

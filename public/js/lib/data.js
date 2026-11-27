@@ -8,23 +8,17 @@
 import { hydrateCatalog } from "./catalog-schema.js";
 import { resolveCatalogApiBase } from "./config.js";
 
-const PAGES_CATALOG_JSON_URL =
+const LEGACY_STATIC_CATALOG_URL =
     "https://napl-catalog.pages.dev/assets/data/catalog.json";
 
 let catalogPromise = null;
 
 function getCatalogUrls() {
-    const apiBase = resolveCatalogApiBase();
-    if (!apiBase) {
-        return ["/api/public-catalog", PAGES_CATALOG_JSON_URL];
+    const mode = resolveCatalogApiBase();
+    if (!mode) {
+        return ["/api/public-catalog", "assets/data/catalog.json", LEGACY_STATIC_CATALOG_URL];
     }
-    if (typeof window !== "undefined") {
-        const host = String(window.location.hostname || "").toLowerCase();
-        if (host === "napl-catalog.pages.dev" || host.endsWith(".napl-catalog.pages.dev")) {
-            return ["/assets/data/catalog.json", PAGES_CATALOG_JSON_URL];
-        }
-    }
-    return [PAGES_CATALOG_JSON_URL];
+    return ["assets/data/catalog.json", LEGACY_STATIC_CATALOG_URL];
 }
 
 async function fetchStaticJsonCatalog() {

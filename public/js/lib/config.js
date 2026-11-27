@@ -2,35 +2,59 @@
  * NAPL — CORE CONFIGURATION
  */
 
-const SUPABASE_FUNCTIONS_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
-function usesVercelApi() {
+// Single external community microservice URL (Node.js 22 + SQLite WAL on Oracle Cloud / VPS).
+// Replace with your production domain (or set <meta name="napl-community-api" content="https://..."> in HTML).
+const DEFAULT_COMMUNITY_API_BASE =
+    "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
+
+function isLocalPreviewHost() {
     if (typeof window === "undefined") return false;
     const host = String(window.location.hostname || "").toLowerCase();
-    return host.endsWith(".vercel.app") || host === "napl.app" || host === "www.napl.app";
+    return (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".run.app")
+    );
 }
-const COMMUNITY_API_BASE = usesVercelApi() ? "/api" : SUPABASE_FUNCTIONS_BASE;
+
+export function resolveCommunityApiBase() {
+    if (typeof window !== "undefined") {
+        if (typeof window.NAPL_COMMUNITY_API_BASE === "string" && window.NAPL_COMMUNITY_API_BASE.trim()) {
+            return window.NAPL_COMMUNITY_API_BASE.trim().replace(/\/+$/, "");
+        }
+        if (typeof document !== "undefined") {
+            const meta = document.querySelector('meta[name="napl-community-api"]');
+            const content = String(meta?.getAttribute("content") || "").trim();
+            if (content) {
+                return content.replace(/\/+$/, "");
+            }
+        }
+        if (isLocalPreviewHost()) {
+            return "/api";
+        }
+    }
+    return DEFAULT_COMMUNITY_API_BASE;
+}
+
+export const COMMUNITY_API_BASE = resolveCommunityApiBase();
 export const RATINGS_API_BASE = `${COMMUNITY_API_BASE}/ratings`;
 export const POPULARITY_API_BASE = `${COMMUNITY_API_BASE}/popularity`;
 export const COMPATIBILITY_API_URL = `${COMMUNITY_API_BASE}/compatibility`;
 export const REPORT_LINK_API_URL = `${COMMUNITY_API_BASE}/report-link`;
+export const ADMIN_DASHBOARD_API_URL = `${COMMUNITY_API_BASE}/admin-dashboard`;
 
-export const WORKER_API_BASE =
-    "https://napl-admin-api.federicoxastro.workers.dev";
+export const GITHUB_ADMIN_DEFAULTS = {
+    dataRepo: "Fe2rr/NAPL-Data",
+    codeRepo: "Fe2rr/Napl-prueba",
+    branch: "main",
+};
 
 export function resolveCatalogApiBase() {
     if (typeof window === "undefined") return "";
-    const host = String(window.location.hostname || "").toLowerCase();
-    if (
-        host === "localhost" ||
-        host === "127.0.0.1" ||
-        host.endsWith(".run.app") ||
-        host.endsWith(".vercel.app") ||
-        host === "napl.app" ||
-        host === "www.napl.app"
-    ) {
+    if (isLocalPreviewHost()) {
         return "";
     }
-    return WORKER_API_BASE;
+    return "static";
 }
 
 export const RATING_TOKEN_STORAGE_KEY = "napl_rating_token_v1";

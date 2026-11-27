@@ -1,97 +1,273 @@
-import worker from "../cloudflare/napl-admin-worker.js";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { createHash } from "node:crypto";
+import {
+  SHEET_URL,
+  csvParse,
+  fromRows,
+  mergeImportedCatalog,
+  toPublicCatalog,
+  syncSinglePortWithSource,
+} from "../lib/catalog-core.mjs";
+import {
+  optimizeSingleCover,
+  writeCoverManifest,
+} from "../lib/cover-optimizer.mjs";
 
-const env={
-  ADMIN_PASSWORD:process.env.ADMIN_PASSWORD,
-  SESSION_SECRET:process.env.SESSION_SECRET,
-  GITHUB_TOKEN:process.env.GITHUB_TOKEN||process.env.CATALOG_DATA_GITHUB_TOKEN,
-  CATALOG_DATA_GITHUB_TOKEN:process.env.CATALOG_DATA_GITHUB_TOKEN,
-  ADMIN_ORIGIN:"https://napl-admin.pages.dev",
-  CRON_BATCH_SIZE:"15",
-  AUTO_PUBLISH_CRON:""
+const dataDir = path.resolve(process.env.NAPL_DATA_DIR || "data");
+const privateStatePath = path.join(dataDir, "private", "catalog-state.json");
+const publicCatalogPath = path.join(dataDir, "public", "assets", "data", "catalog.json");
+const coversDir = path.join(dataDir, "public", "assets", "covers");
+
+const IMPORT_SHEETS = String(process.env.IMPORT_SHEETS || "false") === "true";
+const OPTIMIZE_COVERS = String(process.env.OPTIMIZE_COVERS || "true") !== "false";
+const SYNC_CONCURRENCY = Math.min(
+  Math.max(Number(process.env.SYNC_CONCURRENCY || 6) || 6, 1),
+  12
+);
+
+const githubEnv = {
+  GITHUB_TOKEN:
+    process.env.GITHUB_TOKEN ||
+    process.env.NAPL_DATA_GITHUB_TOKEN ||
+    process.env.CATALOG_DATA_GITHUB_TOKEN ||
+    "",
+  GITLAB_TOKEN: process.env.GITLAB_TOKEN || "",
+  STEAMGRIDDB_API_KEY: process.env.STEAMGRIDDB_API_KEY || "",
 };
-for(const key of ["ADMIN_PASSWORD","SESSION_SECRET","GITHUB_TOKEN","CATALOG_DATA_GITHUB_TOKEN"])if(!env[key])throw new Error(`Missing required secret: ${key}`);
 
-const origin="https://napl-admin.pages.dev";
-let token="";
-async function call(path,method="GET",body={}){
- const headers=new Headers({Origin:origin,Accept:"application/json"});
- if(method!=="GET")headers.set("Content-Type","application/json");
- if(token)headers.set("Authorization",`Bearer ${token}`);
- const req=new Request(`https://napl-internal/api/${path}`,{method,headers,body:method==="GET"?undefined:JSON.stringify(body)});
- const response=await worker.fetch(req,env);
- const raw=await response.text();let data={};try{data=raw?JSON.parse(raw):{}}catch{}
- if(!response.ok)throw new Error(`/${path} HTTP ${response.status}: ${data.error||raw}`);
- return data;
-}
-async function retry(fn,label,attempts=3){
- let last;for(let i=1;i<=attempts;i++){try{return await fn()}catch(e){last=e;console.warn(`${label} attempt ${i}/${attempts}: ${e.message}`);if(i<attempts)await new Promise(r=>setTimeout(r,1500*2**(i-1)))}}
- throw last;
-}
-
-const login=await retry(()=>call("login","POST",{password:env.ADMIN_PASSWORD}),"admin login");
-token=login.token;if(!token)throw new Error("Worker did not issue an admin session.");
-console.log("Authenticated against the existing catalog logic.");
-
-if(process.env.IMPORT_SHEETS==="true"){
- const imported=await retry(()=>call("import-sheets","POST",{compact:true}),"Google Sheets import");
- console.log("Sheets import:",JSON.stringify(imported.summary||{}));
-}else console.log("Google Sheets import skipped (safe default).");
-
-let offset=0,totalChecked=0,totalUpdated=0,totalErrors=0,batches=0;
-while(true){
- const result=await retry(()=>call("sync-sources","POST",{source:"github-actions",limit:15,offset,useOffset:true,stageOnly:true,compact:true,includeCatalog:false}),`sync batch at offset ${offset}`);
- const s=result.sync||{};
- batches++;totalChecked+=Number(s.checkedCount)||0;totalUpdated+=Number(s.updatedCount)||0;totalErrors+=Number(s.errorCount)||0;
- console.log(`Batch ${batches}: checked=${s.checkedCount||0}, updated=${s.updatedCount||0}, errors=${s.errorCount||0}, next=${s.nextOffset}, more=${Boolean(s.hasMore)}`);
- if(!s.hasMore)break;
- const next=Number(s.nextOffset);if(!Number.isFinite(next)||next<=offset)throw new Error("Sync offset did not advance; aborting to prevent an infinite loop.");
- offset=next;
-}
-const applied=await retry(()=>call("sync-apply","POST",{}),"apply staged sync");
-console.log("Staged sync applied:",JSON.stringify({success:applied.success,updated:applied.updatedCount||applied.updated||null}));
-const published=await retry(()=>call("publish","POST",{}),"publish catalog");
-if(published.success===false||published.dataPublishError)throw new Error(published.dataPublishError||published.publishError||"Catalog publish failed.");
-console.log("Catalog published to Fe2rr/NAPL-Data.");
-const dataDir=process.env.NAPL_DATA_DIR;
-if(dataDir){
- const state=await retry(()=>call("catalog","GET"),"read published catalog");
- const catalog=state.catalog||state;
- const allowedHosts=new Set(["images.launchbox-app.com","gamesdb-images.launchbox.gg","shared.fastly.steamstatic.com","shared.akamai.steamstatic.com","cdn.cloudflare.steamstatic.com","cdn.akamai.steamstatic.com","steamcdn-a.akamaihd.net","img.itch.zone","itch.zone","static.itch.io"]);
- const sources=new Set();
- for(const game of catalog.games||[]){
-  if(game.coverUrl)sources.add(String(game.coverUrl).trim());
-  for(const port of game.ports||[])if(port.coverUrl)sources.add(String(port.coverUrl).trim());
- }
- const coversDir=path.join(dataDir,"public","assets","covers");
- await fs.mkdir(coversDir,{recursive:true});
- const covers={};let generated=0,skipped=0,failed=0;
- const queue=[...sources].filter(Boolean);let cursor=0;
- async function optimize(source){
-  let parsed;try{parsed=new URL(source)}catch{return}
-  if(!["http:","https:"].includes(parsed.protocol)||!allowedHosts.has(parsed.hostname.toLowerCase()))return;
-  const name=createHash("sha256").update(source).digest("hex").slice(0,24)+".webp";
-  const file=path.join(coversDir,name);
-  try{await fs.access(file);covers[source]=`https://napl-catalog.pages.dev/assets/covers/${name}`;skipped++;return}catch{}
-  for(let attempt=1;attempt<=3;attempt++){
-   try{
-    const u=new URL("https://wsrv.nl/");u.searchParams.set("url",source);u.searchParams.set("output","webp");u.searchParams.set("w","240");u.searchParams.set("q","82");
-    const response=await fetch(u,{headers:{Accept:"image/webp,image/*;q=0.8"}});
-    if(!response.ok)throw new Error(`wsrv.nl HTTP ${response.status}`);
-    const type=String(response.headers.get("content-type")||"").toLowerCase();
-    if(!type.startsWith("image/"))throw new Error("wsrv.nl did not return an image");
-    const bytes=Buffer.from(await response.arrayBuffer());if(bytes.length<512)throw new Error("Optimized image is unexpectedly small");
-    await fs.writeFile(file,bytes);covers[source]=`https://napl-catalog.pages.dev/assets/covers/${name}`;generated++;return;
-   }catch(e){if(attempt===3){failed++;console.warn("Cover optimization skipped:",source,e.message)}else await new Promise(r=>setTimeout(r,500*attempt))}
+async function retry(fn, label, attempts = 3) {
+  let lastError;
+  for (let i = 1; i <= attempts; i++) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      console.warn(`${label} attempt ${i}/${attempts}: ${err.message}`);
+      if (i < attempts) {
+        await new Promise((r) => setTimeout(r, 1200 * 2 ** (i - 1)));
+      }
+    }
   }
- }
- const workers=Array.from({length:4},async()=>{while(cursor<queue.length){const source=queue[cursor++];await optimize(source)}});
- await Promise.all(workers);
- const manifestPath=path.join(coversDir,"manifest.json");
- await fs.writeFile(manifestPath,JSON.stringify({version:1,generatedAt:new Date().toISOString(),covers},null,2)+"\n");
- console.log(`Cover pipeline: ${generated} generated, ${skipped} cached, ${failed} failed, ${sources.size} source URLs.`);
+  throw lastError;
 }
-console.log(JSON.stringify({batches,totalChecked,totalUpdated,totalErrors,completedAt:new Date().toISOString()},null,2));
-if(totalErrors>0)console.warn("Sync completed with provider errors; inspect workflow logs.");
+
+async function readState() {
+  try {
+    const raw = await fs.readFile(privateStatePath, "utf8");
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.catalog && Array.isArray(parsed.catalog.games)) {
+      return {
+        version: Number(parsed.version) || 1,
+        catalog: parsed.catalog,
+        syncCursor: Number(parsed.syncCursor) || 0,
+        syncLog: Array.isArray(parsed.syncLog) ? parsed.syncLog : [],
+      };
+    }
+  } catch (err) {
+    if (err?.code !== "ENOENT") {
+      throw new Error(`Could not read ${privateStatePath}: ${err.message}`);
+    }
+  }
+
+  try {
+    const rawPublic = await fs.readFile(publicCatalogPath, "utf8");
+    const pub = JSON.parse(rawPublic);
+    if (pub && Array.isArray(pub.games)) {
+      return {
+        version: 1,
+        catalog: pub,
+        syncCursor: 0,
+        syncLog: [],
+      };
+    }
+  } catch {
+    // Fall through
+  }
+
+  throw new Error(
+    `Missing catalog state in ${privateStatePath} and ${publicCatalogPath}.`
+  );
+}
+
+const state = await readState();
+console.log(
+  `Loaded catalog state: ${state.catalog.games.length} games.`
+);
+
+if (IMPORT_SHEETS) {
+  console.log("Fetching Google Sheets CSV...");
+  const csvRes = await retry(async () => {
+    const r = await fetch(SHEET_URL, { signal: AbortSignal.timeout(20000) });
+    if (!r.ok) throw new Error(`Google Sheets HTTP ${r.status}`);
+    return r.text();
+  }, "Google Sheets CSV download");
+  const rows = csvParse(csvRes);
+  if (!rows.length) {
+    throw new Error("Google Sheets CSV returned 0 rows.");
+  }
+  const imported = fromRows(rows);
+  const { imported: merged, summary } = mergeImportedCatalog(state, imported);
+  state.catalog = merged;
+  console.log("Sheets import summary:", JSON.stringify(summary));
+} else {
+  console.log("Google Sheets import skipped (safe default).");
+}
+
+// Collect all ports cleanly for bounded parallel sync
+const syncTargets = [];
+for (const game of state.catalog.games || []) {
+  for (const port of game.ports || []) {
+    if (!port) continue;
+    if (!port.gameSlug && game.slug) {
+      port.gameSlug = game.slug;
+    }
+    syncTargets.push(port);
+  }
+}
+
+let cursor = 0;
+let checkedCount = 0;
+let skippedCount = 0;
+let updatedCount = 0;
+let errorCount = 0;
+const syncEntries = [];
+
+async function syncWorker() {
+  while (cursor < syncTargets.length) {
+    const port = syncTargets[cursor++];
+    try {
+      const result = await retry(
+        () => syncSinglePortWithSource(githubEnv, port),
+        `sync ${port.portId || port.project || "port"}`,
+        2
+      );
+      if (result.status === "skipped") {
+        skippedCount++;
+      } else {
+        checkedCount++;
+        if (result.changed) {
+          updatedCount++;
+        }
+        if (result.status === "down" || result.changed) {
+          syncEntries.push({
+            at: new Date().toISOString(),
+            ...result,
+          });
+        }
+      }
+    } catch (err) {
+      checkedCount++;
+      errorCount++;
+      console.warn(
+        `Sync error [${port.portId || port.project}]: ${err.message}`
+      );
+      syncEntries.push({
+        at: new Date().toISOString(),
+        portId: port.portId || "",
+        gameSlug: port.gameSlug || "",
+        project: port.project || "",
+        status: "error",
+        changed: false,
+        message: err.message,
+      });
+    }
+  }
+}
+
+await Promise.all(
+  Array.from({ length: SYNC_CONCURRENCY }, () => syncWorker())
+);
+
+if (updatedCount > 0 || IMPORT_SHEETS) {
+  state.catalog.updatedAt = new Date().toISOString();
+}
+state.syncCursor = 0;
+if (syncEntries.length > 0) {
+  state.syncLog = [...syncEntries.slice(0, 40), ...(state.syncLog || [])].slice(
+    0,
+    80
+  );
+}
+
+await fs.mkdir(path.dirname(privateStatePath), { recursive: true });
+await fs.writeFile(
+  privateStatePath,
+  JSON.stringify(state, null, 2) + "\n",
+  "utf8"
+);
+
+const publicCatalog = toPublicCatalog(state.catalog);
+await fs.mkdir(path.dirname(publicCatalogPath), { recursive: true });
+await fs.writeFile(
+  publicCatalogPath,
+  JSON.stringify(publicCatalog) + "\n",
+  "utf8"
+);
+
+console.log(
+  `Sync finished: totalPorts=${syncTargets.length}, checked=${checkedCount}, skipped=${skippedCount}, updated=${updatedCount}, errors=${errorCount}`
+);
+
+if (OPTIMIZE_COVERS) {
+  const sources = new Set();
+  for (const game of publicCatalog.games || []) {
+    if (game.coverUrl) sources.add(String(game.coverUrl).trim());
+    for (const port of game.ports || []) {
+      if (port.coverUrl) sources.add(String(port.coverUrl).trim());
+    }
+  }
+
+  await fs.mkdir(coversDir, { recursive: true });
+  const coverQueue = [...sources].filter(Boolean);
+  let coverCursor = 0;
+  const covers = {};
+  const activeFilenames = new Set();
+  let generated = 0;
+  let cached = 0;
+  let ignored = 0;
+  let failed = 0;
+
+  async function coverWorker() {
+    while (coverCursor < coverQueue.length) {
+      const source = coverQueue[coverCursor++];
+      const res = await optimizeSingleCover(source, coversDir);
+      if (res.status === "generated") {
+        generated++;
+        covers[source] = res.relativePath;
+        activeFilenames.add(res.filename);
+      } else if (res.status === "cached") {
+        cached++;
+        covers[source] = res.relativePath;
+        activeFilenames.add(res.filename);
+      } else if (res.status === "ignored") {
+        ignored++;
+      } else {
+        failed++;
+        console.warn(`Cover optimization skipped: ${source} (${res.error})`);
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: 4 }, () => coverWorker()));
+  await writeCoverManifest(coversDir, covers);
+
+  // Prune orphaned .webp files only when a healthy catalog cover set was processed
+  let pruned = 0;
+  if (sources.size >= 50 && activeFilenames.size > 0) {
+    const existingFiles = await fs.readdir(coversDir);
+    for (const file of existingFiles) {
+      if (file.endsWith(".webp") && !activeFilenames.has(file)) {
+        await fs.unlink(path.join(coversDir, file)).catch(() => {});
+        pruned++;
+      }
+    }
+  }
+
+  console.log(
+    `Cover pipeline: ${generated} generated, ${cached} cached, ${ignored} skipped-host, ${failed} failed, ${pruned} pruned (${sources.size} source URLs).`
+  );
+}
+
+if (errorCount > 0) {
+  console.warn("Sync completed with some upstream source errors; check logs above.");
+}

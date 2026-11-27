@@ -1,0 +1,83 @@
+name: NAPL metadata lookup
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Lookup mode: launchbox | steam | port_source | optimize_cover"
+        required: true
+        type: choice
+        options:
+          - launchbox
+          - steam
+          - port_source
+          - optimize_cover
+      url:
+        description: "Target URL, AppID, or owner/repo"
+        required: true
+        type: string
+      request_id:
+        description: "Optional request correlation ID from NAPL Admin"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+jobs:
+  lookup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout NAPL-Prueba
+        uses: actions/checkout@v4
+
+      - name: Validate required Actions secrets
+        env:
+          NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+        run: |
+          test -n "$NAPL_DATA_GITHUB_TOKEN" || { echo "::error::Missing Actions secret NAPL_DATA_GITHUB_TOKEN"; exit 1; }
+
+      - name: Checkout NAPL-Data assets repository
+        uses: actions/checkout@v4
+        with:
+          repository: Fe2rr/NAPL-Data
+          ref: main
+          path: data
+          token: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+
+      - name: Configure Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install local cwebp tool (best-effort)
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq webp
+
+      - name: Run metadata lookup & cover pre-optimization
+        env:
+          GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+          STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
+          LOOKUP_MODE: ${{ inputs.mode }}
+          LOOKUP_URL: ${{ inputs.url }}
+          LOOKUP_REQUEST_ID: ${{ inputs.request_id }}
+          NAPL_DATA_DIR: data
+        run: node scripts/lookup-metadata.mjs
+
+      - name: Commit lookup result and cover assets
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git pull --rebase origin main
+          git add private/lookup-results public/assets/covers || true
+          if ! git diff --cached --quiet; then
+            git commit -m "NAPL: metadata lookup (${{ inputs.mode }})"
+            git push origin HEAD:main
+          else
+            echo "No lookup output changes to commit."
+          fi

@@ -1,9 +1,10 @@
 /*
  * NAPL — COVER IMAGE LOADER & FALLBACK HELPER
  *
- * Recovers Steam covers when newer AppIDs use hashed asset paths or
- * when a specific Steam CDN host fails to respond, and caches both
- * resolved URLs and retrieved image binaries in the browser.
+ * Serves pre-optimized static WebP covers from GitHub Pages (assets/covers/),
+ * falls back to wsrv.nl WebP optimization for newly added covers pending the
+ * next GitHub Actions run, and recovers vertical Steam artwork when CDN hosts
+ * fail to respond.
  */
 
 import {
@@ -17,27 +18,36 @@ import {
     getCachedOrFetchImageSrc,
 } from "./image-cache.js";
 
-const LEGACY_COVER_OPTIMIZER_URL =
-    "https://napl-image-optimizer.federicoxastro.workers.dev/image";
-function isVercelHost() {
-    const host = typeof window === "undefined" ? "" : String(window.location.hostname || "").toLowerCase();
-    return host.endsWith(".vercel.app") || host === "napl.app" || host === "www.napl.app";
+function isLocalPreviewHost() {
+    if (typeof window === "undefined") return false;
+    const host = String(window.location.hostname || "").toLowerCase();
+    return (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".run.app")
+    );
 }
+
 let coverManifestPromise = null;
 async function getStaticCoverUrl(rawUrl) {
-    if (!isVercelHost()) return "";
+    const cleanRaw = String(rawUrl || "").trim();
+    if (!cleanRaw || typeof window === "undefined") return "";
     try {
         if (!coverManifestPromise) {
-            coverManifestPromise = fetch("/api/cover-manifest", { cache: "force-cache" })
-                .then((response) => response.ok ? response.json() : {})
+            const manifestUrl = new URL("assets/covers/manifest.json", window.location.href).toString();
+            coverManifestPromise = fetch(manifestUrl, { cache: "force-cache" })
+                .then((response) => (response.ok ? response.json() : {}))
                 .catch(() => ({}));
         }
         const manifest = await coverManifestPromise;
-        return String(manifest?.covers?.[String(rawUrl || "").trim()] || "");
+        const mapped = String(manifest?.covers?.[cleanRaw] || "").trim();
+        if (!mapped) return "";
+        return new URL(mapped, window.location.href).toString();
     } catch {
         return "";
     }
 }
+
 const OPTIMIZABLE_COVER_HOSTS = new Set([
     "images.launchbox-app.com",
     "gamesdb-images.launchbox.gg",
@@ -49,6 +59,7 @@ const OPTIMIZABLE_COVER_HOSTS = new Set([
     "img.itch.zone",
     "itch.zone",
     "static.itch.io",
+    "cdn2.steamgriddb.com",
 ]);
 
 export function getOptimizedCoverUrl(rawUrl, width = 180) {
@@ -61,17 +72,11 @@ export function getOptimizedCoverUrl(rawUrl, width = 180) {
             return "";
         }
         source.protocol = "https:";
-        if (isVercelHost()) {
-            const optimized = new URL("https://wsrv.nl/");
-            optimized.searchParams.set("url", source.toString());
-            optimized.searchParams.set("output", "webp");
-            optimized.searchParams.set("w", String(width));
-            optimized.searchParams.set("q", "82");
-            return optimized.toString();
-        }
-        const optimized = new URL(LEGACY_COVER_OPTIMIZER_URL);
+        const optimized = new URL("https://wsrv.nl/");
         optimized.searchParams.set("url", source.toString());
+        optimized.searchParams.set("output", "webp");
         optimized.searchParams.set("w", String(width));
+        optimized.searchParams.set("q", "82");
         return optimized.toString();
     } catch {
         return "";
@@ -101,7 +106,7 @@ function buildSteamFallbackUrls(appId, excludeUrls = []) {
         excludeUrls.map((u) => String(u || "").trim()).filter(Boolean)
     );
     const candidates = [
-        `/api/steam-cover/${encodeURIComponent(appId)}`,
+        ...(isLocalPreviewHost() ? [`/api/steam-cover/${encodeURIComponent(appId)}`] : []),
         `https://shared.fastly.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`,
         `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900_2x.jpg`,
         `https://shared.akamai.steamstatic.com/store_item_assets/steam/apps/${appId}/library_600x900.jpg`,

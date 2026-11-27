@@ -1,4 +1,5 @@
 import express from 'express';
+import crypto from 'node:crypto';
 import fs from 'fs';
 import path from 'path';
 import zlib from 'zlib';
@@ -650,6 +651,143 @@ app.post('/api/report-link', (req, res) => {
   });
 
   return res.json({ success: true, portId, reason: reason || note, note });
+});
+
+// Local preview ratings & popularity (matches community-server/server.mjs contracts)
+const previewVoterTokens = new Set();
+const previewRatingVotes = new Map(); // portId -> Map(token -> stars)
+const previewPopularity = new Map(); // gameKey -> { alltime, month, week }
+
+function computePreviewRatingsSummary() {
+  let sumAll = 0;
+  let countAll = 0;
+  for (const portMap of previewRatingVotes.values()) {
+    for (const stars of portMap.values()) {
+      sumAll += stars;
+      countAll += 1;
+    }
+  }
+  const globalAvg = countAll > 0 ? sumAll / countAll : 0;
+  const ports = [];
+  for (const [portId, portMap] of previewRatingVotes.entries()) {
+    if (portMap.size === 0) continue;
+    let sum = 0;
+    for (const stars of portMap.values()) sum += stars;
+    const votes = portMap.size;
+    const avg = sum / votes;
+    const score = (votes / (votes + 5)) * avg + (5 / (votes + 5)) * globalAvg;
+    ports.push({
+      port_id: portId,
+      votes,
+      avg: Number(avg.toFixed(2)),
+      score: Number(score.toFixed(2)),
+    });
+  }
+  return { ports, global_avg: Number(globalAvg.toFixed(2)) };
+}
+
+function getPreviewMyVotes(token) {
+  const votes = {};
+  for (const [portId, portMap] of previewRatingVotes.entries()) {
+    if (portMap.has(token)) votes[portId] = portMap.get(token);
+  }
+  return votes;
+}
+
+app.get(['/api/ratings', '/api/ratings/my-votes'], (req, res) => {
+  const action = String(req.query.action || (req.path.endsWith('/my-votes') ? 'my-votes' : '')).trim();
+  if (action === 'my-votes') {
+    const token = String(req.query.token || '').trim();
+    if (!token || !previewVoterTokens.has(token)) {
+      return res.status(401).json({ error: 'invalid_token' });
+    }
+    return res.json({ votes: getPreviewMyVotes(token) });
+  }
+  return res.json(computePreviewRatingsSummary());
+});
+
+app.post(['/api/ratings', '/api/ratings/:action'], (req, res) => {
+  const action = String(req.params.action || req.body?.action || req.query.action || '').trim();
+  if (action === 'token') {
+    const token = crypto.randomUUID();
+    previewVoterTokens.add(token);
+    return res.json({ token });
+  }
+  const token = String(req.body?.token || '').trim();
+  if (!token || !previewVoterTokens.has(token)) {
+    return res.status(401).json({ error: 'invalid_token' });
+  }
+  if (action === 'my-votes') {
+    return res.json({ votes: getPreviewMyVotes(token) });
+  }
+  if (action === 'vote' || action === 'unvote') {
+    const portId = String(req.body?.port_id || '').trim();
+    if (!portId) return res.status(400).json({ error: 'invalid_port_id' });
+    if (action === 'unvote') {
+      previewRatingVotes.get(portId)?.delete(token);
+      return res.json({ ok: true, port_id: portId });
+    }
+    const stars = Number(req.body?.stars);
+    if (!Number.isInteger(stars) || stars < 1 || stars > 5) {
+      return res.status(400).json({ error: 'invalid_stars' });
+    }
+    if (!previewRatingVotes.has(portId)) previewRatingVotes.set(portId, new Map());
+    previewRatingVotes.get(portId).set(token, stars);
+    return res.json({ ok: true, port_id: portId, stars });
+  }
+  return res.status(404).json({ error: 'not_found' });
+});
+
+app.get('/api/popularity', (req, res) => {
+  const period = String(req.query.period || 'week').toLowerCase();
+  if (!['week', 'month', 'alltime'].includes(period)) {
+    return res.status(400).json({ error: 'invalid_period' });
+  }
+  const games = Array.from(previewPopularity.entries())
+    .map(([slug, counts]) => ({ slug, visits: counts[period] || 0 }))
+    .filter((g) => g.visits > 0)
+    .sort((a, b) => b.visits - a.visits || a.slug.localeCompare(b.slug));
+  return res.json({ success: true, period, games });
+});
+
+app.post('/api/popularity', (req, res) => {
+  const gameKey = String(req.body?.game || '').trim().toLowerCase();
+  if (!/^[a-z0-9][a-z0-9-]{0,179}$/.test(gameKey)) {
+    return res.status(400).json({ error: 'invalid_game' });
+  }
+  const current = previewPopularity.get(gameKey) || { alltime: 0, month: 0, week: 0 };
+  current.alltime += 1;
+  current.month += 1;
+  current.week += 1;
+  previewPopularity.set(gameKey, current);
+  return res.json({ success: true, counted: true });
+});
+
+app.get('/api/admin-dashboard', (req, res) => {
+  return res.json({
+    success: true,
+    totals: {
+      linkReports: linkReports.size,
+      compatibilityReports: compatibilityReports.size,
+      ratingVotes: Array.from(previewRatingVotes.values()).reduce((sum, m) => sum + m.size, 0),
+      gamesTracked: previewPopularity.size,
+    },
+    reports: Array.from(linkReports.values()),
+    compatibility: Array.from(compatibilityReports.values()),
+    ratings: [],
+    popularity: Array.from(previewPopularity.entries()).map(([game_key, c]) => ({
+      game_key,
+      all_time_visits: c.alltime,
+      week_visits: c.week,
+      month_visits: c.month,
+    })),
+  });
+});
+
+app.get('/assets/covers/manifest.json', (req, res, next) => {
+  const localManifest = path.join(__dirname, 'public', 'assets', 'covers', 'manifest.json');
+  if (fs.existsSync(localManifest)) return next();
+  return res.json({ version: 1, covers: {} });
 });
 
 // Steam cover resolver/proxy for hashed Store asset paths (IStoreBrowseService)

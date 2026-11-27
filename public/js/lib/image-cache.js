@@ -139,7 +139,7 @@ export function isCacheableImageUrl(url) {
         const host = parsed.hostname.toLowerCase();
         return (
             /(?:^|\.)steamstatic\.com$/i.test(host) ||
-            host === "napl-image-optimizer.federicoxastro.workers.dev"
+            host === "wsrv.nl"
         );
     } catch {
         return false;
