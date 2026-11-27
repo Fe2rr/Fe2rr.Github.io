@@ -10,6 +10,7 @@ on:
         options:
           - launchbox
           - steam
+          - itch
           - port_source
           - optimize_cover
       url:
