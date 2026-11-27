@@ -18,6 +18,10 @@ const sqlNum = (value) => {
   const n = Number(value ?? 0);
   return Number.isFinite(n) ? String(n) : "0";
 };
+const sqlDate = (value) => {
+  const date = value ? new Date(value) : new Date(nowIso);
+  return sqlStr(Number.isFinite(date.getTime()) ? date.toISOString() : String(value || nowIso));
+};
 
 function pushBatches(out, table, columns, rows, mapper, mode = "OR REPLACE", chunkSize = 200) {
   const valid = (Array.isArray(rows) ? rows : []).map(mapper).filter(Boolean);
@@ -75,12 +79,12 @@ const sql = [];
 const counts = {};
 counts.rating_tokens = pushBatches(sql, "rating_tokens",
   ["token_hash", "ip_hash", "created_at"], t.rating_tokens,
-  (r) => r?.token_hash ? [sqlStr(r.token_hash), sqlStr(r.ip_hash || ""), sqlStr(r.created_at || nowIso)].join(", ") : null,
+  (r) => r?.token_hash ? [sqlStr(r.token_hash), sqlStr(r.ip_hash || ""), sqlDate(r.created_at)].join(", ") : null,
   "OR IGNORE");
 
 counts.rating_token_issues = pushBatches(sql, "rating_token_issues",
-  ["ip_hash", "created_at"], t.rating_token_issues,
-  (r) => r?.ip_hash ? [sqlStr(r.ip_hash), sqlStr(r.created_at || nowIso)].join(", ") : null);
+  ["id", "ip_hash", "created_at"], t.rating_token_issues,
+  (r) => r?.ip_hash ? [sqlNum(r.id), sqlStr(r.ip_hash), sqlDate(r.created_at)].join(", ") : null);
 
 const ratingAgg = new Map();
 let totalVotes = 0;
@@ -96,7 +100,7 @@ counts.rating_votes = pushBatches(sql, "rating_votes",
     agg.votes++;
     agg.sum += stars;
     ratingAgg.set(r.port_id, agg);
-    return [sqlStr(r.port_id), sqlStr(r.token_hash), String(stars), sqlStr(r.created_at || nowIso), sqlStr(r.updated_at || r.created_at || nowIso)].join(", ");
+    return [sqlStr(r.port_id), sqlStr(r.token_hash), String(stars), sqlDate(r.created_at), sqlDate(r.updated_at || r.created_at)].join(", ");
   });
 
 const ratingStats = Array.from(ratingAgg, ([portId, agg]) => ({ portId, ...agg }));
@@ -110,13 +114,13 @@ counts.game_popularity = pushBatches(sql, "game_popularity",
   (r) => {
     const key = String(r?.game_key || "").trim().toLowerCase();
     if (!key) return null;
-    return [sqlStr(key), sqlNum(r.all_time_visits), sqlNum(r.week_visits), sqlNum(r.month_visits), sqlStr(r.week_start || nowIso.slice(0, 10)), sqlStr(r.month_start || nowIso.slice(0, 7) + "-01"), sqlStr(r.updated_at || nowIso)].join(", ");
+    return [sqlStr(key), sqlNum(r.all_time_visits), sqlNum(r.week_visits), sqlNum(r.month_visits), sqlStr(r.week_start || nowIso.slice(0, 10)), sqlStr(r.month_start || nowIso.slice(0, 7) + "-01"), sqlDate(r.updated_at)].join(", ");
   });
 
 counts.game_popularity_visit_limits = pushBatches(sql, "game_popularity_visit_limits",
   ["ip_hash", "game_key", "last_visit_at"], t.game_popularity_visit_limits,
   (r) => r?.ip_hash && r?.game_key
-    ? [sqlStr(r.ip_hash), sqlStr(String(r.game_key).toLowerCase()), sqlStr(r.last_visit_at || nowIso)].join(", ")
+    ? [sqlStr(r.ip_hash), sqlStr(String(r.game_key).toLowerCase()), sqlDate(r.last_visit_at)].join(", ")
     : null,
   "OR REPLACE",
   200
@@ -125,7 +129,7 @@ counts.game_popularity_visit_limits = pushBatches(sql, "game_popularity_visit_li
 const COMPAT_STATUSES = new Set(["crash", "low_fps", "playable_30", "playable_60"]);
 const compatAgg = new Map();
 counts.compatibility_reports = pushBatches(sql, "compatibility_reports",
-  ["port_id", "token_hash", "device_id", "device_name", "device_soc", "device_type", "works", "updated_at", "status"], t.compatibility_reports,
+  ["id", "port_id", "token_hash", "device_id", "device_name", "device_soc", "device_type", "works", "updated_at", "status"], t.compatibility_reports,
   (r) => {
     if (!r?.port_id || !r?.token_hash || !r?.device_id) return null;
     const status = COMPAT_STATUSES.has(r.status) ? r.status : (r.works ? "playable_30" : "crash");
@@ -141,7 +145,7 @@ counts.compatibility_reports = pushBatches(sql, "compatibility_reports",
     else if (status === "low_fps") agg.low++;
     else agg.crash++;
     compatAgg.set(r.port_id, agg);
-    return [sqlStr(r.port_id), sqlStr(r.token_hash), sqlStr(r.device_id), sqlStr(name), sqlStr(soc), sqlStr(type), String(works), sqlStr(r.updated_at || nowIso), sqlStr(status)].join(", ");
+    return [sqlNum(r.id), sqlStr(r.port_id), sqlStr(r.token_hash), sqlStr(r.device_id), sqlStr(name), sqlStr(soc), sqlStr(type), String(works), sqlDate(r.updated_at), sqlStr(status)].join(", ");
   });
 
 const compatStats = Array.from(compatAgg, ([portId, agg]) => ({ portId, ...agg }));
@@ -150,14 +154,14 @@ pushBatches(sql, "compat_port_stats",
   (r) => [sqlStr(r.portId), String(r.yes), String(r.no), String(r.p60), String(r.p30), String(r.low), String(r.crash), sqlStr(nowIso)].join(", "));
 
 counts.link_reports = pushBatches(sql, "link_reports",
-  ["port_id", "reporter_hash", "reason", "note", "url", "created_at", "updated_at", "discord_notified_at"], t.link_reports,
+  ["id", "port_id", "reporter_hash", "reason", "note", "url", "created_at", "updated_at", "discord_notified_at"], t.link_reports,
   (r) => r?.port_id && r?.reporter_hash
-    ? [sqlStr(r.port_id), sqlStr(r.reporter_hash), sqlStr(r.reason || "Custom note"), sqlStr(r.note || ""), sqlStr(r.url || ""), sqlStr(r.created_at || nowIso), sqlStr(r.updated_at || r.created_at || nowIso), sqlStr(nowIso)].join(", ")
+    ? [sqlNum(r.id), sqlStr(r.port_id), sqlStr(r.reporter_hash), sqlStr(r.reason || "Custom note"), sqlStr(r.note || ""), sqlStr(r.url || ""), sqlDate(r.created_at), sqlDate(r.updated_at || r.created_at), sqlDate(nowIso)].join(", ")
     : null);
 
 counts.link_report_rate_limits = pushBatches(sql, "link_report_rate_limits",
   ["reporter_hash", "last_report_at"], t.link_report_rate_limits,
-  (r) => r?.reporter_hash ? [sqlStr(r.reporter_hash), sqlStr(r.last_report_at || nowIso)].join(", ") : null);
+  (r) => r?.reporter_hash ? [sqlStr(r.reporter_hash), sqlDate(r.last_report_at)].join(", ") : null);
 
 fs.writeFileSync(path.join(outDir, "02-community.sql"), sql.join("\n\n") + "\n", "utf8");
 console.log("Generated D1 import SQL: " + deviceCount + " devices; " + JSON.stringify(counts));
