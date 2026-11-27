@@ -127,6 +127,9 @@ function renderEditor() {
     if (field) field.value = game[key] ?? "";
   }
   $("metadata-url").value = game.steamUrl || game.launchboxUrl || "";
+  const preview = $("game-cover-preview");
+  preview.src = game.coverUrl || "";
+  preview.hidden = !game.coverUrl;
   $("port-count").textContent = (game.ports || []).length + " ports";
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
     <article class="port-card" data-port-card="${i}">
@@ -332,7 +335,11 @@ $("ports-list").addEventListener("click", async (event) => {
   setBusy(true, "Revisando fuente del port con GitHub Actions…");
   try {
     const result = await runGithubLookup("port_source", target, { timeoutMs:300000, pollIntervalMs:4000 });
-    notice("Consulta de fuente completada: " + JSON.stringify(result).slice(0,450), "success");
+    const info = result?.data || result;
+    const fields = {project:info.project || info.name,developer:info.developer,year:info.year,version:info.version,controller:info.controller,files:info.files,works:info.works,link:info.link,url:info.repoUrl || info.url || target,githubRepo:info.githubRepo || info.syncTarget,portId:info.portId,lastUpdate:info.lastUpdate};
+    for (const [key,value] of Object.entries(fields)) if (value && !port[key]) port[key] = value;
+    renderEditor();
+    notice("Fuente consultada. Se completaron los datos disponibles; revisalos antes de guardar.", "success");
   } catch (error) {
     notice(error.message || "No se pudo consultar la fuente.", "error");
   } finally {
@@ -360,8 +367,8 @@ $("lookup-metadata").addEventListener("click", async () => {
   try {
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
     const game = readDraft();
-    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl"};
-    for (const [source,target] of Object.entries(aliases)) if (data?.[source] && !game[target]) game[target] = data[source];
+    const payload = data?.data || data;\n    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl"};
+    for (const [source,target] of Object.entries(aliases)) if (payload?.[source] && !game[target]) game[target] = payload[source];\n    if (mode === "steam" && payload?.steamUrl) game.steamUrl = payload.steamUrl;\n    if (mode === "launchbox") game.launchboxUrl = url;
     renderEditor();
     notice("Consulta completada. Revisá los campos y guardá los cambios.", "success");
   } catch (error) { notice(error.message || "No se pudieron obtener los metadatos.", "error"); }
