@@ -1460,3 +1460,20 @@ button {
 .console-tab-content{padding:4px 8px 10px;border:1px solid rgba(167,243,208,.12);border-radius:9px;background:rgba(10,24,19,.24)}
 .console-content-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:3px 2px 8px;margin-bottom:6px;border-bottom:1px solid var(--line)}
 .console-content-heading strong{font-size:12px;color:#e2f2e9}
+\n
+/* Admin catalog: platform accordions and compact sync filters */
+.sync-filter-buttons{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin:0 0 12px}
+.sync-filter-button{border:1px solid var(--line);border-radius:7px;padding:8px 5px;background:#0c1916;color:#a9c6b6;font:600 11px "Plus Jakarta Sans",sans-serif;cursor:pointer}
+.sync-filter-button.active{background:rgba(74,151,111,.22);border-color:#65ad85;color:#d7f4e2}
+.platform-accordion{margin:0 0 7px;border:1px solid rgba(167,243,208,.15);border-radius:9px;background:rgba(10,24,19,.38);overflow:hidden}
+.platform-accordion>summary{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;cursor:pointer;list-style:none;color:#dceee4;font:700 12px "Outfit",sans-serif}
+.platform-accordion>summary::-webkit-details-marker{display:none}
+.platform-accordion>summary:after{content:"＋";color:var(--accent);font:700 16px "JetBrains Mono",monospace}
+.platform-accordion[open]>summary:after{content:"−"}
+.platform-summary-meta{margin-left:auto;color:var(--muted);font:10px "Plus Jakarta Sans",sans-serif}
+.platform-accordion-content{padding:0 9px 9px;border-top:1px solid var(--line)}
+.platform-content-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 2px}
+.platform-content-heading strong{font-size:11px;color:#91c9a9}
+.metadata-cover-field{display:block;margin-bottom:10px;color:var(--muted);font-size:10px;font-weight:700}
+.metadata-cover-field input{display:block;width:100%;margin-top:6px;border:1px solid var(--line);border-radius:8px;background:#0c1916;color:var(--text);padding:10px 12px;font-size:12px}
+.game-title-fields{grid-template-columns:minmax(0,1fr)}
