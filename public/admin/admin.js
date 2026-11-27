@@ -62,6 +62,9 @@ function normalizeState(value) {
   next.catalog.updatedAt = next.catalog.updatedAt || "";
   next.catalog.platformOrder = Array.isArray(next.catalog.platformOrder) ? next.catalog.platformOrder : [];
   next.catalog.games = Array.isArray(next.catalog.games) ? next.catalog.games : [];
+  for (const game of next.catalog.games) {
+    if (!Array.isArray(game.ports)) game.ports = [];
+  }
   next.syncCursor = Number(next.syncCursor) || 0;
   next.syncLog = Array.isArray(next.syncLog) ? next.syncLog : [];
   return next;
@@ -102,7 +105,7 @@ function renderEditor() {
   $("port-count").textContent = (game.ports || []).length + " ports";
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
     <article class="port-card" data-port-card="${i}">
-      <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div>
+      <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button secondary" data-inspect-port="${i}">Revisar fuente</button> <button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
       <div class="port-fields">
         ${portField(i,"project","Proyecto",port.project)}
         ${portField(i,"developer","Desarrollador",port.developer)}
@@ -277,12 +280,29 @@ $("add-port").addEventListener("click", () => {
   game.ports.push({portId:game.slug+"-port-"+(game.ports.length+1),project:"",developer:"",year:"",version:"",controller:"",files:"",works:"",link:"",url:"",dataUrl:"",githubRepo:"",lastUpdate:"",dateAdded:new Date().toISOString().slice(0,10),notes:""});
   renderEditor();
 });
-$("ports-list").addEventListener("click", (event) => {
-  const button = event.target.closest("[data-remove-port]");
-  if (!button) return;
+$("ports-list").addEventListener("click", async (event) => {
+  const removeButton = event.target.closest("[data-remove-port]");
+  if (removeButton) {
+    const game = readDraft();
+    game.ports.splice(Number(removeButton.dataset.removePort),1);
+    renderEditor();
+    return;
+  }
+  const inspectButton = event.target.closest("[data-inspect-port]");
+  if (!inspectButton || busy) return;
   const game = readDraft();
-  game.ports.splice(Number(button.dataset.removePort),1);
-  renderEditor();
+  const port = game.ports[Number(inspectButton.dataset.inspectPort)];
+  const target = port?.githubRepo || port?.url || port?.link;
+  if (!target) return notice("Este port no tiene una fuente para consultar.", "error");
+  setBusy(true, "Revisando fuente del port con GitHub Actions…");
+  try {
+    const result = await runGithubLookup("port_source", target, { timeoutMs:300000, pollIntervalMs:4000 });
+    notice("Consulta de fuente completada: " + JSON.stringify(result).slice(0,450), "success");
+  } catch (error) {
+    notice(error.message || "No se pudo consultar la fuente.", "error");
+  } finally {
+    setBusy(false);
+  }
 });
 $("game-form").addEventListener("submit", async (event) => {
   event.preventDefault();
