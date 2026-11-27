@@ -1,6 +1,6 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, apikey, Authorization",
 };
 
@@ -126,11 +126,11 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
 
-    if (request.method === "GET" && url.pathname.endsWith("/ratings")) {
-      const result = await rpc("napl_get_ratings", {});
-      return json(result || { ports: [], global_avg: 0 }, 200, {
-        "Cache-Control": "public, max-age=30, s-maxage=60",
-      });
+    if (request.method === "GET") {
+      return json({
+        success: false,
+        error: "public_ratings_moved_to_static_snapshot",
+      }, 410, { "Cache-Control": "no-store" });
     }
 
     if (request.method === "POST") {
