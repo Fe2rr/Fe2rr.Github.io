@@ -162,6 +162,24 @@ Deno.serve(async (request: Request) => {
   }
 
   try {
+    if (request.method === "GET" && url.pathname.endsWith("/admin-dashboard")) {
+      const [snapshotResponse, pendingResponse] = await Promise.all([
+        handleSnapshot(),
+        handlePendingReports(),
+      ]);
+      if (!snapshotResponse.ok || !pendingResponse.ok) {
+        throw new Error("Could not assemble community dashboard.");
+      }
+      const [snapshot, pending] = await Promise.all([
+        snapshotResponse.json(),
+        pendingResponse.json(),
+      ]);
+      return json({
+        success: true,
+        snapshot,
+        reports: Array.isArray(pending?.reports) ? pending.reports : [],
+      }, 200, { "Cache-Control": "no-store" });
+    }
     if (request.method === "GET" && url.pathname.endsWith("/community-snapshot")) {
       return await handleSnapshot();
     }
