@@ -79,9 +79,15 @@ function gameSyncStatus(game) {
 }
 function platformManufacturer(game) {
   if (game.manufacturer) return game.manufacturer;
-  const platform = String(game.platform || "");
-  const known = ["Nintendo","Sony","Microsoft","Sega","Atari","NEC","SNK","Valve","Commodore","Apple"];
-  return known.find((maker) => platform.toLowerCase().startsWith(maker.toLowerCase())) || "Otros";
+  const platform = String(game.platform || "").toLowerCase();
+  const rules = [
+    [/nintendo|nes|snes|super famicom|game ?boy|gamecube|wii|switch/, "Nintendo"],
+    [/playstation|\bps[1-5]\b|psp|vita/, "Sony"],
+    [/xbox/, "Microsoft"],
+    [/sega|megadrive|mega drive|dreamcast|saturn|game gear/, "Sega"],
+    [/atari/, "Atari"], [/neogeo|neo geo|snk/, "SNK"], [/pc|windows|steam/, "PC"]
+  ];
+  return rules.find(([pattern]) => pattern.test(platform))?.[1] || "Otros";
 }
 function renderGameList() {
   const games = state?.catalog?.games || [];
@@ -133,7 +139,7 @@ function renderEditor() {
   $("port-count").textContent = (game.ports || []).length + " ports";
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
     <article class="port-card" data-port-card="${i}">
-      <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button secondary" data-inspect-port="${i}">Revisar fuente</button> <button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
+      <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
       <div class="port-source-row">${portField(i,"url","Enlace del port",port.url,"url")}<button type="button" class="button secondary" data-inspect-port="${i}">Obtener datos del enlace</button></div>\n      <details class="port-data-details"><summary>Datos del port</summary><div class="port-fields">
         ${portField(i,"project","Proyecto",port.project)}
         ${portField(i,"developer","Desarrollador",port.developer)}
