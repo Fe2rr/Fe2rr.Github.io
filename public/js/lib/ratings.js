@@ -135,64 +135,46 @@ async function postWithTokenRefresh(endpoint, payload) {
     }
 }
 
-async function loadMyVotes(force = false) {
-    if (myVotesCache && !force) {
+async function loadMyVotes(portId) {
+    if (!portId) return myVotesCache || {};
+    if (!myVotesCache) myVotesCache = {};
+    if (Object.prototype.hasOwnProperty.call(myVotesCache, portId)) {
         return myVotesCache;
     }
 
-    const data = await postWithTokenRefresh("/my-votes", {});
-
-    if (
-        !data ||
-        !data.votes ||
-        typeof data.votes !== "object" ||
-        Array.isArray(data.votes)
-    ) {
-        throw new Error("The ratings server returned an invalid vote list.");
+    const data = await postWithTokenRefresh("/my-votes", { port_id: portId });
+    if (!data || !data.votes || typeof data.votes !== "object" || Array.isArray(data.votes)) {
+        throw new Error("The ratings server returned an invalid vote response.");
     }
 
-    myVotesCache = data.votes;
+    const value = Number(data.votes[portId]);
+    myVotesCache[portId] = Number.isInteger(value) && value >= 1 && value <= 5 ? value : 0;
     return myVotesCache;
 }
 
 export async function loadPortRatings(fresh = false) {
+    if (!fresh && ratingsCache) return ratingsCache;
+
     try {
-        if (!fresh && ratingsCache) return ratingsCache;
-
-        if (!fresh) {
-            const summary = await loadCommunitySummary();
-            if (summary?.ratings && Array.isArray(summary.ratings.ports)) {
-                ratingsCache = normalizeRatingsPayload(summary.ratings);
-                return ratingsCache;
-            }
+        const summary = await loadCommunitySummary();
+        if (summary?.ratings && Array.isArray(summary.ratings.ports)) {
+            ratingsCache = normalizeRatingsPayload(summary.ratings);
+            return ratingsCache;
         }
-
-        const response = await fetch(RATINGS_API_BASE, {
-            method: "GET",
-            cache: "default",
-        });
-
-        if (!response.ok) {
-            throw new Error(`Ratings API returned HTTP ${response.status}.`);
-        }
-
-        const data = await response.json();
-        if (!data || !Array.isArray(data.ports)) {
-            throw new Error("Ratings API returned an invalid response.");
-        }
-
-        ratingsCache = normalizeRatingsPayload(data);
-        return ratingsCache;
     } catch (error) {
-        console.warn("NAPL: could not load port ratings.", error);
-        return {};
+        console.warn("NAPL: could not load the static ratings summary.", error);
     }
+
+    // Ratings are published statically by GitHub Actions. Do not fall back to a
+    // full database read when the snapshot is unavailable.
+    ratingsCache = ratingsCache || {};
+    return ratingsCache;
 }
 
 export function createRatingActions() {
     return {
         async getMyVote(portId) {
-            const votes = await loadMyVotes();
+            const votes = await loadMyVotes(portId);
             const value = Number(votes[portId]);
 
             return Number.isInteger(value) && value >= 1 && value <= 5
