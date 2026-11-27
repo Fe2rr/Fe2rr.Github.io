@@ -1,6 +1,6 @@
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, apikey, Authorization",
 };
 
@@ -56,12 +56,10 @@ Deno.serve(async (request: Request) => {
   try {
     const url = new URL(request.url);
     if (request.method === "GET") {
-      const period = (url.searchParams.get("period") || "week").toLowerCase();
-      if (!["week", "month", "alltime"].includes(period)) return json({ error: "invalid_period" }, 400);
-      const games = await rpc("napl_get_popularity", { p_period: period });
-      return json({ success: true, period, games: Array.isArray(games) ? games : [] }, 200, {
-        "Cache-Control": "public, max-age=20, s-maxage=30",
-      });
+      return json({
+        success: false,
+        error: "public_popularity_moved_to_static_snapshot",
+      }, 410, { "Cache-Control": "no-store" });
     }
     if (request.method === "POST") {
       const raw = await request.text();
