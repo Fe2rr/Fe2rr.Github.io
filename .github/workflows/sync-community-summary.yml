@@ -5,6 +5,7 @@ on:
     paths:
       - ".github/workflows/sync-community-summary.yml"
   schedule:
+    # Static community snapshot (including recent compatibility reports) is refreshed every six hours.
     - cron: "17 */6 * * *"
   workflow_dispatch:
 
