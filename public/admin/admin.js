@@ -143,14 +143,13 @@ function renderEditor() {
         ${portField(i,"files","Archivos del juego",port.files)}
         ${portField(i,"works","Estado / funciona",port.works)}
         ${portField(i,"link","Etiqueta del enlace",port.link)}
-        ${portField(i,"url","URL del port",port.url,"url")}
         ${portField(i,"dataUrl","URL de archivos",port.dataUrl,"url")}
         ${portField(i,"githubRepo","Repositorio GitHub",port.githubRepo)}
         ${portField(i,"portId","ID del port",port.portId)}
         ${portField(i,"lastUpdate","Última actualización",port.lastUpdate)}
         ${portField(i,"dateAdded","Fecha de alta",port.dateAdded)}
         ${portField(i,"notes","Notas",port.notes,"textarea",true)}
-      </div>
+      </div></details>
     </article>`).join("") || '<p class="muted">Esta ficha todavía no tiene ports.</p>';
 }
 function portField(i, key, label, value, type = "text", wide = false) {
@@ -362,16 +361,17 @@ $("close-community").addEventListener("click", () => $("community-dialog").close
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
   if (!url) return notice("Ingresá la URL del juego.", "error");
-  const mode = /store\.steampowered\.com\/app\/|^\d+$/.test(url) ? "steam" : "launchbox";
+  const mode = $("metadata-source").value;
   setBusy(true, "Consultando metadatos con GitHub Actions…");
   try {
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
     const game = readDraft();
     const payload = data?.data || data;
-    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl"};
+    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl",itchUrl:"itchUrl"};
     for (const [source,target] of Object.entries(aliases)) if (payload?.[source] && !game[target]) game[target] = payload[source];
     if (mode === "steam" && payload?.steamUrl) game.steamUrl = payload.steamUrl;
     if (mode === "launchbox") game.launchboxUrl = url;
+    if (mode === "itch") game.itchUrl = url;
     renderEditor();
     notice("Consulta completada. Revisá los campos y guardá los cambios.", "success");
   } catch (error) { notice(error.message || "No se pudieron obtener los metadatos.", "error"); }
