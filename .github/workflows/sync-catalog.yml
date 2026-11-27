@@ -1,6 +1,10 @@
 name: NAPL catalog sync
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/sync-catalog.mjs"
   schedule:
     - cron: "17 4 * * *"
   workflow_dispatch:
