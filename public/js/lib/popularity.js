@@ -1,4 +1,4 @@
-/* NAPL popularity service — static community summary first, live Worker on write/fallback. */
+/* NAPL popularity service — GitHub snapshot for reads, Supabase Edge Function for deduplicated writes. */
 import { createSlug } from "./helpers.js";
 import { POPULARITY_API_BASE } from "./config.js";
 import { loadCommunitySummary } from "./community-summary.js";
@@ -88,7 +88,7 @@ export async function ensurePopularPeriod(period = "alltime") {
         }
 
         // Popularity is a GitHub-hosted static snapshot. Never read the full
-        // ranking from D1 on a passive visit.
+        // ranking from Supabase on a passive visit.
         return previous;
     })()
         .catch((error) => {
