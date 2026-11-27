@@ -215,14 +215,14 @@ function table(title, rows, columns) {
   return `<section class="community-section"><h3>${esc(title)} · ${content.length}</h3><div class="table-wrap"><table><thead><tr>${columns.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${content.map(row=>`<tr>${columns.map(c=>`<td>${esc(typeof c.value==="function"?c.value(row):row[c.key])}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">Sin registros.</td></tr>`}</tbody></table></div></section>`;
 }
 async function loadCommunity() {
-  $("community-status").textContent = "Consultando Cloudflare D1…";
+  $("community-status").textContent = "Consultando resumen comunitario…";
   $("community-data").innerHTML = "";
   $("community-dialog").showModal();
   try {
     const data = await fetchCommunityAdminDashboard({ pat });
     const totals = data.totals || {};
     const metrics = [
-      ["Reportes de enlaces", totals.linkReports], ["Reportes compatibilidad", totals.compatibilityReports],
+      ["Reportes pendientes", totals.linkReports], ["Reportes compatibilidad", totals.compatibilityReports],
       ["Votos", totals.ratingVotes], ["Juegos con visitas", totals.gamesTracked], ["Visitas totales", totals.allTimeVisits],
     ];
     $("community-data").innerHTML = '<div class="community-grid">' + metrics.map(([label,value])=>`<div class="metric"><small>${esc(label)}</small><strong>${Number(value || 0).toLocaleString("es-UY")}</strong></div>`).join("") + "</div>" +
@@ -233,12 +233,12 @@ async function loadCommunity() {
         {label:"Fecha",key:"updated_at"},{label:"Port ID",key:"port_id"},{label:"Dispositivo",key:"device_name"},{label:"Estado",key:"status"},{label:"Funciona",value:r=>r.works?"Sí":"No"}
       ]) +
       table("Ratings", data.ratings, [
-        {label:"Port ID",key:"port_id"},{label:"Votos",key:"votes"},{label:"Suma estrellas",key:"sum_stars"},{label:"Actualizado",key:"updated_at"}
+        {label:"Port ID",key:"port_id"},{label:"Votos",key:"votes"},{label:"Promedio",key:"avg"},{label:"Puntaje",key:"score"}
       ]) +
       table("Popularidad", data.popularity, [
         {label:"Juego",key:"game_key"},{label:"Visitas totales",key:"all_time_visits"},{label:"Semana",key:"week_visits"},{label:"Mes",key:"month_visits"},{label:"Actualizado",key:"updated_at"}
       ]);
-    $("community-status").textContent = "Datos obtenidos desde napl-community-api.";
+    $("community-status").textContent = "Datos obtenidos desde Supabase y snapshots de GitHub.";
   } catch (error) {
     $("community-status").textContent = error.message || "No se pudo cargar el dashboard.";
   }
