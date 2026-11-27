@@ -1,4 +1,4 @@
-name: NAPL static and Cloudflare validation
+name: NAPL project validation
 
 on:
   push:
@@ -19,11 +19,13 @@ jobs:
           node-version: 22
       - name: Check JavaScript syntax
         run: |
-          find public/js scripts lib cloudflare cloudflare-community -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
-      - name: Verify static admin entrypoints
+          find public/js public/admin scripts lib -type f \\( -name '*.js' -o -name '*.mjs' \\) -print0 | xargs -0 -r -n1 node --check
+      - name: Verify admin module imports and active architecture
         run: |
+          node --input-type=module -e "import('./public/js/lib/github-admin.js').then(m => { if (typeof m.fetchCommunityAdminDashboard !== 'function') process.exit(1); })"
           test -s public/admin/index.html
           test -s public/admin/admin.js
           test -s public/admin/admin.css
-          grep -q 'github-admin.js' public/admin/admin.js
-          grep -q 'napl-community-api' public/js/lib/config.js
+          grep -q 'fetchCommunityAdminDashboard' public/admin/admin.js
+          grep -q 'community-sync/admin-dashboard' public/js/lib/github-admin.js
+          ! grep -R -n -E 'ADMIN_DASHBOARD_API_URL|napl-community-api|napl-admin-api|napl-image-optimizer|Napl-prueba|cloudflare-community' public/js public/admin scripts lib
