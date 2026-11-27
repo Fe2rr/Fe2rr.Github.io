@@ -2,7 +2,13 @@ name: Deploy NAPL to GitHub Pages
 
 on:
   push:
-    branches: ["main", "v4"]
+    branches:
+      - main
+    paths:
+      - "public/**"
+      - "scripts/**"
+      - ".github/workflows/deploy-pages.yml"
+      - "cloudflare-community/**"
   workflow_dispatch:
 
 permissions:
@@ -11,7 +17,7 @@ permissions:
   id-token: write
 
 concurrency:
-  group: "pages"
+  group: github-pages
   cancel-in-progress: true
 
 jobs:
@@ -21,48 +27,44 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Checkout NAPL-Data public catalog & WebP covers
-        if: ${{ secrets.NAPL_DATA_GITHUB_TOKEN != '' }}
+      - name: Validate NAPL data token
+        env:
+          NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+        run: |
+          if [ -z "$NAPL_DATA_GITHUB_TOKEN" ]; then
+            echo "::error::Missing repository secret NAPL_DATA_GITHUB_TOKEN."
+            exit 1
+          fi
+
+      - name: Checkout NAPL-Data
         uses: actions/checkout@v4
         with:
           repository: Fe2rr/NAPL-Data
           ref: main
           path: _napl_data
           token: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+          persist-credentials: false
 
-      - name: Bundle NAPL-Data static assets into public/
-        if: ${{ secrets.NAPL_DATA_GITHUB_TOKEN != '' }}
+      - name: Bundle catalog, device shards and WebP covers
         run: |
-          if [ -f "_napl_data/public/assets/data/catalog.json" ]; then
-            mkdir -p public/assets/data
-            cp "_napl_data/public/assets/data/catalog.json" "public/assets/data/catalog.json"
-            echo "Bundled catalog.json from NAPL-Data"
+          mkdir -p public/assets/data public/assets/covers
+          cp -a _napl_data/public/assets/data/. public/assets/data/
+          if [ -d _napl_data/public/assets/covers ]; then
+            cp -a _napl_data/public/assets/covers/. public/assets/covers/
           fi
-          if [ -f "_napl_data/public/assets/data/community-summary.json" ]; then
-            mkdir -p public/assets/data
-            cp "_napl_data/public/assets/data/community-summary.json" "public/assets/data/community-summary.json"
-            echo "Bundled community-summary.json from NAPL-Data"
-          fi
-          if [ -d "_napl_data/public/assets/covers" ]; then
-            mkdir -p public/assets/covers
-            cp -R _napl_data/public/assets/covers/. public/assets/covers/
-            echo "Bundled static WebP covers from NAPL-Data"
-          fi
+          test -s public/assets/data/catalog.json
 
-      - name: Configure GitHub Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload public folder
+      - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./public
+          path: public
 
   deploy:
-    needs: build
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
