@@ -1,4 +1,4 @@
-name: NAPL Vercel API validation
+name: NAPL static and Cloudflare validation
 
 on:
   push:
@@ -17,11 +17,13 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Install dependencies
-        run: npm install
       - name: Check JavaScript syntax
         run: |
-          find api scripts -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
-          node --check cloudflare/napl-admin-worker.js
-      - name: Build frontend
-        run: npm run build
+          find public/js scripts lib cloudflare cloudflare-community -type f \\( -name '*.js' -o -name '*.mjs' \\) -print0 | xargs -0 -n1 node --check
+      - name: Verify static admin entrypoints
+        run: |
+          test -s public/admin/index.html
+          test -s public/admin/admin.js
+          test -s public/admin/admin.css
+          grep -q 'github-admin.js' public/admin/admin.js
+          grep -q 'napl-community-api' public/js/lib/config.js
