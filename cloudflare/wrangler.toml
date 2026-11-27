@@ -1,7 +1,0 @@
-name = "napl-admin-api"
-main = "napl-admin-worker.js"
-compatibility_date = "2026-11-21"
-compatibility_flags = []
-
-# Compatibilidad mínima para la versión archivada v5.
-# No agregar secrets, bindings de Queue ni cron triggers.
