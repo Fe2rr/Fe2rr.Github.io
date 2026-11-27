@@ -1,53 +1,46 @@
-# NAPL — Arquitectura GitHub + Cloudflare
+# NAPL — arquitectura actual
 
-NAPL utiliza **GitHub Pages, GitHub Actions y Fe2rr/NAPL-Data** para el sitio, el catálogo, las portadas, el panel administrativo y las automatizaciones. El único servicio externo activo para las operaciones comunitarias en tiempo real es **Cloudflare Workers + D1**.
+NAPL funciona con GitHub como plataforma principal. La versión activa es la publicada desde `Fe2rr/Fe2rr.github.io`, rama `main`. El repositorio `archive` es un respaldo separado y no forma parte del despliegue.
 
-## Arquitectura
+## Componentes
 
-1. **GitHub Pages**
-   - Sitio público estático.
-   - Catálogo, dispositivos, resúmenes comunitarios y portadas WebP.
-   - Panel administrativo en `https://fe2rr.github.io/Napl-prueba/admin/`.
-2. **GitHub Actions**
-   - `sync-catalog.yml`: sincronización de ports y optimización WebP.
-   - `sync-community-summary.yml`: resumen comunitario y digest de reportes.
-   - `lookup-metadata.yml`: consultas de metadatos y optimización de portadas.
-   - `deploy-pages.yml`: publicación de la web.
-3. **Fe2rr/NAPL-Data**
-   - `private/catalog-state.json`: estado editable y privado.
-   - `public/assets/data/catalog.json`: catálogo público.
-   - `public/assets/data/community-summary.json`: snapshot comunitario estático.
-4. **Cloudflare**
-   - Worker `napl-community-api` + D1 `napl-community`: ratings, popularidad, compatibilidad, reportes y dashboard administrativo.
-   - Workers legacy `napl-admin-api` y `napl-image-optimizer`: se conservan temporalmente por compatibilidad con la versión v5 del sitio de producción.
+1. **GitHub Pages:** sitio público, panel administrativo, catálogo, dispositivos, portadas WebP y snapshots comunitarios.
+2. **Fe2rr/NAPL-Data:** estado privado del catálogo y datos públicos generados.
+3. **GitHub Actions:** sincronización del catálogo, optimización estática de portadas, consultas de metadatos, snapshots comunitarios, digest de Discord y publicación.
+4. **Supabase:** operaciones comunitarias transaccionales y endpoint autenticado que consume GitHub Actions y el panel admin.
+5. **Cloudflare:** sin Workers, D1, Queues ni Pages activos para NAPL. No se debe recrear infraestructura para tareas que ya resuelven GitHub o Supabase.
+6. **Neon:** entorno de staging aislado; no recibe tráfico de producción.
 
 ## Panel administrativo
 
-El panel es una SPA estática de GitHub Pages. Se autentica con un Fine-grained PAT que queda guardado únicamente en `sessionStorage`.
+El panel estático se publica en `https://fe2rr.github.io/admin/`.
 
-Permisos requeridos:
+- Catálogo y cambios: GitHub API contra `Fe2rr/NAPL-Data`.
+- Automatizaciones: GitHub Actions del repositorio `Fe2rr/Fe2rr.github.io`.
+- Comunidad: snapshot de GitHub más endpoint `community-sync/admin-dashboard` de Supabase.
+- El Fine-grained PAT se mantiene en `sessionStorage`; se envía a GitHub y al endpoint comunitario únicamente para validar permisos. No se persiste en la base de datos.
+
+Permisos del PAT:
 - `Fe2rr/NAPL-Data`: Contents — Read and write.
-- `Fe2rr/Napl-prueba`: Actions — Read and write (para disparar workflows) y acceso de lectura al repositorio.
+- `Fe2rr/Fe2rr.github.io`: Actions — Read and write; Contents — Read.
 
-Funciones:
-- Crear, editar y eliminar juegos y ports.
-- Guardar estado privado y snapshot público en un commit atómico.
-- Publicar los cambios en GitHub Pages.
-- Ejecutar sincronización del catálogo e importación CSV bajo demanda.
-- Consultar metadatos mediante GitHub Actions.
-- Abrir el dashboard comunitario y revisar reportes consultando el Worker de Cloudflare.
+## Consumo
 
-El PAT nunca se envía al Worker comunitario para editar el catálogo. El Worker solo verifica el PAT contra GitHub para autorizar el dashboard.
+- Las lecturas públicas de ratings, popularidad, compatibilidad y dispositivos deben salir de JSON estático de GitHub.
+- Supabase queda limitado a escrituras, consultas de hardware solicitadas por el usuario, lecturas frescas posteriores a envíos y snapshots programados.
+- Las visitas se deduplican en el navegador y en Postgres.
+- GitHub Actions actualiza el snapshot cada seis horas y envía reportes de enlaces en lotes.
+- No usar Cloudflare como proxy o backend de reserva.
 
-## Optimización de lecturas
+## Funciones comunitarias Supabase
 
-- Visitas pasivas: 0 llamadas al Worker y 0 lecturas D1.
-- Resumen público: JSON estático desde GitHub Pages.
-- Consultas de compatibilidad y operaciones comunitarias: Worker + D1, con límites por endpoint.
-- El dashboard administrativo utiliza consultas acotadas y no forma parte del tráfico normal de visitantes.
+- `ratings`: emisión de token, consulta de voto propio y envío/eliminación de votos. La lectura pública masiva se sirve desde el snapshot.
+- `popularity`: registro de visitas. Los rankings públicos se sirven desde el snapshot.
+- `compatibility`: envíos, consultas frescas y búsqueda de hardware.
+- `report-link`: recepción y limitación de reportes de enlaces.
+- `community-sync`: snapshot, digest de reportes y dashboard administrativo consolidado.
+- `admin-dashboard`: endpoint antiguo retirado; el stub remoto responde HTTP 410 y no se utiliza desde el frontend.
 
-## Recursos legacy
+## Regla de mantenimiento
 
-No eliminar `napl-admin-api` ni `napl-image-optimizer` mientras la rama `v5` de `Fe2rr/Fe2rr.Github.io` siga dependiendo de ellos. La migración del panel administrativo a GitHub Pages no modifica el sitio de producción.
-
-Supabase y Neon ya no forman parte de la arquitectura de ejecución de este repositorio. La instancia de Supabase debe permanecer disponible hasta completar las pruebas funcionales finales y confirmar la continuidad de `REPORTER_HASH_SECRET`.
+Antes de agregar infraestructura, comprobar si GitHub Actions, JSON estático o las funciones existentes ya resuelven la necesidad. No modificar `archive` sin autorización explícita.
