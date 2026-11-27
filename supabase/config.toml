@@ -1,0 +1,18 @@
+project_id = "gsksanvcdbdoevairzpj"
+
+[functions.ratings]
+verify_jwt = false
+
+[functions.compatibility]
+verify_jwt = false
+
+[functions.popularity]
+verify_jwt = false
+
+[functions.report-link]
+verify_jwt = false
+
+[functions.community-sync]
+verify_jwt = false
+
+# admin-dashboard is a legacy function. The current admin uses GitHub directly.
