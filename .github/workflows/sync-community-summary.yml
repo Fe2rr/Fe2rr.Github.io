@@ -1,6 +1,9 @@
 name: NAPL community summary & Discord digest
 
 on:
+  push:
+    paths:
+      - ".github/workflows/sync-community-summary.yml"
   schedule:
     - cron: "17 * * * *"
   workflow_dispatch:
