@@ -1448,3 +1448,8 @@ button {
 .game-data-details{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}.game-data-details summary{cursor:pointer;color:#9ccbb0;font-weight:700;margin-bottom:12px}
 #metadata-source{min-width:115px;padding:10px;border:1px solid var(--line);border-radius:7px;background:#0c1916;color:var(--text)}
 @media(max-width:680px){.game-title-fields{grid-template-columns:1fr}.game-cover-editor{align-items:flex-start}}
+
+.port-source-row{display:flex;align-items:end;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.port-source-row label{flex:1;min-width:0}.port-data-details{padding:10px 14px}
+.port-data-details summary{cursor:pointer;color:#9ccbb0;font-size:12px;font-weight:700;margin-bottom:10px}
+@media(max-width:640px){.port-source-row{align-items:stretch;flex-direction:column}}
