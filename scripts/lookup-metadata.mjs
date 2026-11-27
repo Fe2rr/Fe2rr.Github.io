@@ -71,21 +71,6 @@ async function inspectItchPage(rawUrl) {
 }
 let output = null;
 let fatalError = null;
-");
-    const patterns = [
-      new RegExp('<meta[^>]*'+attr+'=["\\']'+escaped+'["\\'][^>]*content=["\\']([^"\\']*)["\\']','i'),
-      new RegExp('<meta[^>]*content=["\\']([^"\\']*)["\\'][^>]*'+attr+'=["\\']'+escaped+'["\\']','i')
-    ];
-    for (const pattern of patterns) { const match=html.match(pattern); if(match) return match[1].replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").trim(); }
-    return "";
-  };
-  const name = meta("og:title") || (html.match(/<title[^>]*>([\s\S]*?)<\\/title>/i)?.[1] || "").replace(/<[^>]+>/g,"").trim();
-  if (!name) throw new Error("No se pudo obtener el título de itch.io.");
-  return {name,coverUrl:meta("og:image"),description:meta("og:description","name"),itchUrl:target.toString()};
-}
-let output = null;
-let fatalError = null;
-
 try {
   if (!mode || !url) {
     throw new Error("Both LOOKUP_MODE and LOOKUP_URL are required.");
