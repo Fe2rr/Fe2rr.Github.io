@@ -12,6 +12,7 @@ import { loadCommunitySummary } from "./community-summary.js";
 
 let ratingTokenMemory = "";
 let myVotesCache = null;
+let ratingsCache = null;
 
 function normalizeRatingsPayload(data) {
     const ratings = {};
@@ -156,16 +157,19 @@ async function loadMyVotes(force = false) {
 
 export async function loadPortRatings(fresh = false) {
     try {
+        if (!fresh && ratingsCache) return ratingsCache;
+
         if (!fresh) {
             const summary = await loadCommunitySummary();
             if (summary?.ratings && Array.isArray(summary.ratings.ports)) {
-                return normalizeRatingsPayload(summary.ratings);
+                ratingsCache = normalizeRatingsPayload(summary.ratings);
+                return ratingsCache;
             }
         }
 
         const response = await fetch(RATINGS_API_BASE, {
             method: "GET",
-            cache: "no-store",
+            cache: "default",
         });
 
         if (!response.ok) {
@@ -177,7 +181,8 @@ export async function loadPortRatings(fresh = false) {
             throw new Error("Ratings API returned an invalid response.");
         }
 
-        return normalizeRatingsPayload(data);
+        ratingsCache = normalizeRatingsPayload(data);
+        return ratingsCache;
     } catch (error) {
         console.warn("NAPL: could not load port ratings.", error);
         return {};
@@ -196,23 +201,22 @@ export function createRatingActions() {
         },
 
         async submitVote(portId, stars) {
-            await postWithTokenRefresh("/vote", {
+            const result = await postWithTokenRefresh("/vote", {
                 port_id: portId,
                 stars,
             });
 
-            if (!myVotesCache) {
-                myVotesCache = {};
-            }
-
+            if (!myVotesCache) myVotesCache = {};
             myVotesCache[portId] = stars;
 
-            const updatedRatings = await loadPortRatings(true);
+            if (result?.rating) {
+                if (!ratingsCache) ratingsCache = {};
+                ratingsCache[portId] = result.rating;
+                return { myVote: stars, rating: result.rating };
+            }
 
-            return {
-                myVote: stars,
-                rating: updatedRatings[portId] || null,
-            };
+            const updatedRatings = await loadPortRatings(true);
+            return { myVote: stars, rating: updatedRatings[portId] || null };
         },
     };
 }
