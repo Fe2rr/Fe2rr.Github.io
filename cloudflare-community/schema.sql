@@ -40,6 +40,8 @@ CREATE TABLE IF NOT EXISTS rating_port_stats (
   updated_at TEXT NOT NULL
 );
 
+CREATE INDEX IF NOT EXISTS idx_rating_port_stats_votes ON rating_port_stats(votes DESC, port_id ASC);
+
 CREATE TABLE IF NOT EXISTS rating_global_meta (
   id INTEGER PRIMARY KEY CHECK (id = 1),
   total_votes INTEGER NOT NULL DEFAULT 0,
@@ -59,8 +61,8 @@ CREATE TABLE IF NOT EXISTS game_popularity (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_pop_alltime ON game_popularity(all_time_visits DESC, game_key ASC);
-CREATE INDEX IF NOT EXISTS idx_pop_week ON game_popularity(week_start, week_visits DESC);
-CREATE INDEX IF NOT EXISTS idx_pop_month ON game_popularity(month_start, month_visits DESC);
+CREATE INDEX IF NOT EXISTS idx_pop_week ON game_popularity(week_start, week_visits DESC, game_key ASC);
+CREATE INDEX IF NOT EXISTS idx_pop_month ON game_popularity(month_start, month_visits DESC, game_key ASC);
 
 CREATE TABLE IF NOT EXISTS game_popularity_visit_limits (
   ip_hash TEXT NOT NULL,
@@ -84,6 +86,7 @@ CREATE TABLE IF NOT EXISTS compatibility_reports (
 );
 CREATE INDEX IF NOT EXISTS idx_compat_port ON compatibility_reports(port_id, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_compat_device ON compatibility_reports(device_id, updated_at DESC, id DESC);
+CREATE INDEX IF NOT EXISTS idx_compat_device_name ON compatibility_reports(device_name COLLATE NOCASE, updated_at DESC, id DESC);
 CREATE INDEX IF NOT EXISTS idx_compat_soc ON compatibility_reports(device_soc COLLATE NOCASE, updated_at DESC, id DESC);
 
 CREATE TABLE IF NOT EXISTS compat_port_stats (
