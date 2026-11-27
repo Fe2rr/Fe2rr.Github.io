@@ -48,7 +48,8 @@ export function getStoredGithubPat() {
 
 export function clearGithubSession() {
     try {
-        sessionStorage.removeItem(PAT_SESSION_KEY);\n        sessionStorage.removeItem(REPO_CFG_SESSION_KEY);
+        sessionStorage.removeItem(PAT_SESSION_KEY);
+        sessionStorage.removeItem(REPO_CFG_SESSION_KEY);
     } catch {
         // Ignore
     }
