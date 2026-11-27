@@ -46,6 +46,30 @@ async function pruneOldResults() {
   }
 }
 
+async function inspectItchPage(rawUrl) {
+  let target;
+  try { target = new URL(rawUrl); } catch { throw new Error("URL de itch.io inválida."); }
+  if (target.protocol !== "https:" || !(target.hostname === "itch.io" || target.hostname.endsWith(".itch.io"))) {
+    throw new Error("Solo se permiten páginas HTTPS de itch.io.");
+  }
+  const response = await fetch(target.toString(), {headers:{"User-Agent":"Mozilla/5.0 NAPL metadata lookup","Accept":"text/html"}});
+  if (!response.ok) throw new Error("itch.io respondió HTTP " + response.status + ".");
+  const html = await response.text();
+  const meta = (key, attr="property") => {
+    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\let output = null;
+let fatalError = null;
+");
+    const patterns = [
+      new RegExp('<meta[^>]*'+attr+'=["\\']'+escaped+'["\\'][^>]*content=["\\']([^"\\']*)["\\']','i'),
+      new RegExp('<meta[^>]*content=["\\']([^"\\']*)["\\'][^>]*'+attr+'=["\\']'+escaped+'["\\']','i')
+    ];
+    for (const pattern of patterns) { const match=html.match(pattern); if(match) return match[1].replace(/&amp;/g,"&").replace(/&quot;/g,'"').replace(/&#39;/g,"'").trim(); }
+    return "";
+  };
+  const name = meta("og:title") || (html.match(/<title[^>]*>([\s\S]*?)<\\/title>/i)?.[1] || "").replace(/<[^>]+>/g,"").trim();
+  if (!name) throw new Error("No se pudo obtener el título de itch.io.");
+  return {name,coverUrl:meta("og:image"),description:meta("og:description","name"),itchUrl:target.toString()};
+}
 let output = null;
 let fatalError = null;
 
