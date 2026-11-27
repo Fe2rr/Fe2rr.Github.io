@@ -1,28 +1,26 @@
-# NAPL Infrastructure Migration — GitHub + 1 Único Servicio Externo
+# NAPL Infrastructure Migration — GitHub + Cloudflare Workers & D1 (Sin Tarjeta)
 
-NAPL concentra el sitio público, el panel administrativo, el catálogo JSON, las portadas WebP pre-optimizadas y toda la automatización pesada en **GitHub**, y utiliza **exactamente 1 servicio externo** únicamente para las métricas y reportes comunitarios anónimos (`/ratings`, `/popularity`, `/compatibility`, `/report-link`).
+NAPL ejecuta el sitio público, el panel administrativo, el catálogo JSON, las portadas WebP pre-optimizadas, los resúmenes comunitarios periódicos y toda la automatización pesada en **GitHub**, y utiliza **Cloudflare Workers + D1 (`cloudflare-community/`, sin tarjeta de crédito)** como **único servicio externo** estrictamente para las interacciones comunitarias en tiempo real.
 
-## Opciones disponibles para el único servicio comunitario
-
-1. **Opción recomendada sin tarjeta de crédito: `deno-community/` (Deno Deploy + Deno KV)**
-   - **Sin tarjeta de crédito**, **sin pausas por inactividad** y **sin topes diarios** (1M requests/mes, 20 GiB egress/mes, 1M lecturas KV/mes con caché en memoria + resúmenes particionados).
-   - Se despliega directo desde GitHub con entrypoint `deno-community/main.ts` y raíz `/` (ver [`deno-community/README.md`](deno-community/README.md)).
-2. **Opción alternativa auto-alojada / VPS: `community-server/` (Node.js 22 + SQLite WAL + Caddy)**
-   - Pensado para **Oracle Cloud Always Free**, **Serv00** o cualquier VPS económico con Docker/systemd (`community-server/README.md`).
-
-## Arquitectura en GitHub
+## Arquitectura Optimizada (`0` lecturas en visita pasiva, `<= 250` lecturas por visita interactiva)
 
 1. **GitHub Pages + Repositorio de datos (`Fe2rr/NAPL-Data`)**
-   - `deploy-pages.yml` empaqueta el sitio público desde `public/` e incluye automáticamente `catalog.json` y `public/assets/covers/*` desde `Fe2rr/NAPL-Data` (cuando `NAPL_DATA_GITHUB_TOKEN` está configurado).
-2. **GitHub Actions (CORS-free, sin Workers ni Colas)**
-   - `.github/workflows/sync-catalog.yml` + `scripts/sync-catalog.mjs` + `lib/catalog-core.mjs`: sincroniza todos los ports contra GitHub/GitLab/Play Store, optimiza portadas a WebP estático (`cwebp` local con fallback `wsrv.nl`), publica `catalog.json` + `manifest.json` en `Fe2rr/NAPL-Data` y dispara el redeploy de GitHub Pages.
-   - `.github/workflows/lookup-metadata.yml` + `scripts/lookup-metadata.mjs`: resuelve consultas bajo demanda de LaunchBox, Steam (`library_600x900` / SteamGridDB) y repositorios/Play Store sin CORS.
+   - `deploy-pages.yml` empaqueta `public/` junto con `catalog.json`, `community-summary.json` y `assets/covers/*` desde `Fe2rr/NAPL-Data`.
+   - En visitas pasivas (home, Spotlight, categorías), el navegador solo consume archivos estáticos en GitHub Pages (`0` llamadas al Worker, `0` lecturas D1).
+2. **GitHub Actions (CORS-free, sin colas ni cron en Cloudflare)**
+   - `.github/workflows/sync-catalog.yml` + `scripts/sync-catalog.mjs` + `lib/catalog-core.mjs`: sincroniza ports contra GitHub/GitLab/Play Store, optimiza portadas a WebP (`cwebp` + `wsrv.nl`) y publica `catalog.json` + `manifest.json`.
+   - `.github/workflows/sync-community-summary.yml` + `scripts/sync-community-summary.mjs`: cada 30 minutos descarga `/community-snapshot`, actualiza `assets/data/community-summary.json` en `Fe2rr/NAPL-Data`, re-despliega Pages solo si hubo cambios y envía un resumen agrupado a `DISCORD_WEBHOOK_URL` con los reportes de enlaces pendientes (`/link-reports-pending` + `/ack`).
+   - `.github/workflows/lookup-metadata.yml` + `scripts/lookup-metadata.mjs`: resuelve consultas bajo demanda de LaunchBox, Steam (`library_600x900` / SteamGridDB) y repositorios/Play Store.
 3. **Panel Admin estático por Fine-grained PAT (`public/js/lib/github-admin.js`)**
-   - Autentica al administrador con un Fine-grained PAT guardado únicamente en `sessionStorage`, lee y commitea atómicamente `private/catalog-state.json` + `public/assets/data/catalog.json` y dispara `workflow_dispatch` para sync/Sheets/lookup.
+   - Autentica al administrador con Fine-grained PAT guardado únicamente en `sessionStorage`, edita `private/catalog-state.json` + `public/assets/data/catalog.json` en `Fe2rr/NAPL-Data` y dispara `workflow_dispatch`.
+4. **Único servicio comunitario externo: `cloudflare-community/` (Cloudflare Workers + D1)**
+   - Ver guía completa de despliegue paso a paso en [`cloudflare-community/README.md`](cloudflare-community/README.md).
+   - Opcional auto-alojado: [`community-server/README.md`](community-server/README.md) (Node 22 + SQLite WAL + Caddy para VPS).
 
 ## Pasos de corte a producción
 
-1. Configura `NAPL_DATA_GITHUB_TOKEN` (Fine-grained PAT con `Contents: Read and write` sobre `Fe2rr/NAPL-Data`) en **Actions secrets** de `Fe2rr/Napl-prueba` y ejecuta `NAPL catalog sync` con `import_sheets=false`.
-2. Exporta tus datos actuales de Supabase (`SUPABASE_DB_URL="..." node scripts/export-supabase.mjs`) e impórtalos en **Deno Deploy** (`/admin-import`) o en **SQLite** (`community-server/import-from-supabase.mjs`).
-3. Configura el dominio HTTPS de tu único servicio comunitario en `public/js/lib/config.js` (`DEFAULT_COMMUNITY_API_BASE`) o vía `<meta name="napl-community-api" content="https://tu-proyecto.deno.dev">` en `public/index.html`.
-4. Verifica `/health`, votos, popularidad, compatibilidad y admin por PAT antes de dar de baja Cloudflare Workers/Images y Supabase.
+1. Configura `NAPL_DATA_GITHUB_TOKEN` (Fine-grained PAT con `Contents: Read and write` sobre `Fe2rr/NAPL-Data`) en **Actions secrets** de `Fe2rr/Napl-prueba` y ejecuta `NAPL catalog sync`.
+2. Despliega el Worker + D1 siguiendo [`cloudflare-community/README.md`](cloudflare-community/README.md) e importa tu respaldo de Supabase con `node cloudflare-community/export-to-d1-sql.mjs`.
+3. Agrega los **Actions secrets** `NAPL_COMMUNITY_API_BASE` (`https://napl-community-api.<tu-subdominio>.workers.dev`) y `DISCORD_WEBHOOK_URL` en `Fe2rr/Napl-prueba`, luego ejecuta `NAPL community summary & Discord digest`.
+4. Configura `DEFAULT_COMMUNITY_API_BASE` en `public/js/lib/config.js` (o `<meta name="napl-community-api" content="...">` en `public/index.html`).
+5. Verifica `/health`, votos, popularidad, compatibilidad, digest a Discord y admin por PAT antes de dar de baja Supabase/Workers antiguos.

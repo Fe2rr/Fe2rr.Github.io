@@ -38,6 +38,11 @@ jobs:
             cp "_napl_data/public/assets/data/catalog.json" "public/assets/data/catalog.json"
             echo "Bundled catalog.json from NAPL-Data"
           fi
+          if [ -f "_napl_data/public/assets/data/community-summary.json" ]; then
+            mkdir -p public/assets/data
+            cp "_napl_data/public/assets/data/community-summary.json" "public/assets/data/community-summary.json"
+            echo "Bundled community-summary.json from NAPL-Data"
+          fi
           if [ -d "_napl_data/public/assets/covers" ]; then
             mkdir -p public/assets/covers
             cp -R _napl_data/public/assets/covers/. public/assets/covers/

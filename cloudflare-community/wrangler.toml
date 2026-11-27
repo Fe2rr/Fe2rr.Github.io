@@ -1,0 +1,16 @@
+name = "napl-community-api"
+main = "worker.js"
+compatibility_date = "2026-11-27"
+compatibility_flags = []
+
+# No [triggers] crons here: all catalog sync, snapshots and Discord digests run in GitHub Actions.
+
+[vars]
+GITHUB_DATA_REPO = "Fe2rr/NAPL-Data"
+ALLOWED_ORIGINS = "https://fe2rr.github.io,https://napl-catalog.pages.dev,https://napl-admin.pages.dev,http://localhost:3000,http://127.0.0.1:3000"
+
+# After creating the D1 database (`npx wrangler d1 create napl-community`), replace database_id below:
+[[d1_databases]]
+binding = "DB"
+database_name = "napl-community"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

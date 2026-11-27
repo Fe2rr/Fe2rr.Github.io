@@ -2,8 +2,8 @@
  * NAPL — CORE CONFIGURATION
  */
 
-// Single external community microservice URL (Node.js 22 + SQLite WAL on Oracle Cloud / VPS).
-// Replace with your production domain (or set <meta name="napl-community-api" content="https://..."> in HTML).
+// Single external community microservice URL (Cloudflare Workers + D1 in cloudflare-community/).
+// Replace with your Workers/custom domain (or set <meta name="napl-community-api" content="https://..."> in HTML).
 const DEFAULT_COMMUNITY_API_BASE =
     "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
 

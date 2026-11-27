@@ -11,6 +11,7 @@ import {
     USER_DEVICE_STORAGE_KEY,
 } from "./config.js";
 import { getRatingToken } from "./ratings.js";
+import { loadCommunitySummary } from "./community-summary.js";
 
 let devicesCache = null;
 let devicesPromise = null;
@@ -421,13 +422,14 @@ export async function searchCompatibilityByHardware({
     deviceId = "",
     soc = "",
     query = "",
-    limit = 500,
+    limit = 200,
 } = {}) {
+    const clampedLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
     const params = new URLSearchParams({ action: "search" });
     if (deviceId) params.set("device_id", deviceId);
     if (soc) params.set("soc", soc);
     if (query) params.set("q", query);
-    if (limit) params.set("limit", String(limit));
+    params.set("limit", String(clampedLimit));
 
     const response = await fetch(
         `${COMPATIBILITY_API_URL}?${params.toString()}`,
@@ -536,7 +538,7 @@ export async function loadGameCompatibility(portIds, fresh = false) {
         if (missingIds.length === 0) return cached;
     }
 
-    const requestedIds = fresh ? cleanIds : missingIds;
+    const requestedIds = (fresh ? cleanIds : missingIds).slice(0, 10);
 
     try {
         const params = new URLSearchParams({
@@ -566,6 +568,14 @@ export async function loadGameCompatibility(portIds, fresh = false) {
         return { ...cached, ...data.compatibility };
     } catch (error) {
         console.warn("NAPL: could not load compatibility reports.", error);
+        const summary = await loadCommunitySummary();
+        if (summary?.compatibility && typeof summary.compatibility === "object") {
+            for (const id of requestedIds) {
+                if (!cached[id] && summary.compatibility[id]) {
+                    cached[id] = normalizeCompatSummary(summary.compatibility[id]);
+                }
+            }
+        }
         return cached;
     }
 }

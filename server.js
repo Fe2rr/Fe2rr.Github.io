@@ -784,6 +784,47 @@ app.get('/api/admin-dashboard', (req, res) => {
   });
 });
 
+app.get('/assets/data/community-summary.json', (req, res, next) => {
+  const localSummary = path.join(__dirname, 'public', 'assets', 'data', 'community-summary.json');
+  if (fs.existsSync(localSummary)) return next();
+
+  const buildPreviewPopularity = (period) =>
+    Array.from(previewPopularity.entries())
+      .map(([slug, counts]) => ({ slug, visits: counts[period] || 0 }))
+      .filter((g) => g.visits > 0)
+      .sort((a, b) => b.visits - a.visits || a.slug.localeCompare(b.slug))
+      .slice(0, 250);
+
+  const compatibility = {};
+  for (const r of compatibilityReports.values()) {
+    if (!compatibility[r.portId]) {
+      compatibility[r.portId] = {
+        yes: 0,
+        no: 0,
+        counts: { playable_60: 0, playable_30: 0, low_fps: 0, crash: 0 },
+      };
+    }
+    const entry = compatibility[r.portId];
+    if (r.works) entry.yes += 1;
+    else entry.no += 1;
+    if (entry.counts[r.status] !== undefined) {
+      entry.counts[r.status] += 1;
+    }
+  }
+
+  return res.json({
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    ratings: computePreviewRatingsSummary(),
+    popularity: {
+      week: buildPreviewPopularity('week'),
+      month: buildPreviewPopularity('month'),
+      alltime: buildPreviewPopularity('alltime'),
+    },
+    compatibility,
+  });
+});
+
 app.get('/assets/covers/manifest.json', (req, res, next) => {
   const localManifest = path.join(__dirname, 'public', 'assets', 'covers', 'manifest.json');
   if (fs.existsSync(localManifest)) return next();

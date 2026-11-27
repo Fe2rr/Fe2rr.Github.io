@@ -1,0 +1,86 @@
+name: NAPL community summary & Discord digest
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: napl-community-summary
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  sync-community:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout NAPL-Prueba
+        uses: actions/checkout@v4
+
+      - name: Check required secrets
+        id: check_env
+        env:
+          NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+          NAPL_COMMUNITY_API_BASE: ${{ secrets.NAPL_COMMUNITY_API_BASE }}
+        run: |
+          if [ -z "$NAPL_DATA_GITHUB_TOKEN" ] || [ -z "$NAPL_COMMUNITY_API_BASE" ]; then
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "NAPL_DATA_GITHUB_TOKEN or NAPL_COMMUNITY_API_BASE is not set yet; skipping."
+          else
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Checkout NAPL-Data repository
+        if: steps.check_env.outputs.ready == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: Fe2rr/NAPL-Data
+          ref: main
+          path: data
+          token: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+
+      - name: Configure Node.js
+        if: steps.check_env.outputs.ready == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Sync community snapshot & dispatch Discord link digest
+        if: steps.check_env.outputs.ready == 'true'
+        env:
+          NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+          NAPL_COMMUNITY_API_BASE: ${{ secrets.NAPL_COMMUNITY_API_BASE }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          NAPL_DATA_DIR: data
+        run: node scripts/sync-community-summary.mjs
+
+      - name: Commit updated community-summary.json
+        if: steps.check_env.outputs.ready == 'true'
+        id: commit_summary
+        working-directory: data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -f "public/assets/data/community-summary.json" ]; then
+            git add public/assets/data/community-summary.json
+          fi
+          if ! git diff --cached --quiet; then
+            git commit -m "NAPL: update static community summary"
+            git pull --rebase origin main
+            git push origin HEAD:main
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No community summary changes detected."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Trigger GitHub Pages redeploy when summary changed
+        if: steps.check_env.outputs.ready == 'true' && steps.commit_summary.outputs.changed == 'true'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run deploy-pages.yml --repo "${{ github.repository }}"

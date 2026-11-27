@@ -8,9 +8,32 @@ import {
     RATINGS_API_BASE,
     RATING_TOKEN_STORAGE_KEY,
 } from "./config.js";
+import { loadCommunitySummary } from "./community-summary.js";
 
 let ratingTokenMemory = "";
 let myVotesCache = null;
+
+function normalizeRatingsPayload(data) {
+    const ratings = {};
+
+    for (const port of data?.ports || []) {
+        if (typeof port?.port_id !== "string" || !port.port_id.trim()) {
+            continue;
+        }
+
+        const avg = Number(port.avg);
+        const votes = Number(port.votes);
+        const score = Number(port.score);
+
+        ratings[port.port_id] = {
+            avg: Number.isFinite(avg) ? avg : 0,
+            votes: Number.isFinite(votes) ? votes : 0,
+            score: Number.isFinite(score) ? score : 0,
+        };
+    }
+
+    return ratings;
+}
 
 function readStoredRatingToken() {
     if (ratingTokenMemory) {
@@ -131,8 +154,15 @@ async function loadMyVotes(force = false) {
     return myVotesCache;
 }
 
-export async function loadPortRatings() {
+export async function loadPortRatings(fresh = false) {
     try {
+        if (!fresh) {
+            const summary = await loadCommunitySummary();
+            if (summary?.ratings && Array.isArray(summary.ratings.ports)) {
+                return normalizeRatingsPayload(summary.ratings);
+            }
+        }
+
         const response = await fetch(RATINGS_API_BASE, {
             method: "GET",
             cache: "no-store",
@@ -147,25 +177,7 @@ export async function loadPortRatings() {
             throw new Error("Ratings API returned an invalid response.");
         }
 
-        const ratings = {};
-
-        for (const port of data.ports) {
-            if (typeof port.port_id !== "string" || !port.port_id.trim()) {
-                continue;
-            }
-
-            const avg = Number(port.avg);
-            const votes = Number(port.votes);
-            const score = Number(port.score);
-
-            ratings[port.port_id] = {
-                avg: Number.isFinite(avg) ? avg : 0,
-                votes: Number.isFinite(votes) ? votes : 0,
-                score: Number.isFinite(score) ? score : 0,
-            };
-        }
-
-        return ratings;
+        return normalizeRatingsPayload(data);
     } catch (error) {
         console.warn("NAPL: could not load port ratings.", error);
         return {};
@@ -195,7 +207,7 @@ export function createRatingActions() {
 
             myVotesCache[portId] = stars;
 
-            const updatedRatings = await loadPortRatings();
+            const updatedRatings = await loadPortRatings(true);
 
             return {
                 myVote: stars,
