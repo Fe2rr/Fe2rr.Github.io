@@ -25,7 +25,7 @@ function markStoredVisitToday(game) {
     try {
         const today = new Date().toISOString().slice(0, 10);
         let stored = JSON.parse(localStorage.getItem(VISIT_DEDUP_STORAGE_KEY) || "{}");
-        if (!stored || stored.day !== today || typeof stored.games !== "object") {
+        if (!stored || stored.day !== today || !stored.games || typeof stored.games !== "object") {
             stored = { day: today, games: {} };
         }
         stored.games[game] = true;
