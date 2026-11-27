@@ -25,10 +25,19 @@ permissions:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 60
     steps:
       - name: Checkout NAPL-Prueba
         uses: actions/checkout@v4
+      - name: Validate required Actions secrets
+        env:
+          NAPL_ADMIN_PASSWORD: ${{ secrets.NAPL_ADMIN_PASSWORD }}
+          NAPL_SESSION_SECRET: ${{ secrets.NAPL_SESSION_SECRET }}
+          NAPL_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
+        run: |
+          test -n "$NAPL_ADMIN_PASSWORD" || { echo "::error::Missing Actions secret NAPL_ADMIN_PASSWORD"; exit 1; }
+          test -n "$NAPL_SESSION_SECRET" || { echo "::error::Missing Actions secret NAPL_SESSION_SECRET"; exit 1; }
+          test -n "$NAPL_DATA_GITHUB_TOKEN" || { echo "::error::Missing Actions secret NAPL_DATA_GITHUB_TOKEN"; exit 1; }
       - name: Checkout NAPL-Data assets repository
         uses: actions/checkout@v4
         with:
