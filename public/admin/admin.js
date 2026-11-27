@@ -79,7 +79,6 @@ function renderAll() {
 }
 let openPlatforms = new Set();
 let activeSyncFilter = "all";
-let activeSyncFilter = "all";
 function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
