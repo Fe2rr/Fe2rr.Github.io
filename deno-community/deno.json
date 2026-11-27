@@ -1,0 +1,10 @@
+{
+  "tasks": {
+    "dev": "deno run --unstable-kv --allow-net --allow-read --allow-env main.ts",
+    "start": "deno run --unstable-kv --allow-net --allow-read --allow-env main.ts",
+    "import": "deno run --unstable-kv --allow-net --allow-read --allow-env import-from-supabase.ts"
+  },
+  "compilerOptions": {
+    "strict": true
+  }
+}
