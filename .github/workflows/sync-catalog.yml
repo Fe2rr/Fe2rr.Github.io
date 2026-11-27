@@ -6,10 +6,10 @@ on:
   workflow_dispatch:
     inputs:
       import_sheets:
-        description: "Import the latest Google Sheets CSV before syncing"
+        description: "Import the legacy Google Sheets CSV (only if intentionally refreshing from that source)"
         required: false
         type: boolean
-        default: true
+        default: false
 
 concurrency:
   group: napl-catalog-sync
@@ -42,7 +42,7 @@ jobs:
           SESSION_SECRET: ${{ secrets.NAPL_SESSION_SECRET }}
           GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
           CATALOG_DATA_GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
-          IMPORT_SHEETS: ${{ github.event_name == 'schedule' && 'true' || inputs.import_sheets }}
+          IMPORT_SHEETS: ${{ github.event_name == 'workflow_dispatch' && inputs.import_sheets || 'false' }}
           NAPL_DATA_DIR: data
           GITHUB_ACTIONS: "true"
           SYNC_CONCURRENCY: "4"
