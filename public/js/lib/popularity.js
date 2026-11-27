@@ -18,7 +18,7 @@ function normalizePopularityKey(value) {
 async function requestPopularity(period) {
     const response = await fetch(
         `${POPULARITY_API_BASE}?period=${encodeURIComponent(period)}`,
-        { method: "GET", cache: "no-store" }
+        { method: "GET", cache: "default" }
     );
     if (!response.ok) {
         throw new Error(`Popularity API returned HTTP ${response.status}.`);
