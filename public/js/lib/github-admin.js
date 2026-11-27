@@ -9,7 +9,7 @@
  * /admin-dashboard endpoint.
  */
 
-import { ADMIN_DASHBOARD_API_URL } from "./config.js";
+import { COMMUNITY_API_BASE } from "./config.js";
 
 const PAT_SESSION_KEY = "napl_github_pat_v1";
 const REPO_CFG_SESSION_KEY = "napl_github_repo_cfg_v1";
@@ -474,7 +474,7 @@ export async function fetchCommunityAdminDashboard({ pat } = {}) {
         throw new Error("Sesión GitHub requerida para consultar el dashboard.");
     }
 
-    const response = await fetch(ADMIN_DASHBOARD_API_URL, {
+    const response = await fetch(`${COMMUNITY_API_BASE}/community-sync/admin-dashboard`, {
         method: "GET",
         headers: {
             Accept: "application/json",
@@ -483,11 +483,51 @@ export async function fetchCommunityAdminDashboard({ pat } = {}) {
         cache: "no-store",
     });
 
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data?.success) {
-        throw new Error(
-            data?.error || `Dashboard API HTTP ${response.status}`
-        );
+    const payload = await response.json().catch(() => ({}));
+    if (!response.ok || !payload?.success || !payload?.snapshot) {
+        throw new Error(payload?.error || `Dashboard API HTTP ${response.status}`);
     }
-    return data;
+
+    const snapshot = payload.snapshot;
+    const ratings = Array.isArray(snapshot.ratings?.ports) ? snapshot.ratings.ports : [];
+    const week = new Map((snapshot.popularity?.week || []).map((item) => [item.slug, Number(item.visits) || 0]));
+    const month = new Map((snapshot.popularity?.month || []).map((item) => [item.slug, Number(item.visits) || 0]));
+    const popularity = (snapshot.popularity?.alltime || []).map((item) => ({
+        game_key: item.slug,
+        all_time_visits: Number(item.visits) || 0,
+        week_visits: week.get(item.slug) || 0,
+        month_visits: month.get(item.slug) || 0,
+        updated_at: snapshot.generatedAt || "",
+    }));
+
+    const compatibilityMap = snapshot.compatibility && typeof snapshot.compatibility === "object"
+        ? snapshot.compatibility
+        : {};
+    const compatibility = Object.entries(compatibilityMap).flatMap(([portId, item]) =>
+        (Array.isArray(item?.reports) ? item.reports : []).map((report) => ({
+            updated_at: report.updatedAt || "",
+            port_id: portId,
+            device_name: report.deviceName || report.deviceId || "",
+            status: report.status || "",
+            works: Boolean(report.works),
+        }))
+    );
+    const compatibilityReports = Object.values(compatibilityMap).reduce(
+        (total, item) => total + (Number(item?.yes) || 0) + (Number(item?.no) || 0),
+        0
+    );
+
+    return {
+        totals: {
+            linkReports: Array.isArray(payload.reports) ? payload.reports.length : 0,
+            compatibilityReports,
+            ratingVotes: ratings.reduce((total, item) => total + (Number(item.votes) || 0), 0),
+            gamesTracked: popularity.length,
+            allTimeVisits: popularity.reduce((total, item) => total + item.all_time_visits, 0),
+        },
+        reports: Array.isArray(payload.reports) ? payload.reports : [],
+        compatibility,
+        ratings,
+        popularity,
+    };
 }
