@@ -79,7 +79,7 @@ CREATE INDEX IF NOT EXISTS popularity_rank_month_idx ON game_popularity(month_vi
 CREATE INDEX IF NOT EXISTS popularity_rank_all_idx ON game_popularity(all_time_visits DESC);
 
 CREATE OR REPLACE FUNCTION napl_register_game_visit(p_game_key text,p_ip_hash text)
-RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $
+RETURNS boolean LANGUAGE plpgsql SECURITY DEFINER SET search_path TO public AS $$
 DECLARE v_now timestamptz:=now(); v_week date:=date_trunc('week',now())::date;
 v_month date:=date_trunc('month',now())::date; v_allowed text;
 BEGIN
@@ -98,7 +98,7 @@ BEGIN
 END $$;
 
 CREATE OR REPLACE FUNCTION napl_get_popularity(p_period text DEFAULT 'week')
-RETURNS TABLE(slug text,visits bigint) LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO public AS $
+RETURNS TABLE(slug text,visits bigint) LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO public AS $$
  SELECT game_key,CASE WHEN lower(coalesce(p_period,'week'))='alltime' THEN all_time_visits
  WHEN lower(coalesce(p_period,'week'))='month' THEN CASE WHEN month_start=date_trunc('month',now())::date THEN month_visits ELSE 0 END
  ELSE CASE WHEN week_start=date_trunc('week',now())::date THEN week_visits ELSE 0 END END
