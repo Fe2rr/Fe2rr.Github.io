@@ -1,21 +1,14 @@
 # Cloudflare en NAPL
 
-GitHub es la plataforma principal. Cloudflare queda reducido a compatibilidad con la versión archivada v5.
+NAPL ya no depende de Cloudflare en producción. Los Workers antiguos se retiraron porque la versión activa no los utiliza y la compatibilidad con v5 dejó de ser necesaria.
 
-## Recursos activos
+## Estado
 
-- **Worker `napl-admin-api`:** shim mínimo de `GET /api/public-catalog` para v5. No contiene autenticación, administración, sincronización ni acceso a bases de datos.
-- **Worker `napl-image-optimizer`:** se conserva mientras la versión archivada v5 lo necesite.
+- Workers NAPL: ninguno.
+- D1: ninguna base de datos NAPL.
+- Queues: ninguna cola NAPL.
+- Pages: ningún proyecto NAPL.
 
-## Recursos retirados
+Las portadas se optimizan en GitHub Actions y se publican como WebP estáticos. El catálogo, las imágenes y los snapshots se sirven desde GitHub Pages / Fe2rr/NAPL-Data.
 
-- **Worker `napl-community-api`:** retirado el 27/11/2026. Las operaciones comunitarias activas usan las Edge Functions de Supabase.
-- **D1 `napl-community`:** retirado el 27/11/2026. Los datos comunitarios se verificaron contra Supabase antes del retiro.
-- Pages `napl-admin`: reemplazado por `https://fe2rr.github.io/admin/`.
-- Queue `napl-sync-tasks` y dead-letter queue `napl-sync-dlq`: la sincronización pasó a GitHub Actions.
-
-## Límites de arquitectura
-
-- No desplegar un backend comunitario en Cloudflare.
-- No recrear D1, Queues ni Pages para funciones ya resueltas por GitHub o Supabase.
-- No retirar `napl-admin-api` ni `napl-image-optimizer` mientras se quiera conservar la compatibilidad con v5.
+No desplegar ni recrear Workers, D1, Queues o Pages para funciones cubiertas por GitHub o Supabase. Cloudflare queda fuera del camino crítico de NAPL.
