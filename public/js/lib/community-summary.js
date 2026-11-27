@@ -2,7 +2,7 @@
  * NAPL — STATIC COMMUNITY SUMMARY LOADER
  *
  * Reads the pre-aggregated snapshot bundled from Fe2rr/NAPL-Data by GitHub Actions.
- * Passive visits trigger zero Worker calls and zero D1 reads.
+ * Passive visits trigger zero Supabase or Cloudflare calls and zero database reads.
  */
 
 const SUMMARY_TTL_MS = 15 * 60 * 1000;
