@@ -174,14 +174,14 @@ async function login(raw) {
 async function saveCatalog() {
   if (busy) return;
   const game = readDraft();
-  if (!game.name || !game.slug) throw new Error("El juego necesita nombre y slug.");
-  const duplicates = state.catalog.games.filter((g) => g.slug === game.slug && g !== game);
+  if (game && (!game.name || !game.slug)) throw new Error("El juego necesita nombre y slug.");
+  const duplicates = game ? state.catalog.games.filter((g) => g.slug === game.slug && g !== game) : [];
   if (duplicates.length) throw new Error("Ya existe otro juego con ese slug.");
   setBusy(true, "Guardando catálogo en GitHub…");
   try {
     const saved = await saveAndPublishCatalogState(state, { publishPublic: true, message: "NAPL Admin: " + game.name });
     state = normalizeState(saved.state);
-    selectedSlug = game.slug;
+    selectedSlug = game?.slug || state.catalog.games[0]?.slug || "";
     $("save-hint").textContent = "JSON privado y snapshot público guardados.";
     notice("Guardado en Fe2rr/NAPL-Data. Publicando GitHub Pages…");
     await dispatchWorkflowAndWait("deploy-pages.yml", {}, {
