@@ -5,8 +5,8 @@ on:
     paths:
       - ".github/workflows/sync-community-summary.yml"
   schedule:
-    # Static community snapshot (including recent compatibility reports) is refreshed every six hours.
-    - cron: "17 */6 * * *"
+    # Static community snapshot is refreshed hourly; vote submissions update the active port immediately.
+    - cron: "17 * * * *"
   workflow_dispatch:
 
 concurrency:
