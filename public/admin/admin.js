@@ -126,7 +126,7 @@ function renderEditor() {
     const field = form.elements.namedItem(key);
     if (field) field.value = game[key] ?? "";
   }
-  $("metadata-url").value = game.steamUrl || game.launchboxUrl || "";
+  $("metadata-url").value = game.steamUrl || game.launchboxUrl || game.itchUrl || "";
   const preview = $("game-cover-preview");
   preview.src = game.coverUrl || "";
   preview.hidden = !game.coverUrl;
@@ -134,7 +134,7 @@ function renderEditor() {
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
     <article class="port-card" data-port-card="${i}">
       <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button secondary" data-inspect-port="${i}">Revisar fuente</button> <button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
-      <div class="port-fields">
+      <div class="port-source-row">${portField(i,"url","Enlace del port",port.url,"url")}<button type="button" class="button secondary" data-inspect-port="${i}">Obtener datos del enlace</button></div>\n      <details class="port-data-details"><summary>Datos del port</summary><div class="port-fields">
         ${portField(i,"project","Proyecto",port.project)}
         ${portField(i,"developer","Desarrollador",port.developer)}
         ${portField(i,"year","Año",port.year)}
@@ -361,14 +361,17 @@ $("community-button").addEventListener("click", loadCommunity);
 $("close-community").addEventListener("click", () => $("community-dialog").close());
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
-  if (!url) return notice("Ingresá una URL de Steam o LaunchBox.", "error");
+  if (!url) return notice("Ingresá la URL del juego.", "error");
   const mode = /store\.steampowered\.com\/app\/|^\d+$/.test(url) ? "steam" : "launchbox";
   setBusy(true, "Consultando metadatos con GitHub Actions…");
   try {
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
     const game = readDraft();
-    const payload = data?.data || data;\n    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl"};
-    for (const [source,target] of Object.entries(aliases)) if (payload?.[source] && !game[target]) game[target] = payload[source];\n    if (mode === "steam" && payload?.steamUrl) game.steamUrl = payload.steamUrl;\n    if (mode === "launchbox") game.launchboxUrl = url;
+    const payload = data?.data || data;
+    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl"};
+    for (const [source,target] of Object.entries(aliases)) if (payload?.[source] && !game[target]) game[target] = payload[source];
+    if (mode === "steam" && payload?.steamUrl) game.steamUrl = payload.steamUrl;
+    if (mode === "launchbox") game.launchboxUrl = url;
     renderEditor();
     notice("Consulta completada. Revisá los campos y guardá los cambios.", "success");
   } catch (error) { notice(error.message || "No se pudieron obtener los metadatos.", "error"); }
