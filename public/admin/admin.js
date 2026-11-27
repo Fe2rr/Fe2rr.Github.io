@@ -64,6 +64,8 @@ function normalizeState(value) {
   next.catalog.games = Array.isArray(next.catalog.games) ? next.catalog.games : [];
   for (const game of next.catalog.games) {
     if (!Array.isArray(game.ports)) game.ports = [];
+    if (!game.year) game.year = game.ports.find(port => port.year)?.year || "";
+    for (const port of game.ports) { delete port.year; delete port.works; }
     delete game.manufacturer;
   }
   next.syncCursor = Number(next.syncCursor) || 0;
@@ -75,7 +77,9 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
-let openPlatforms = new Set();\nlet activeSyncFilter = "all";\nlet activeSyncFilter = "all";
+let openPlatforms = new Set();
+let activeSyncFilter = "all";
+let activeSyncFilter = "all";
 function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
@@ -102,7 +106,6 @@ function renderGameList() {
         ${entries.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Sync":"No sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta plataforma.</p>'}
       </div></details>`;
   }).join("") || '<p class="muted">No hay resultados.</p>';
-  $("platform-options").innerHTML = orderedPlatforms.map(p=>`<option value="${esc(p)}"></option>`).join("");
 }
 
 function detectMetadataSource(rawUrl) {
@@ -180,7 +183,9 @@ function readDraft() {
     card.querySelectorAll("[data-port-field]").forEach((field) => {
       next[field.dataset.portField] = field.value.trim();
     });
-    delete next.year;\n    delete next.works;\n    delete next.year;\n    delete next.works;\n    if (!next.portId) next.portId = game.slug + "-port-" + (index + 1);
+    delete next.year;
+    delete next.works;
+    if (!next.portId) next.portId = game.slug + "-port-" + (index + 1);
     return next;
   });
   game.platforms = game.platform ? [game.platform] : [];
@@ -286,7 +291,23 @@ $("logout-button").addEventListener("click", () => {
   clearGithubSession(); pat = ""; state = null; showLogin();
 });
 $("search").addEventListener("input", renderGameList);
-$("sync-filter").addEventListener("click", (event) => {\n  const button = event.target.closest("[data-sync-filter]");\n  if (!button) return;\n  activeSyncFilter = button.dataset.syncFilter;\n  $("sync-filter").querySelectorAll("[data-sync-filter]").forEach(item=>item.classList.toggle("active",item===button));\n  renderGameList();\n});\n$("game-form").elements.namedItem("platform").addEventListener("change", (event) => {\n  if (event.target.value !== "__add_new__") return;\n  const name = prompt("Nombre de la nueva plataforma:");\n  if (!name?.trim()) { event.target.value = currentGame()?.platform || ""; return; }\n  const platform = name.trim();\n  if (!state.catalog.platformOrder.includes(platform)) state.catalog.platformOrder.push(platform);\n  event.target.insertAdjacentHTML("beforeend", `<option value="${esc(platform)}">${esc(platform)}</option>`);\n  event.target.value = platform;\n  renderGameList();\n});
+$("sync-filter").addEventListener("click", (event) => {
+  const button = event.target.closest("[data-sync-filter]");
+  if (!button) return;
+  activeSyncFilter = button.dataset.syncFilter;
+  $("sync-filter").querySelectorAll("[data-sync-filter]").forEach(item=>item.classList.toggle("active",item===button));
+  renderGameList();
+});
+$("game-form").elements.namedItem("platform").addEventListener("change", (event) => {
+  if (event.target.value !== "__add_new__") return;
+  const name = prompt("Nombre de la nueva plataforma:");
+  if (!name?.trim()) { event.target.value = currentGame()?.platform || ""; return; }
+  const platform = name.trim();
+  if (!state.catalog.platformOrder.includes(platform)) state.catalog.platformOrder.push(platform);
+  event.target.insertAdjacentHTML("beforeend", `<option value="${esc(platform)}">${esc(platform)}</option>`);
+  event.target.value = platform;
+  renderGameList();
+});
 $("game-list").addEventListener("toggle", (event) => {
   const accordion = event.target.closest("[data-platform-accordion]");
   if (!accordion) return;
@@ -383,11 +404,11 @@ $("lookup-metadata").addEventListener("click", async () => {
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
     const game = readDraft();
     const payload = data?.data || data;
-    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description",steamUrl:"steamUrl",steam_url:"steamUrl",launchboxUrl:"launchboxUrl",itchUrl:"itchUrl"};
+    const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description"};
     for (const [source,target] of Object.entries(aliases)) if (payload?.[source] && !game[target]) game[target] = payload[source];
-    if (mode === "steam" && payload?.steamUrl) game.steamUrl = payload.steamUrl;
-    if (mode === "launchbox") game.launchboxUrl = url;
-    if (mode === "itch") game.itchUrl = url;
+    game.steamUrl = mode === "steam" ? url : "";
+    game.launchboxUrl = mode === "launchbox" ? url : "";
+    game.itchUrl = mode === "itch" ? url : "";
     renderEditor();
     notice("Consulta completada. Revisá los campos y guardá los cambios.", "success");
   } catch (error) { notice(error.message || "No se pudieron obtener los metadatos.", "error"); }
