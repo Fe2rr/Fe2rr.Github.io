@@ -70,6 +70,28 @@ export async function syncCommunitySummary({
     method: "GET",
     headers,
   });
+  if (snapshotRes.status === 429) {
+    let retryAfterSeconds = Number(snapshotRes.headers?.get?.("Retry-After") || 0) || null;
+    try {
+      const cooldownBody = await snapshotRes.clone().json();
+      retryAfterSeconds =
+        Number(cooldownBody?.retry_after_seconds || retryAfterSeconds || 0) || null;
+    } catch {
+      // A cooldown response may have no JSON body.
+    }
+    console.log(
+      retryAfterSeconds
+        ? `Community snapshot is cooling down; skipping this run. Retry after approximately ${retryAfterSeconds}s.`
+        : "Community snapshot is cooling down (HTTP 429); skipping this run without treating it as a failure."
+    );
+    return {
+      skipped: true,
+      cooldown: true,
+      retryAfterSeconds,
+      snapshotChanged: false,
+      reportsDispatched: 0,
+    };
+  }
   if (!snapshotRes.ok) {
     throw new Error(`Community snapshot fetch failed (HTTP ${snapshotRes.status}).`);
   }
