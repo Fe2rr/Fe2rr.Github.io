@@ -7,18 +7,10 @@
 const DEFAULT_COMMUNITY_API_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
 
 export function resolveCommunityApiBase() {
-    if (typeof window !== "undefined") {
-        const override = typeof window.NAPL_COMMUNITY_API_BASE === "string"
-            ? window.NAPL_COMMUNITY_API_BASE.trim()
-            : "";
-        if (override) return override.replace(/\/+$/, "");
-        if (typeof document !== "undefined") {
-            const meta = document.querySelector('meta[name="napl-community-api"]');
-            const value = String(meta?.getAttribute("content") || "").trim();
-            if (value) return value.replace(/\/+$/, "");
-        }
-    }
-    return DEFAULT_COMMUNITY_API_BASE;
+    const override = typeof window !== "undefined" && typeof window.NAPL_COMMUNITY_API_BASE === "string"
+        ? window.NAPL_COMMUNITY_API_BASE.trim()
+        : "";
+    return override ? override.replace(/\/+$/, "") : DEFAULT_COMMUNITY_API_BASE;
 }
 
 export const COMMUNITY_API_BASE = resolveCommunityApiBase();
