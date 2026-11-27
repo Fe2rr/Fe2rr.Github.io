@@ -96,6 +96,8 @@ try {
     data = await inspectLaunchboxUrl(url);
   } else if (mode === "steam") {
     data = await inspectSteamApp(url, env);
+  } else if (mode === "itch") {
+    data = await inspectItchPage(url);
   } else if (mode === "port_source" || mode === "source") {
     data = await inspectPortSource(url, env);
   } else if (mode === "optimize_cover") {
