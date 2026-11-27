@@ -3,7 +3,5 @@ main = "napl-admin-worker.js"
 compatibility_date = "2026-11-21"
 compatibility_flags = []
 
-# Worker legacy de compatibilidad para la versión v5.
-# La sincronización programada del catálogo se ejecuta en GitHub Actions.
-[vars]
-CRON_BATCH_SIZE = "10"
+# Compatibilidad mínima para la versión archivada v5.
+# No agregar secrets, bindings de Queue ni cron triggers.
