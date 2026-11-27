@@ -1,4 +1,5 @@
 name: NAPL catalog sync
+# Configuration edits intentionally trigger a safe sync; Import Sheets defaults to false.
 
 on:
   push:
