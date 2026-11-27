@@ -74,19 +74,44 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
+function gameSyncStatus(game) {
+  return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
+}
+function platformManufacturer(game) {
+  if (game.manufacturer) return game.manufacturer;
+  const platform = String(game.platform || "");
+  const known = ["Nintendo","Sony","Microsoft","Sega","Atari","NEC","SNK","Valve","Commodore","Apple"];
+  return known.find((maker) => platform.toLowerCase().startsWith(maker.toLowerCase())) || "Otros";
+}
 function renderGameList() {
   const games = state?.catalog?.games || [];
   const q = $("search").value.trim().toLowerCase();
+  const mode = $("sync-filter")?.value || "all";
   const filtered = games.filter((game) => {
-    const haystack = [game.name, game.slug, game.platform, ...(game.ports || []).flatMap((p) => [p.project, p.developer, p.portId, p.url, p.githubRepo])].join(" ").toLowerCase();
+    const synced = gameSyncStatus(game);
+    if (mode === "synced" && !synced) return false;
+    if (mode === "unsynced" && synced) return false;
+    const haystack = [game.name, game.slug, game.manufacturer, game.platform, ...(game.ports || []).flatMap((p) => [p.project, p.developer, p.portId, p.url, p.githubRepo])].join(" ").toLowerCase();
     return haystack.includes(q);
   });
-  $("catalog-count").textContent = games.length + " juegos · " + games.reduce((n, g) => n + (g.ports || []).length, 0) + " ports";
-  $("game-list").innerHTML = filtered.map((game) => `
-    <button type="button" class="game-item ${game.slug === selectedSlug ? "active" : ""}" data-select-game="${esc(game.slug)}">
-      <strong>${esc(game.name || "Sin nombre")}</strong>
-      <small>${esc(game.platform || "Sin plataforma")} · ${(game.ports || []).length} ports</small>
-    </button>`).join("") || '<p class="muted">No hay resultados.</p>';
+  $("catalog-count").textContent = filtered.length + " / " + games.length + " juegos · " + games.reduce((n, g) => n + (g.ports || []).length, 0) + " ports";
+  const makers = new Map();
+  for (const game of filtered) {
+    const maker = platformManufacturer(game);
+    if (!makers.has(maker)) makers.set(maker, new Map());
+    const consoles = makers.get(maker);
+    const platform = game.platform || "Sin consola";
+    if (!consoles.has(platform)) consoles.set(platform, []);
+    consoles.get(platform).push(game);
+  }
+  $("game-list").innerHTML = [...makers.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([maker, consoles]) => `
+    <section class="maker-group"><h3 class="maker-heading">${esc(maker)}</h3>
+    ${[...consoles.entries()].sort(([a],[b])=>a.localeCompare(b)).map(([platform, entries]) => {
+      const ordered = [...entries].sort((a,b)=>Number(gameSyncStatus(a))-Number(gameSyncStatus(b)) || String(a.name).localeCompare(String(b.name)));
+      return `<section class="console-group"><div class="console-heading"><strong>${esc(platform)}</strong><button type="button" class="button secondary category-add" data-add-category="${esc(platform)}">+ Juego</button></div>
+      ${ordered.map(game => `<button type="button" class="game-item ${game.slug === selectedSlug ? "active" : ""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name || "Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game) ? "is-synced" : ""}"></span>${gameSyncStatus(game) ? "Con sync" : "Sin sync"} · ${(game.ports || []).length} ports</small></button>`).join("")}
+      </section>`;
+    }).join("")}</section>`).join("") || '<p class="muted">No hay resultados.</p>';
   const platforms = [...new Set([...(state?.catalog?.platformOrder || []), ...games.map((g) => g.platform).filter(Boolean)])];
   $("platform-options").innerHTML = platforms.map((p) => `<option value="${esc(p)}"></option>`).join("");
 }
@@ -97,7 +122,7 @@ function renderEditor() {
   if (!game) return;
   $("editor-title").textContent = game.name || "Nuevo juego";
   const form = $("game-form");
-  for (const key of ["name","slug","platform","year","genre","coverUrl","steamUrl","launchboxUrl","description"]) {
+  for (const key of ["name","slug","manufacturer","platform","year","genre","coverUrl","steamUrl","launchboxUrl","description"]) {
     const field = form.elements.namedItem(key);
     if (field) field.value = game[key] ?? "";
   }
@@ -252,7 +277,16 @@ $("logout-button").addEventListener("click", () => {
   clearGithubSession(); pat = ""; state = null; showLogin();
 });
 $("search").addEventListener("input", renderGameList);
+$("sync-filter").addEventListener("change", renderGameList);
 $("game-list").addEventListener("click", (event) => {
+  const addButton = event.target.closest("[data-add-category]");
+  if (addButton) {
+    if (currentGame()) readDraft();
+    const platform = addButton.dataset.addCategory;
+    const base = {name:"Nuevo juego",slug:"nuevo-juego",manufacturer:platformManufacturer({platform}),platform,year:"",coverUrl:"",genre:"",description:"",ports:[]};
+    let slug=base.slug,n=2; while(state.catalog.games.some(g=>g.slug===slug)) slug=base.slug+"-"+n++;
+    base.slug=slug; state.catalog.games.unshift(base); selectedSlug=slug; renderAll(); return;
+  }
   const button = event.target.closest("[data-select-game]");
   if (!button) return;
   if (currentGame()) readDraft();
@@ -260,7 +294,7 @@ $("game-list").addEventListener("click", (event) => {
   renderAll();
 });
 $("new-game").addEventListener("click", () => {
-  const base = { name:"Nuevo juego", slug:"nuevo-juego", platform:"", year:"", coverUrl:"", genre:"", description:"", ports:[] };
+  const base = { name:"Nuevo juego", slug:"nuevo-juego", manufacturer:"", platform:"", year:"", coverUrl:"", genre:"", description:"", ports:[] };
   let slug = base.slug, n = 2;
   while (state.catalog.games.some(g=>g.slug===slug)) slug = base.slug + "-" + n++;
   base.slug = slug;
