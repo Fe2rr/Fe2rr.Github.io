@@ -26,7 +26,6 @@ export const RATINGS_API_BASE = `${COMMUNITY_API_BASE}/ratings`;
 export const POPULARITY_API_BASE = `${COMMUNITY_API_BASE}/popularity`;
 export const COMPATIBILITY_API_URL = `${COMMUNITY_API_BASE}/compatibility`;
 export const REPORT_LINK_API_URL = `${COMMUNITY_API_BASE}/report-link`;
-export const ADMIN_DASHBOARD_API_URL = `${COMMUNITY_API_BASE}/admin-dashboard`;
 
 export const GITHUB_ADMIN_DEFAULTS = {
     dataRepo: "Fe2rr/NAPL-Data",
