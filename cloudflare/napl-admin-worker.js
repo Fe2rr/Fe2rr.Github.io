@@ -1527,7 +1527,7 @@ async function route(req, env) {
   const origin = req.headers.get("Origin") || "";
   if (path === "/api/public-catalog" && req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors(req, env, true) });
   if (path === "/api/public-catalog" && req.method === "GET") return new Response(null, { status: 302, headers: {
-    ...cors(req, env, true), Location: "https://napl-catalog.pages.dev/assets/data/catalog.json", "Cache-Control": "public, max-age=30"
+    ...cors(req, env, true), Location: "https://raw.githubusercontent.com/Fe2rr/NAPL-Data/main/public/assets/data/catalog.json", "Cache-Control": "public, max-age=30"
   }});
   if (req.method === "OPTIONS") {
     const okOrigin = !origin || isAllowedOrigin(origin, env);
