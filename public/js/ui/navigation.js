@@ -26,6 +26,10 @@ function getPlatformGroup(platform) {
         return "Sony";
     }
 
+    if (normalized.includes("sega")) {
+        return "Sega";
+    }
+
     if (normalized.startsWith("xbox")) {
         return "Xbox";
     }
@@ -141,7 +145,7 @@ export function initNavigation(options = {}) {
         platformList.replaceChildren();
 
         const platforms = getUniquePlatforms(platformOrder, loadedGames);
-        const groupOrder = ["Nintendo", "Sony", "Xbox", "Others"];
+        const groupOrder = ["Nintendo", "Sega", "Sony", "Xbox", "Others"];
         const grouped = new Map(groupOrder.map((group) => [group, []]));
 
         for (const platform of platforms) {
