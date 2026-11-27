@@ -48,7 +48,7 @@ export function getStoredGithubPat() {
 
 export function clearGithubSession() {
     try {
-        sessionStorage.removeItem(PAT_SESSION_KEY);
+        sessionStorage.removeItem(PAT_SESSION_KEY);\n        sessionStorage.removeItem(REPO_CFG_SESSION_KEY);
     } catch {
         // Ignore
     }
@@ -180,6 +180,21 @@ export async function loginWithGithubPat(rawPat, configOverrides = {}) {
         throw new Error(
             `El token no tiene permisos de escritura (Contents: Read and write) sobre ${cfg.dataRepo}.`
         );
+    }
+
+    // The same PAT must be able to dispatch the GitHub Actions workflows
+    // in the code repository. Listing workflows verifies repository access;
+    // dispatch itself will enforce the Actions: Read and write permission.
+    await githubApi(`/repos/${cfg.codeRepo}`, { pat });
+    const { data: workflows } = await githubApi(
+        `/repos/${cfg.codeRepo}/actions/workflows?per_page=100`,
+        { pat }
+    );
+    const available = new Set((workflows?.workflows || []).map((item) => item.name || item.path?.split("/").pop()));
+    const required = [cfg.syncWorkflow, cfg.lookupWorkflow, cfg.deployWorkflow];
+    const missing = required.filter((name) => !available.has(name) && !available.has(`.github/workflows/${name}`));
+    if (missing.length) {
+        throw new Error(`No se pudieron verificar estos workflows en ${cfg.codeRepo}: ${missing.join(", ")}.`);
     }
 
     let user = null;
