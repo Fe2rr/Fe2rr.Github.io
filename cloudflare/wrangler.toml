@@ -3,12 +3,7 @@ main = "napl-admin-worker.js"
 compatibility_date = "2026-11-21"
 compatibility_flags = []
 
-# El catálogo se almacena en JSON privado en Fe2rr/NAPL-Data.
-# No requiere binding D1. Los secretos se configuran en Cloudflare.
-
-[triggers]
-crons = ["*/30 * * * *"]
-
+# Worker legacy de compatibilidad para la versión v5.
+# La sincronización programada del catálogo se ejecuta en GitHub Actions.
 [vars]
-AUTO_PUBLISH_CRON = "false"
 CRON_BATCH_SIZE = "10"
