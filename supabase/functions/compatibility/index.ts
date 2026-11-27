@@ -133,10 +133,13 @@ Deno.serve(async (request: Request) => {
       const result = await rpc("get_compatibility_for_ports", {
         p_port_ids: ids,
       });
+      const cacheControl = url.searchParams.get("fresh") === "1"
+        ? "no-store"
+        : "public, max-age=30, s-maxage=60";
       return json(
         { success: true, compatibility: result || {} },
         200,
-        { "Cache-Control": "public, max-age=30, s-maxage=60" },
+        { "Cache-Control": cacheControl },
       );
     }
 
