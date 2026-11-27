@@ -24,7 +24,6 @@ const LINK_REASONS = new Set([
 
 const DEFAULT_ORIGINS = [
   "https://fe2rr.github.io",
-  "https://napl-catalog.pages.dev",
   "https://napl-admin.pages.dev",
   "http://localhost:3000",
   "http://127.0.0.1:3000",
@@ -38,19 +37,7 @@ function getAllowedOrigins(env) {
 }
 
 function isAllowedOrigin(origin, env) {
-  if (!origin) return false;
-  if (getAllowedOrigins(env).includes(origin)) return true;
-  try {
-    const u = new URL(origin);
-    return (
-      u.protocol === "https:" &&
-      (u.hostname.endsWith(".run.app") ||
-        u.hostname.endsWith(".napl-admin.pages.dev") ||
-        u.hostname.endsWith(".napl-catalog.pages.dev"))
-    );
-  } catch {
-    return false;
-  }
+  return Boolean(origin) && getAllowedOrigins(env).includes(origin);
 }
 
 function buildSecurityHeaders(origin, env, extra = {}) {
@@ -206,18 +193,20 @@ async function verifyGithubAdminPat(req, env) {
   }
 }
 
-async function getRatingsSummary(db) {
+async function getRatingsSummary(db, maxPorts = 249) {
   const meta = await db
     .prepare("SELECT total_votes, total_sum FROM rating_global_meta WHERE id = 1")
     .first();
   const totalVotes = Number(meta?.total_votes || 0);
   const totalSum = Number(meta?.total_sum || 0);
   const globalAvg = totalVotes > 0 ? totalSum / totalVotes : 0;
+  const limit = Math.min(Math.max(Number(maxPorts) || 249, 1), 1000);
 
   const { results } = await db
     .prepare(
-      "SELECT port_id, votes, sum_stars FROM rating_port_stats WHERE votes > 0 ORDER BY port_id ASC"
+      "SELECT port_id, votes, sum_stars FROM rating_port_stats WHERE votes > 0 ORDER BY votes DESC, port_id ASC LIMIT ?"
     )
+    .bind(limit)
     .all();
 
   const ports = (results || []).map((r) => {
@@ -232,10 +221,7 @@ async function getRatingsSummary(db) {
     };
   });
 
-  return {
-    ports,
-    global_avg: Number(globalAvg.toFixed(2)),
-  };
+  return { ports, global_avg: Number(globalAvg.toFixed(2)) };
 }
 
 async function handleRatings(req, url, env, origin) {
@@ -250,7 +236,7 @@ async function handleRatings(req, url, env, origin) {
         return json(origin, env, 401, { error: "invalid_token" });
       }
       const { results } = await db
-        .prepare("SELECT port_id, stars FROM rating_votes WHERE token_hash = ?")
+        .prepare("SELECT port_id, stars FROM rating_votes WHERE token_hash = ? LIMIT 250")
         .bind(tokenHash)
         .all();
       const votes = {};
@@ -258,7 +244,7 @@ async function handleRatings(req, url, env, origin) {
       return json(origin, env, 200, { votes });
     }
 
-    return json(origin, env, 200, await getRatingsSummary(db), "public, max-age=60, s-maxage=300");
+    return json(origin, env, 200, await getRatingsSummary(db, 249), "public, max-age=60, s-maxage=300");
   }
 
   if (req.method !== "POST") {
@@ -307,7 +293,7 @@ async function handleRatings(req, url, env, origin) {
 
   if (action === "my-votes") {
     const { results } = await db
-      .prepare("SELECT port_id, stars FROM rating_votes WHERE token_hash = ?")
+      .prepare("SELECT port_id, stars FROM rating_votes WHERE token_hash = ? LIMIT 250")
       .bind(tokenHash)
       .all();
     const votes = {};
@@ -493,47 +479,33 @@ async function handlePopularity(req, url, env, origin) {
   const nowIso = now.toISOString();
   const cutoff20s = new Date(now.getTime() - 20_000).toISOString();
 
-  const prev = await db
-    .prepare("SELECT last_visit_at FROM game_popularity_visit_limits WHERE ip_hash = ? AND game_key = ?")
-    .bind(ipHash, gameKey)
-    .first();
+  const visitLimit = await db
+    .prepare(
+      "INSERT INTO game_popularity_visit_limits (ip_hash, game_key, last_visit_at) VALUES (?, ?, ?) " +
+      "ON CONFLICT(ip_hash, game_key) DO UPDATE SET last_visit_at = excluded.last_visit_at " +
+      "WHERE game_popularity_visit_limits.last_visit_at < ?"
+    )
+    .bind(ipHash, gameKey, nowIso, cutoff20s)
+    .run();
 
-  if (prev && prev.last_visit_at >= cutoff20s) {
+  if (Number(visitLimit.meta?.changes || 0) === 0) {
     return json(origin, env, 200, { success: true, counted: false });
   }
 
   const weekStart = utcWeekStart(now);
   const monthStart = utcMonthStart(now);
-
-  await db.batch([
-    db
-      .prepare(
-        `INSERT INTO game_popularity_visit_limits (ip_hash, game_key, last_visit_at)
-         VALUES (?, ?, ?)
-         ON CONFLICT(ip_hash, game_key) DO UPDATE SET last_visit_at = excluded.last_visit_at`
-      )
-      .bind(ipHash, gameKey, nowIso),
-    db
-      .prepare(
-        `INSERT INTO game_popularity (
-           game_key, all_time_visits, week_visits, month_visits, week_start, month_start, updated_at
-         ) VALUES (?, 1, 1, 1, ?, ?, ?)
-         ON CONFLICT(game_key) DO UPDATE SET
-           all_time_visits = game_popularity.all_time_visits + 1,
-           week_visits = CASE
-             WHEN game_popularity.week_start = excluded.week_start THEN game_popularity.week_visits + 1
-             ELSE 1
-           END,
-           month_visits = CASE
-             WHEN game_popularity.month_start = excluded.month_start THEN game_popularity.month_visits + 1
-             ELSE 1
-           END,
-           week_start = excluded.week_start,
-           month_start = excluded.month_start,
-           updated_at = excluded.updated_at`
-      )
-      .bind(gameKey, weekStart, monthStart, nowIso),
-  ]);
+  await db
+    .prepare(
+      "INSERT INTO game_popularity (game_key, all_time_visits, week_visits, month_visits, week_start, month_start, updated_at) " +
+      "VALUES (?, 1, 1, 1, ?, ?, ?) " +
+      "ON CONFLICT(game_key) DO UPDATE SET " +
+      "all_time_visits = game_popularity.all_time_visits + 1, " +
+      "week_visits = CASE WHEN game_popularity.week_start = excluded.week_start THEN game_popularity.week_visits + 1 ELSE 1 END, " +
+      "month_visits = CASE WHEN game_popularity.month_start = excluded.month_start THEN game_popularity.month_visits + 1 ELSE 1 END, " +
+      "week_start = excluded.week_start, month_start = excluded.month_start, updated_at = excluded.updated_at"
+    )
+    .bind(gameKey, weekStart, monthStart, nowIso)
+    .run();
 
   return json(origin, env, 200, { success: true, counted: true });
 }
@@ -641,19 +613,39 @@ async function handleCompatibility(req, url, env, origin) {
           .all();
         rows = res.results || [];
       } else {
-        const pattern = `%${q.toLowerCase()}%`;
-        const res = await db
-          .prepare(
-            `SELECT port_id AS portId, device_id AS deviceId, device_name AS deviceName,
-                    device_soc AS deviceSoc, device_type AS deviceType, status, updated_at AS updatedAt
-             FROM compatibility_reports
-             WHERE lower(device_name) LIKE ? OR lower(device_soc) LIKE ?
-             ORDER BY updated_at DESC, id DESC
-             LIMIT ?`
-          )
-          .bind(pattern, pattern, limit)
-          .all();
-        rows = res.results || [];
+        const cleanQuery = q.replace(/[\\%_]/g, "").trim().toLowerCase();
+        if (cleanQuery) {
+          const prefix = cleanQuery + "%";
+          const perFieldLimit = Math.max(1, Math.ceil(limit / 2));
+          const [nameRes, socRes] = await Promise.all([
+            db
+              .prepare(
+                "SELECT port_id AS portId, device_id AS deviceId, device_name AS deviceName, " +
+                "device_soc AS deviceSoc, device_type AS deviceType, status, updated_at AS updatedAt " +
+                "FROM compatibility_reports WHERE device_name LIKE ? COLLATE NOCASE " +
+                "ORDER BY device_name COLLATE NOCASE, updated_at DESC, id DESC LIMIT ?"
+              )
+              .bind(prefix, perFieldLimit)
+              .all(),
+            db
+              .prepare(
+                "SELECT port_id AS portId, device_id AS deviceId, device_name AS deviceName, " +
+                "device_soc AS deviceSoc, device_type AS deviceType, status, updated_at AS updatedAt " +
+                "FROM compatibility_reports WHERE device_soc LIKE ? COLLATE NOCASE " +
+                "ORDER BY device_soc COLLATE NOCASE, updated_at DESC, id DESC LIMIT ?"
+              )
+              .bind(prefix, perFieldLimit)
+              .all(),
+          ]);
+          const seen = new Set();
+          for (const row of [...(nameRes.results || []), ...(socRes.results || [])]) {
+            const key = JSON.stringify([row.portId, row.deviceId]);
+            if (seen.has(key)) continue;
+            seen.add(key);
+            rows.push(row);
+            if (rows.length >= limit) break;
+          }
+        }
       }
 
       const reports = rows.map((r) => ({
@@ -927,7 +919,7 @@ async function handleCommunitySnapshot(req, env, origin) {
   }
 
   const db = env.DB;
-  const ratings = await getRatingsSummary(db);
+  const ratings = await getRatingsSummary(db, 1000);
   const [week, month, alltime] = await Promise.all([
     getPopularityPeriod(db, "week"),
     getPopularityPeriod(db, "month"),
@@ -1013,20 +1005,20 @@ async function handleAdminDashboard(req, env, origin) {
   const [reportsRes, compatRes, ratingsRes, popRes, totals] = await Promise.all([
     db
       .prepare(
-        "SELECT id, port_id, reason, note, url, created_at, updated_at, discord_notified_at FROM link_reports ORDER BY updated_at DESC LIMIT 100"
+        "SELECT id, port_id, reason, note, url, created_at, updated_at, discord_notified_at FROM link_reports ORDER BY updated_at DESC LIMIT 60"
       )
       .all(),
     db
       .prepare(
-        "SELECT id, port_id, device_id, device_name, works, status, updated_at FROM compatibility_reports ORDER BY updated_at DESC LIMIT 100"
+        "SELECT id, port_id, device_id, device_name, works, status, updated_at FROM compatibility_reports ORDER BY updated_at DESC LIMIT 60"
       )
       .all(),
     db
-      .prepare("SELECT port_id, votes, sum_stars, updated_at FROM rating_port_stats ORDER BY votes DESC LIMIT 100")
+      .prepare("SELECT port_id, votes, sum_stars, updated_at FROM rating_port_stats ORDER BY votes DESC LIMIT 50")
       .all(),
     db
       .prepare(
-        "SELECT game_key, all_time_visits, week_visits, month_visits, week_start, month_start, updated_at FROM game_popularity ORDER BY all_time_visits DESC LIMIT 250"
+        "SELECT game_key, all_time_visits, week_visits, month_visits, week_start, month_start, updated_at FROM game_popularity ORDER BY all_time_visits DESC LIMIT 80"
       )
       .all(),
     db
