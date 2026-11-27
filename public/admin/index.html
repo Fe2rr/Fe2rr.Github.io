@@ -4,16 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
-  <meta name="theme-color" content="#10231d">
+  <meta name="theme-color" content="#102a26">
   <title>NAPL · Administración</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./admin.css">
   <script type="module" src="./admin.js"></script>
 </head>
 <body>
   <section id="login-view" class="login-shell">
     <form id="login-form" class="login-card">
-      <div class="brand">NAPL <span>ADMIN</span></div>
-      <h1>Panel de administración</h1>
+      <div class="brand-mark">NAPL <span>ADMIN · JSON</span></div>
+      <h1>Panel de catálogo</h1>
       <p>Acceso directo a GitHub. El token permanece en la sesión del navegador. Solo se envía a GitHub y a Supabase para validar permisos y consultar el panel comunitario; no se almacena permanentemente.</p>
       <label for="github-pat">GitHub Fine-grained PAT</label>
       <input id="github-pat" type="password" autocomplete="off" spellcheck="false" required placeholder="github_pat_…">
@@ -23,11 +26,11 @@
     </form>
   </section>
 
-  <main id="admin-view" hidden>
+  <main id="admin-view" class="admin-shell" hidden>
     <header class="topbar">
       <div class="brand">NAPL <span>ADMIN</span></div>
-      <div id="connection-state" class="connection">Conectando…</div>
-      <div class="actions">
+      <div id="connection-state" class="topbar-state">Conectando…</div>
+      <div class="topbar-actions">
         <button id="sync-button" class="button secondary">Sincronizar fuentes</button>
         <button id="import-button" class="button secondary">Importar CSV</button>
         <button id="community-button" class="button secondary">Comunidad y reportes</button>
@@ -35,25 +38,25 @@
       </div>
     </header>
     <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-    <section class="layout">
-      <aside class="catalog-panel">
-        <div class="panel-heading">
+    <section class="workspace">
+      <aside class="sidebar">
+        <div class="sidebar-heading">
           <div><h2>Catálogo</h2><small id="catalog-count">0 juegos</small></div>
           <button id="new-game" class="button primary">+ Juego</button>
         </div>
-        <input id="search" class="search" type="search" placeholder="Buscar juego, plataforma o port…">
-        <div id="game-list" class="game-list"></div>
+        <input id="search" class="search-input" type="search" placeholder="Buscar juego, plataforma o port…">
+        <div id="game-list" class="platform-list"></div>
       </aside>
-      <section class="editor-panel">
+      <section class="editor">
         <div id="empty-state" class="empty-state"><h2>Seleccioná un juego</h2><p>Elegí una ficha del catálogo o creá un juego nuevo.</p></div>
         <form id="game-form" hidden>
           <div class="editor-heading">
-            <div><small>CATÁLOGO / EDICIÓN</small><h1 id="editor-title">Juego</h1></div>
+            <div><small class="editor-eyebrow">CATÁLOGO / EDICIÓN</small><h1 id="editor-title">Juego</h1></div>
             <button id="delete-game" type="button" class="button danger">Eliminar juego</button>
           </div>
           <section class="section">
             <h2>Datos del juego</h2>
-            <div class="fields">
+            <div class="admin-game-meta-grid">
               <label>Nombre<input name="name" required></label>
               <label>Slug<input name="slug" required></label>
               <label>Plataforma<input name="platform" list="platform-options"><datalist id="platform-options"></datalist></label>
@@ -62,19 +65,19 @@
               <label>Portada URL<input name="coverUrl" type="url"></label>
               <label>Steam URL<input name="steamUrl" type="url"></label>
               <label>LaunchBox URL<input name="launchboxUrl" type="url"></label>
-              <label class="wide">Descripción<textarea name="description" rows="3"></textarea></label>
+              <label class="field full-width">Descripción<textarea name="description" rows="3"></textarea></label>
             </div>
-            <div class="lookup-row">
+            <div class="autofill-box"><div class="autofill-row">
               <input id="metadata-url" type="url" placeholder="URL de Steam o LaunchBox para obtener metadatos">
               <button id="lookup-metadata" type="button" class="button secondary">Consultar metadatos</button>
               <button id="optimize-cover" type="button" class="button secondary">Optimizar portada</button>
-            </div>
+            </div></div>
           </section>
-          <section class="section">
-            <div class="section-title"><div><h2>Ports</h2><small id="port-count"></small></div><button id="add-port" type="button" class="button secondary">+ Agregar port</button></div>
-            <div id="ports-list" class="ports-list"></div>
+          <section class="section admin-ports-section">
+            <div class="admin-ports-heading"><div><h2>Ports</h2><small id="port-count"></small></div><button id="add-port" type="button" class="button secondary">+ Agregar port</button></div>
+            <div id="ports-list" class="admin-port-grid"></div>
           </section>
-          <div class="save-row">
+          <div class="editor-footer">
             <span id="save-hint">Los cambios se guardan en NAPL-Data.</span>
             <button id="save-game" type="submit" class="button primary">Guardar y publicar</button>
           </div>
@@ -83,8 +86,8 @@
     </section>
   </main>
 
-  <dialog id="community-dialog">
-    <div class="dialog-head"><div><small>DATOS COMUNITARIOS · SUPABASE + GITHUB</small><h2>Comunidad y reportes</h2></div><button id="close-community" class="button quiet">Cerrar</button></div>
+  <dialog id="community-dialog" class="sync-modal">
+    <div class="sync-modal-header"><div><small class="editor-eyebrow">DATOS DE LA COMUNIDAD · SUPABASE + GITHUB</small><h2>Comunidad y reportes</h2></div><button id="close-community" class="button quiet">Cerrar</button></div>
     <p id="community-status" class="muted">Consultando datos…</p>
     <div id="community-data"></div>
   </dialog>
