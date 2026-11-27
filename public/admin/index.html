@@ -45,7 +45,7 @@
           <button id="new-game" class="button primary">+ Juego</button>
         </div>
         <input id="search" class="search-input" type="search" placeholder="Buscar juego, consola o port…">
-        <select id="sync-filter" class="sync-filter" aria-label="Filtrar juegos por sincronización"><option value="all">Todos los juegos</option><option value="unsynced">Sin sync</option><option value="synced">Con sync</option></select>
+        <div id="sync-filter" class="sync-filter-buttons" role="group" aria-label="Filtrar juegos"><button type="button" class="sync-filter-button active" data-sync-filter="all">Todos</button><button type="button" class="sync-filter-button" data-sync-filter="synced">Sync</button><button type="button" class="sync-filter-button" data-sync-filter="unsynced">No sync</button></div>
         <div id="game-list" class="platform-list"></div>
       </aside>
       <section class="editor">
@@ -70,7 +70,7 @@
               <div class="admin-game-meta-grid">
                 
                 <label>Slug<input name="slug" required></label>
-                <label>Consola<input name="platform" list="platform-options"><datalist id="platform-options"></datalist></label>
+                <label>Plataforma<select name="platform" required></select><datalist id="platform-options"></datalist></label>
                 <label>Año<input name="year"></label>
                 <label>Género<input name="genre"></label>
                 <label>Steam URL<input name="steamUrl" type="url"></label>
