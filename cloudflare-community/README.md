@@ -10,9 +10,12 @@ El catálogo, las portadas WebP, la sincronización, los resúmenes públicos y 
 - Database ID: `10427055-5b66-414b-9087-332631601bc1`
 - Worker: `https://napl-community-api.federicoxastro.workers.dev`
 - Subdominio `workers.dev`: habilitado
-- Esquema e índices: aplicados
-- Snapshot inicial de datos de Supabase: importado
-- Pendiente para activar todas las funciones: configurar el secreto original `REPORTER_HASH_SECRET` y el secreto de GitHub Actions `NAPL_COMMUNITY_API_BASE`.
+- Esquema e índices: aplicados y verificados.
+- Snapshot inicial de Supabase: importado; conteos comprobados directamente en D1.
+- Binding D1 `DB`, `GITHUB_DATA_REPO`, `ALLOWED_ORIGINS` y el secret binding `REPORTER_HASH_SECRET`: presentes.
+- GitHub Actions: `NAPL_DATA_GITHUB_TOKEN` y `NAPL_COMMUNITY_API_BASE` comprobados por ejecución; `DISCORD_WEBHOOK_URL` es opcional.
+- Pendiente: prueba funcional externa de `/health`, ratings, popularidad, compatibilidad y reportes antes de retirar Supabase.
+- Nota: Cloudflare no permite leer el valor del secret; hay que conservar el mismo valor original de Supabase para mantener continuidad de hashes y límites anti-spam.
 
 ## 1. Configuración del Worker
 
@@ -22,7 +25,7 @@ El Worker ya está desplegado y enlazado a D1. Las variables públicas están co
 - `GITHUB_DATA_REPO`: `Fe2rr/NAPL-Data`.
 - Binding D1: `DB`.
 
-Configura `REPORTER_HASH_SECRET` como **Secret** del Worker. Debe ser exactamente el mismo valor que utilizaba Supabase para conservar la continuidad de los hashes y los límites anti-spam.
+`REPORTER_HASH_SECRET` ya está creado como **Secret** del Worker. Su valor está oculto por Cloudflare, por lo que no se puede comprobar desde la API; debe coincidir con el valor original de Supabase para conservar la continuidad de los hashes y los límites anti-spam.
 
 Desde el directorio `cloudflare-community` se puede establecer con:
 
@@ -58,12 +61,12 @@ No borres el archivo exportado ni los SQL de importación hasta verificar los co
 En `Fe2rr/Napl-prueba` → Settings → Secrets and variables → Actions → Repository secrets:
 
 - `NAPL_DATA_GITHUB_TOKEN`: ya está configurado y funciona con el workflow de catálogo. Fine-grained PAT con Contents Read and write sobre `Fe2rr/NAPL-Data`.
-- `NAPL_COMMUNITY_API_BASE`: `https://napl-community-api.federicoxastro.workers.dev`.
+- `NAPL_COMMUNITY_API_BASE`: configurado como `https://napl-community-api.federicoxastro.workers.dev` y reconocido por el workflow.
 - `DISCORD_WEBHOOK_URL`: opcional; solo si se quiere enviar el digest de reportes a Discord.
 
 Los workflows no declaran un Environment; por eso estos secretos deben estar en **Repository secrets**, no solamente dentro de un Environment.
 
-El workflow `NAPL community summary & Discord digest` corre cada hora y solo actualiza el JSON estático cuando detecta cambios. Luego solicita el redeploy de GitHub Pages.
+El workflow `NAPL community summary & Discord digest` corre cada hora y solo actualiza el JSON estático cuando detecta cambios. Luego solicita el redeploy de GitHub Pages. Si el Worker responde HTTP 429 por cooldown, el script ahora registra una omisión controlada y termina sin marcar el workflow como error; la siguiente ejecución programada vuelve a intentarlo.
 
 ## 4. Frontend
 
