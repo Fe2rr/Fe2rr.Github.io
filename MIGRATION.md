@@ -1,38 +1,53 @@
-# NAPL Infrastructure Migration — GitHub + Cloudflare Workers & D1 (Sin Tarjeta)
+# NAPL — Arquitectura GitHub + Cloudflare
 
-NAPL ejecuta el sitio público, el panel administrativo, el catálogo JSON, las portadas WebP pre-optimizadas, los resúmenes comunitarios periódicos y toda la automatización pesada en **GitHub**, y utiliza **Cloudflare Workers + D1 (`cloudflare-community/`, sin tarjeta de crédito)** como **único servicio externo** estrictamente para las interacciones comunitarias en tiempo real.
+NAPL utiliza **GitHub Pages, GitHub Actions y Fe2rr/NAPL-Data** para el sitio, el catálogo, las portadas, el panel administrativo y las automatizaciones. El único servicio externo activo para las operaciones comunitarias en tiempo real es **Cloudflare Workers + D1**.
 
-## Arquitectura Optimizada (`0` lecturas en visita pasiva, `<= 250` lecturas por visita interactiva)
+## Arquitectura
 
-1. **GitHub Pages + Repositorio de datos (`Fe2rr/NAPL-Data`)**
-   - `deploy-pages.yml` empaqueta `public/` junto con `catalog.json`, `community-summary.json` y `assets/covers/*` desde `Fe2rr/NAPL-Data`.
-   - En visitas pasivas (home, Spotlight, categorías), el navegador solo consume archivos estáticos en GitHub Pages (`0` llamadas al Worker, `0` lecturas D1).
-2. **GitHub Actions (CORS-free, sin colas ni cron en Cloudflare)**
-   - `.github/workflows/sync-catalog.yml` + `scripts/sync-catalog.mjs` + `lib/catalog-core.mjs`: sincroniza ports contra GitHub/GitLab/Play Store, optimiza portadas a WebP (`cwebp` + `wsrv.nl`) y publica `catalog.json` + `manifest.json`.
-   - `.github/workflows/sync-community-summary.yml` + `scripts/sync-community-summary.mjs`: cada hora descarga `/community-snapshot`, actualiza `assets/data/community-summary.json` en `Fe2rr/NAPL-Data`, re-despliega Pages solo si hubo cambios y envía un resumen agrupado a `DISCORD_WEBHOOK_URL` con los reportes de enlaces pendientes (`/link-reports-pending` + `/ack`).
-   - `.github/workflows/lookup-metadata.yml` + `scripts/lookup-metadata.mjs`: resuelve consultas bajo demanda de LaunchBox, Steam (`library_600x900` / SteamGridDB) y repositorios/Play Store.
-3. **Panel Admin estático por Fine-grained PAT (`public/js/lib/github-admin.js`)**
-   - Autentica al administrador con Fine-grained PAT guardado únicamente en `sessionStorage`, edita `private/catalog-state.json` + `public/assets/data/catalog.json` en `Fe2rr/NAPL-Data` y dispara `workflow_dispatch`.
-4. **Único servicio comunitario externo: `cloudflare-community/` (Cloudflare Workers + D1)**
-   - Ver guía completa de despliegue paso a paso en [`cloudflare-community/README.md`](cloudflare-community/README.md).
-   - Opcional auto-alojado: [`community-server/README.md`](community-server/README.md) (Node 22 + SQLite WAL + Caddy para VPS).
+1. **GitHub Pages**
+   - Sitio público estático.
+   - Catálogo, dispositivos, resúmenes comunitarios y portadas WebP.
+   - Panel administrativo en `https://fe2rr.github.io/Napl-prueba/admin/`.
+2. **GitHub Actions**
+   - `sync-catalog.yml`: sincronización de ports y optimización WebP.
+   - `sync-community-summary.yml`: resumen comunitario y digest de reportes.
+   - `lookup-metadata.yml`: consultas de metadatos y optimización de portadas.
+   - `deploy-pages.yml`: publicación de la web.
+3. **Fe2rr/NAPL-Data**
+   - `private/catalog-state.json`: estado editable y privado.
+   - `public/assets/data/catalog.json`: catálogo público.
+   - `public/assets/data/community-summary.json`: snapshot comunitario estático.
+4. **Cloudflare**
+   - Worker `napl-community-api` + D1 `napl-community`: ratings, popularidad, compatibilidad, reportes y dashboard administrativo.
+   - Workers legacy `napl-admin-api` y `napl-image-optimizer`: se conservan temporalmente por compatibilidad con la versión v5 del sitio de producción.
 
-## Estado actual y pasos pendientes para producción
+## Panel administrativo
 
-### Completado en `Fe2rr/Napl-prueba`
+El panel es una SPA estática de GitHub Pages. Se autentica con un Fine-grained PAT que queda guardado únicamente en `sessionStorage`.
 
-1. `NAPL_DATA_GITHUB_TOKEN` y el acceso de escritura a `Fe2rr/NAPL-Data` están verificados.
-2. `NAPL catalog sync` terminó correctamente con `Import Sheets=false`: 1.262 ports totales, 869 comprobados, 393 omitidos, 9 actualizados y 1 error de origen externo (`Repository access blocked`). El commit de datos fue `19f1772`.
-3. Worker `napl-community-api` y D1 `napl-community` están desplegados. El esquema, índices y conteos de las tablas fueron verificados directamente en D1.
-4. El binding `REPORTER_HASH_SECRET` existe. Su valor no es legible desde la API; confirmar que coincide con el secreto original de Supabase antes de retirar ese servicio.
-5. Los Actions secrets `NAPL_COMMUNITY_API_BASE` y `NAPL_DATA_GITHUB_TOKEN` están siendo reconocidos. La URL comunitaria está configurada en `public/index.html` y `public/js/lib/config.js`.
-6. El frontend carga ratings, popularidad y resumen comunitario desde JSON estático; las visitas pasivas no consultan D1. Las consultas interactivas tienen límites por endpoint.
-7. La sincronización comunitaria trata HTTP 429 por cooldown como una omisión controlada, no como fallo del workflow.
+Permisos requeridos:
+- `Fe2rr/NAPL-Data`: Contents — Read and write.
+- `Fe2rr/Napl-prueba`: Actions — Read and write (para disparar workflows) y acceso de lectura al repositorio.
 
-### Pendiente antes de migrar producción
+Funciones:
+- Crear, editar y eliminar juegos y ports.
+- Guardar estado privado y snapshot público en un commit atómico.
+- Publicar los cambios en GitHub Pages.
+- Ejecutar sincronización del catálogo e importación CSV bajo demanda.
+- Consultar metadatos mediante GitHub Actions.
+- Abrir el dashboard comunitario y revisar reportes consultando el Worker de Cloudflare.
 
-1. Confirmar que el deploy de GitHub Pages posterior al catálogo finalizó correctamente.
-2. Probar desde el sitio `/health`, un voto, registro de popularidad, consulta de compatibilidad y envío de reporte de enlace.
-3. Confirmar el digest de Discord si `DISCORD_WEBHOOK_URL` está configurado.
-4. Confirmar que `REPORTER_HASH_SECRET` conserva el valor original de Supabase.
-5. Mantener Supabase y los Workers antiguos activos hasta completar estas pruebas. No modificar `Fe2rr/Fe2rr.Github.io` ni su rama `main` hasta validar el reemplazo.
+El PAT nunca se envía al Worker comunitario para editar el catálogo. El Worker solo verifica el PAT contra GitHub para autorizar el dashboard.
+
+## Optimización de lecturas
+
+- Visitas pasivas: 0 llamadas al Worker y 0 lecturas D1.
+- Resumen público: JSON estático desde GitHub Pages.
+- Consultas de compatibilidad y operaciones comunitarias: Worker + D1, con límites por endpoint.
+- El dashboard administrativo utiliza consultas acotadas y no forma parte del tráfico normal de visitantes.
+
+## Recursos legacy
+
+No eliminar `napl-admin-api` ni `napl-image-optimizer` mientras la rama `v5` de `Fe2rr/Fe2rr.Github.io` siga dependiendo de ellos. La migración del panel administrativo a GitHub Pages no modifica el sitio de producción.
+
+Supabase y Neon ya no forman parte de la arquitectura de ejecución de este repositorio. La instancia de Supabase debe permanecer disponible hasta completar las pruebas funcionales finales y confirmar la continuidad de `REPORTER_HASH_SECRET`.
