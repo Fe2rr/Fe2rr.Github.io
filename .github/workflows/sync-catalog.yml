@@ -79,10 +79,10 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
           git add private/catalog-state.json public/assets/data/catalog.json public/assets/covers
           if ! git diff --cached --quiet; then
             git commit -m "NAPL: sync catalog and static WebP covers"
+            git pull --rebase origin main
             git push origin HEAD:main
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
