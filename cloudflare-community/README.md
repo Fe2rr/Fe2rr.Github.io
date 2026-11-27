@@ -78,13 +78,14 @@ El catálogo se carga desde los archivos de GitHub Pages. No se usa el antiguo f
 
 | Operación pública | Máximo de filas |
 |---|---:|
-| Ratings | 250 |
-| Popularidad | 250 |
-| Búsqueda de compatibilidad | 200 |
-| Compatibilidad de hasta 10 juegos | 220 |
+| Resumen estático de ratings, popularidad y compatibilidad | 0 |
+| Compatibilidad detallada de hasta 10 juegos | <= 220 |
+| Consulta del voto del usuario para un juego | 1 |
+| Endpoint de ratings de respaldo | <= 30 |
+| Endpoint de popularidad de respaldo | <= 30 |
 | Registro de visita | 0 lecturas previas (upsert condicional) |
 
-Los resúmenes estáticos públicos no consumen lecturas D1. El snapshot administrativo ejecutado por GitHub Actions es una tarea de fondo, no una petición de visitante.
+La web no consulta los rankings completos en D1: los descarga como JSON estático desde GitHub. Si un visitante abre la compatibilidad detallada de un juego, esa consulta queda acotada a 220 filas; la consulta de su voto individual agrega una sola fila. Los endpoints de respaldo están limitados a 30 filas y no los usa el frontend normal. El snapshot administrativo ejecutado por GitHub Actions es una tarea de fondo, no una petición de visitante.
 
 ## 6. Verificación
 
