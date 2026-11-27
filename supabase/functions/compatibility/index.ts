@@ -97,8 +97,8 @@ Deno.serve(async (request: Request) => {
         const deviceId = String(url.searchParams.get("device_id") || "").trim().slice(0, 200);
         const soc = String(url.searchParams.get("soc") || "").trim().slice(0, 120);
         const query = String(url.searchParams.get("q") || "").trim().slice(0, 120);
-        const rawLimit = Number(url.searchParams.get("limit") || 500);
-        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 1000) : 500;
+        const rawLimit = Number(url.searchParams.get("limit") || 200);
+        const limit = Number.isFinite(rawLimit) ? Math.min(Math.max(Math.trunc(rawLimit), 1), 200) : 200;
 
         if (!deviceId && !soc && !query) {
           return json({ success: true, reports: [] }, 200);
