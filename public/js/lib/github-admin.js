@@ -2,7 +2,7 @@
  * NAPL — GITHUB PAT ADMIN CLIENT
  *
  * Allows the static Admin SPA (napl-admin) to authenticate with a
- * Fine-grained Personal Access Token (stored only in sessionStorage),
+ * Fine-grained Personal Access Token (stored locally in this browser),
  * read/write Fe2rr/NAPL-Data directly via the GitHub REST API using
  * atomic Git Data commits, dispatch GitHub Actions workflows for sync
  * or CORS-free metadata lookup, and query the single community server's
@@ -39,15 +39,34 @@ function getSessionConfig() {
 }
 
 export function getStoredGithubPat() {
+    // Persist the PAT on this browser so the admin session survives tab/browser restarts.
+    // Migrate an existing sessionStorage token once, without exposing it in repository files.
     try {
-        return sessionStorage.getItem(PAT_SESSION_KEY) || "";
+        const persistent = localStorage.getItem(PAT_SESSION_KEY);
+        if (persistent) return persistent;
+
+        const legacy = sessionStorage.getItem(PAT_SESSION_KEY) || "";
+        if (legacy) {
+            try {
+                localStorage.setItem(PAT_SESSION_KEY, legacy);
+                sessionStorage.removeItem(PAT_SESSION_KEY);
+            } catch {
+                // Keep the legacy session token usable if persistent storage is unavailable.
+            }
+        }
+        return legacy;
     } catch {
-        return "";
+        try {
+            return sessionStorage.getItem(PAT_SESSION_KEY) || "";
+        } catch {
+            return "";
+        }
     }
 }
 
 export function clearGithubSession() {
     try {
+        localStorage.removeItem(PAT_SESSION_KEY);
         sessionStorage.removeItem(PAT_SESSION_KEY);
         sessionStorage.removeItem(REPO_CFG_SESSION_KEY);
     } catch {
@@ -57,7 +76,8 @@ export function clearGithubSession() {
 
 function saveGithubSession(pat, configPatch = {}) {
     try {
-        sessionStorage.setItem(PAT_SESSION_KEY, pat);
+        localStorage.setItem(PAT_SESSION_KEY, pat);
+        sessionStorage.removeItem(PAT_SESSION_KEY);
         if (Object.keys(configPatch).length > 0) {
             const nextCfg = { ...getSessionConfig(), ...configPatch };
             sessionStorage.setItem(REPO_CFG_SESSION_KEY, JSON.stringify(nextCfg));
