@@ -191,8 +191,8 @@ html[data-theme="light"] .home-feature-cta.is-gold:hover {
 @media (max-width: 680px) {
   .home-banners {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    margin-bottom: 18px;
+    gap: 6px;
+    margin-bottom: 16px;
   }
 
   .home-feature-banner {
@@ -278,8 +278,8 @@ html[data-theme="light"] .home-feature-cta.is-gold:hover {
   display: flex;
   flex-direction: column;
   align-items: stretch;
-  gap: 12px;
-  margin-bottom: 24px;
+  gap: 8px;
+  margin-bottom: 20px;
 }
 
 .category-filters-accordion {
@@ -380,13 +380,13 @@ html[data-theme="light"] .home-feature-cta.is-gold:hover {
 
 .category-filters {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr));
   align-items: stretch;
-  gap: 8px;
+  gap: 3px;
 }
 
 .category-filters.has-clear {
-  grid-template-columns: repeat(4, minmax(0, 1fr)) auto;
+  grid-template-columns: minmax(0, 2fr) repeat(3, minmax(0, 1fr)) auto;
 }
 
 .category-filters[hidden] {
@@ -969,7 +969,7 @@ html[data-theme="light"] .home-feature-cta.is-gold:hover {
 
   .category-filters,
   .category-filters.has-clear {
-    gap: 8px;
+    gap: 3px;
   }
 
   .category-filter-trigger {
