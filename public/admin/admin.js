@@ -75,14 +75,14 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
-let openPlatforms = new Set();
+let openPlatforms = new Set();\nlet activeSyncFilter = "all";
 function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
 function renderGameList() {
   const games = state?.catalog?.games || [];
   const q = $("search").value.trim().toLowerCase();
-  const mode = $("sync-filter")?.value || "all";
+  const mode = activeSyncFilter;
   const platforms = [...new Set([...(state?.catalog?.platformOrder || []), ...games.map(g=>g.platform).filter(Boolean)])];
   const filtered = games.filter(game => {
     const synced = gameSyncStatus(game);
@@ -180,7 +180,7 @@ function readDraft() {
     card.querySelectorAll("[data-port-field]").forEach((field) => {
       next[field.dataset.portField] = field.value.trim();
     });
-    if (!next.portId) next.portId = game.slug + "-port-" + (index + 1);
+    delete next.year;\n    delete next.works;\n    if (!next.portId) next.portId = game.slug + "-port-" + (index + 1);
     return next;
   });
   game.platforms = game.platform ? [game.platform] : [];
@@ -286,7 +286,7 @@ $("logout-button").addEventListener("click", () => {
   clearGithubSession(); pat = ""; state = null; showLogin();
 });
 $("search").addEventListener("input", renderGameList);
-$("sync-filter").addEventListener("change", renderGameList);
+$("sync-filter").addEventListener("click", (event) => {\n  const button = event.target.closest("[data-sync-filter]");\n  if (!button) return;\n  activeSyncFilter = button.dataset.syncFilter;\n  $("sync-filter").querySelectorAll("[data-sync-filter]").forEach(item=>item.classList.toggle("active",item===button));\n  renderGameList();\n});\n$("game-form").elements.namedItem("platform").addEventListener("change", (event) => {\n  if (event.target.value !== "__add_new__") return;\n  const name = prompt("Nombre de la nueva plataforma:");\n  if (!name?.trim()) { event.target.value = currentGame()?.platform || ""; return; }\n  const platform = name.trim();\n  if (!state.catalog.platformOrder.includes(platform)) state.catalog.platformOrder.push(platform);\n  event.target.insertAdjacentHTML("beforeend", `<option value="${esc(platform)}">${esc(platform)}</option>`);\n  event.target.value = platform;\n  renderGameList();\n});
 $("game-list").addEventListener("toggle", (event) => {
   const accordion = event.target.closest("[data-platform-accordion]");
   if (!accordion) return;
