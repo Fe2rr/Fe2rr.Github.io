@@ -79,16 +79,17 @@ let activeConsoleByMaker = {};\nfunction gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
 function platformManufacturer(platform) {
-  const value = String(platform || "").toLowerCase().replace(/[_-]+/g, " ");
-  const rules = [
-    [/nintendo|\\bnes\\b|\\bsnes\\b|super famicom|game ?boy|gamecube|wii|switch|virtual boy/, "Nintendo"],
-    [/playstation|\\bps[1-5]\\b|\\bpsp\\b|vita|ps vita/, "Sony"],
-    [/xbox/, "Microsoft"],
-    [/sega|megadrive|mega drive|genesis|dreamcast|saturn|game gear|master system/, "Sega"],
-    [/atari|lynx|jaguar/, "Atari"], [/neogeo|neo geo|\\bsnk\\b/, "SNK"],
-    [/pc|windows|steam|dos|linux/, "PC"], [/commodore|amiga|c64/, "Commodore"], [/nec|pc engine|turbografx/, "NEC"]
-  ];
-  return rules.find(([pattern]) => pattern.test(value))?.[1] || "Otros";
+  const value = String(platform || "").toLowerCase().replace(/[_-]+/g, " ").trim();
+  if (value.includes("nintendo") || ["nes","famicom","snes","super nintendo","super famicom","game boy","gameboy","gamecube","wii","wii u","switch","virtual boy"].some(x=>value===x || value.startsWith(x+" "))) return "Nintendo";
+  if (value.includes("playstation") || value.includes("sony") || ["ps1","ps2","ps3","ps4","ps5","psp","ps vita","vita"].some(x=>value===x || value.startsWith(x+" "))) return "Sony";
+  if (value.includes("xbox") || value.includes("microsoft")) return "Microsoft";
+  if (value.includes("sega") || ["megadrive","mega drive","genesis","dreamcast","saturn","game gear","master system","sg-1000","game gear"].some(x=>value===x || value.startsWith(x+" "))) return "Sega";
+  if (value.includes("atari") || ["lynx","jaguar"].some(x=>value===x || value.startsWith(x+" "))) return "Atari";
+  if (value.includes("neogeo") || value.includes("neo geo") || value.includes("snk")) return "SNK";
+  if (["pc","windows","steam","dos","linux"].some(x=>value===x || value.startsWith(x+" "))) return "PC";
+  if (value.includes("commodore") || value.includes("amiga") || value.includes("c64")) return "Commodore";
+  if (value.includes("nec") || value.includes("pc engine") || value.includes("turbografx")) return "NEC";
+  return "Otros";
 }
 function renderGameList() {
   const games = state?.catalog?.games || [];
