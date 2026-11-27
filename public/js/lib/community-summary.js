@@ -1,12 +1,11 @@
 /*
  * NAPL — STATIC COMMUNITY SUMMARY LOADER
  *
- * Reads the pre-aggregated community snapshot published to GitHub Pages
- * (assets/data/community-summary.json) so passive visits trigger zero Worker
- * calls and zero database reads.
+ * Reads the pre-aggregated snapshot bundled from Fe2rr/NAPL-Data by GitHub Actions.
+ * Passive visits trigger zero Worker calls and zero D1 reads.
  */
 
-const SUMMARY_TTL_MS = 5 * 60 * 1000;
+const SUMMARY_TTL_MS = 15 * 60 * 1000;
 
 let cachedSummary = null;
 let cachedAt = 0;
