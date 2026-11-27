@@ -9,7 +9,7 @@ compatibility_flags = []
 GITHUB_DATA_REPO = "Fe2rr/NAPL-Data"
 ALLOWED_ORIGINS = "https://fe2rr.github.io,https://napl-admin.pages.dev,http://localhost:3000,http://127.0.0.1:3000"
 
-# After creating the D1 database (`npx wrangler d1 create napl-community`), replace database_id below:
+# D1 database created in Cloudflare; keep this ID synchronized with the dashboard:
 [[d1_databases]]
 binding = "DB"
 database_name = "napl-community"
