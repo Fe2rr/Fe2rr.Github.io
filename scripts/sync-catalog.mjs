@@ -35,10 +35,10 @@ const login=await retry(()=>call("login","POST",{password:env.ADMIN_PASSWORD}),"
 token=login.token;if(!token)throw new Error("Worker did not issue an admin session.");
 console.log("Authenticated against the existing catalog logic.");
 
-if(process.env.IMPORT_SHEETS!=="false"){
+if(process.env.IMPORT_SHEETS==="true"){
  const imported=await retry(()=>call("import-sheets","POST",{compact:true}),"Google Sheets import");
  console.log("Sheets import:",JSON.stringify(imported.summary||{}));
-}else console.log("Google Sheets import skipped.");
+}else console.log("Google Sheets import skipped (safe default).");
 
 let offset=0,totalChecked=0,totalUpdated=0,totalErrors=0,batches=0;
 while(true){
