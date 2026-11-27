@@ -75,7 +75,7 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
-let openPlatforms = new Set();\nlet activeSyncFilter = "all";
+let openPlatforms = new Set();\nlet activeSyncFilter = "all";\nlet activeSyncFilter = "all";
 function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
@@ -180,7 +180,7 @@ function readDraft() {
     card.querySelectorAll("[data-port-field]").forEach((field) => {
       next[field.dataset.portField] = field.value.trim();
     });
-    delete next.year;\n    delete next.works;\n    if (!next.portId) next.portId = game.slug + "-port-" + (index + 1);
+    delete next.year;\n    delete next.works;\n    delete next.year;\n    delete next.works;\n    if (!next.portId) next.portId = game.slug + "-port-" + (index + 1);
     return next;
   });
   game.platforms = game.platform ? [game.platform] : [];
