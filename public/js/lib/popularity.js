@@ -3,7 +3,7 @@ import { createSlug } from "./helpers.js";
 import { POPULARITY_API_BASE } from "./config.js";
 import { loadCommunitySummary } from "./community-summary.js";
 
-const POPULARITY_CACHE_TTL_MS = 5 * 60 * 1000;
+const POPULARITY_CACHE_TTL_MS = 15 * 60 * 1000;
 const VISIT_CLIENT_DEDUP_MS = 20 * 1000;
 const popularByPeriod = new Map();
 const popularFetchedAt = new Map();
@@ -13,21 +13,6 @@ const recentVisitSentAt = new Map();
 function normalizePopularityKey(value) {
     const key = createSlug(value || "");
     return /^[a-z0-9][a-z0-9-]{0,179}$/.test(key) ? key : "";
-}
-
-async function requestPopularity(period) {
-    const response = await fetch(
-        `${POPULARITY_API_BASE}?period=${encodeURIComponent(period)}`,
-        { method: "GET", cache: "default" }
-    );
-    if (!response.ok) {
-        throw new Error(`Popularity API returned HTTP ${response.status}.`);
-    }
-    const data = await response.json();
-    if (!data?.success || !Array.isArray(data.games)) {
-        throw new Error("Invalid popularity response.");
-    }
-    return data.games;
 }
 
 function buildPopularityMap(items) {
@@ -73,11 +58,9 @@ export async function ensurePopularPeriod(period = "alltime") {
             return popularByPeriod.get(normalized) || previous;
         }
 
-        const items = await requestPopularity(normalized);
-        const map = buildPopularityMap(items);
-        popularByPeriod.set(normalized, map);
-        popularFetchedAt.set(normalized, Date.now());
-        return map;
+        // Popularity is a GitHub-hosted static snapshot. Never read the full
+        // ranking from D1 on a passive visit.
+        return previous;
     })()
         .catch((error) => {
             console.warn(`Could not load ${normalized} popularity:`, error);
@@ -130,8 +113,10 @@ export function registerGameVisit(popularityKey) {
         })
         .then((result) => {
             if (result?.counted) {
-                popularByPeriod.clear();
-                popularFetchedAt.clear();
+                for (const period of ["week", "month", "alltime"]) {
+                    const map = popularByPeriod.get(period);
+                    if (map) map.set(game, (map.get(game) || 0) + 1);
+                }
             }
         })
         .catch((error) =>
