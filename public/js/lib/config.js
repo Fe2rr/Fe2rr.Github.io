@@ -29,7 +29,7 @@ export const ADMIN_DASHBOARD_API_URL = `${COMMUNITY_API_BASE}/admin-dashboard`;
 
 export const GITHUB_ADMIN_DEFAULTS = {
     dataRepo: "Fe2rr/NAPL-Data",
-    codeRepo: "Fe2rr/Napl-prueba",
+    codeRepo: "Fe2rr/Fe2rr.github.io",
     branch: "main",
 };
 
