@@ -1357,9 +1357,10 @@ async function runSyncBatch(env, options = {}) {
     delete stage.lastErrorAt;
     delete stage.lastErrorOffset;
     const savedStage = await writeSyncStage(env, stage, loaded.sha);
-    return { source, staged: true, stageStatus: stage.status, totalSyncPorts: ports.length,
+    const result = { source, staged: true, stageStatus: stage.status, totalSyncPorts: ports.length,
       checkedCount, updatedCount, downCount, errorCount, nextOffset: stage.nextOffset,
       hasMore: stage.status !== "completed", details, syncedAt: now, stageCommit: savedStage.commit || "" };
+    return options.returnState ? { sync: result, state } : result;
   }
 
   let checkedCount = 0, updatedCount = 0, downCount = 0, errorCount = 0;
