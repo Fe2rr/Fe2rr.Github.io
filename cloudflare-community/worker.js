@@ -193,7 +193,7 @@ async function verifyGithubAdminPat(req, env) {
   }
 }
 
-async function getRatingsSummary(db, maxPorts = 249) {
+async function getRatingsSummary(db, maxPorts = 29) {
   const meta = await db
     .prepare("SELECT total_votes, total_sum FROM rating_global_meta WHERE id = 1")
     .first();
@@ -244,7 +244,7 @@ async function handleRatings(req, url, env, origin) {
       return json(origin, env, 200, { votes });
     }
 
-    return json(origin, env, 200, await getRatingsSummary(db, 249), "public, max-age=60, s-maxage=300");
+    return json(origin, env, 200, await getRatingsSummary(db, 29), "public, max-age=60, s-maxage=300");
   }
 
   if (req.method !== "POST") {
@@ -292,8 +292,17 @@ async function handleRatings(req, url, env, origin) {
   }
 
   if (action === "my-votes") {
+    const portId = typeof body.port_id === "string" ? body.port_id.trim() : "";
+    if (portId) {
+      if (!PORT_ID_RE.test(portId)) return json(origin, env, 400, { error: "invalid_port_id" });
+      const row = await db
+        .prepare("SELECT stars FROM rating_votes WHERE token_hash = ? AND port_id = ?")
+        .bind(tokenHash, portId)
+        .first();
+      return json(origin, env, 200, { votes: row ? { [portId]: Number(row.stars) } : {} });
+    }
     const { results } = await db
-      .prepare("SELECT port_id, stars FROM rating_votes WHERE token_hash = ? LIMIT 250")
+      .prepare("SELECT port_id, stars FROM rating_votes WHERE token_hash = ? ORDER BY updated_at DESC LIMIT 30")
       .bind(tokenHash)
       .all();
     const votes = {};
@@ -411,7 +420,7 @@ async function handleRatings(req, url, env, origin) {
   return json(origin, env, 404, { error: "not_found" });
 }
 
-async function getPopularityPeriod(db, period) {
+async function getPopularityPeriod(db, period, maxRows = 30) {
   const weekStart = utcWeekStart();
   const monthStart = utcMonthStart();
   let rows = [];
@@ -423,8 +432,9 @@ async function getPopularityPeriod(db, period) {
          FROM game_popularity
          WHERE all_time_visits > 0
          ORDER BY all_time_visits DESC, game_key ASC
-         LIMIT 250`
+         LIMIT ?`
       )
+      .bind(maxRows)
       .all();
     rows = res.results || [];
   } else if (period === "month") {
@@ -434,9 +444,9 @@ async function getPopularityPeriod(db, period) {
          FROM game_popularity
          WHERE month_start = ? AND month_visits > 0
          ORDER BY month_visits DESC, game_key ASC
-         LIMIT 250`
+         LIMIT ?`
       )
-      .bind(monthStart)
+      .bind(monthStart, maxRows)
       .all();
     rows = res.results || [];
   } else {
@@ -446,9 +456,9 @@ async function getPopularityPeriod(db, period) {
          FROM game_popularity
          WHERE week_start = ? AND week_visits > 0
          ORDER BY week_visits DESC, game_key ASC
-         LIMIT 250`
+         LIMIT ?`
       )
-      .bind(weekStart)
+      .bind(weekStart, maxRows)
       .all();
     rows = res.results || [];
   }
@@ -933,9 +943,9 @@ async function handleCommunitySnapshot(req, env, origin) {
   const db = env.DB;
   const ratings = await getRatingsSummary(db, 1000);
   const [week, month, alltime] = await Promise.all([
-    getPopularityPeriod(db, "week"),
-    getPopularityPeriod(db, "month"),
-    getPopularityPeriod(db, "alltime"),
+    getPopularityPeriod(db, "week", 250),
+    getPopularityPeriod(db, "month", 250),
+    getPopularityPeriod(db, "alltime", 250),
   ]);
 
   const compatRes = await db
