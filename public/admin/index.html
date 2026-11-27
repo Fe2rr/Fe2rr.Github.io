@@ -14,11 +14,11 @@
     <form id="login-form" class="login-card">
       <div class="brand">NAPL <span>ADMIN</span></div>
       <h1>Panel de administración</h1>
-      <p>Acceso directo a GitHub. El token permanece en la sesión del navegador y no se envía a ningún servidor intermedio.</p>
+      <p>Acceso directo a GitHub. El token permanece en la sesión del navegador. Solo se envía a GitHub y a Supabase para validar permisos y consultar el panel comunitario; no se almacena permanentemente.</p>
       <label for="github-pat">GitHub Fine-grained PAT</label>
       <input id="github-pat" type="password" autocomplete="off" spellcheck="false" required placeholder="github_pat_…">
       <button class="button primary full" type="submit">Conectar con GitHub</button>
-      <p class="hint">Permisos necesarios: Contents Read and write en Fe2rr/NAPL-Data y Actions Read and write en Fe2rr/Napl-prueba.</p>
+      <p class="hint">Permisos necesarios: Contents Read and write en Fe2rr/NAPL-Data y Actions Read and write en Fe2rr/Fe2rr.github.io.</p>
       <p id="login-message" class="message" role="status"></p>
     </form>
   </section>
@@ -84,7 +84,7 @@
   </main>
 
   <dialog id="community-dialog">
-    <div class="dialog-head"><div><small>DATOS COMUNITARIOS · CLOUDFLARE D1</small><h2>Comunidad y reportes</h2></div><button id="close-community" class="button quiet">Cerrar</button></div>
+    <div class="dialog-head"><div><small>DATOS COMUNITARIOS · SUPABASE + GITHUB</small><h2>Comunidad y reportes</h2></div><button id="close-community" class="button quiet">Cerrar</button></div>
     <p id="community-status" class="muted">Consultando datos…</p>
     <div id="community-data"></div>
   </dialog>
