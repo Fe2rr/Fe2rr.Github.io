@@ -64,6 +64,7 @@ function normalizeState(value) {
   next.catalog.games = Array.isArray(next.catalog.games) ? next.catalog.games : [];
   for (const game of next.catalog.games) {
     if (!Array.isArray(game.ports)) game.ports = [];
+    delete game.manufacturer;
   }
   next.syncCursor = Number(next.syncCursor) || 0;
   next.syncLog = Array.isArray(next.syncLog) ? next.syncLog : [];
@@ -130,7 +131,8 @@ function renderGameList() {
 function detectMetadataSource(rawUrl) {
   let url;
   try { url = new URL(rawUrl); } catch { throw new Error("El enlace no es una URL válida."); }
-  const host = url.hostname.toLowerCase().replace(/^www\\./, "");
+  const rawHost = url.hostname.toLowerCase();
+  const host = rawHost.startsWith("www.") ? rawHost.slice(4) : rawHost;
   if (host === "store.steampowered.com" || host === "steamcommunity.com") return "steam";
   if (host === "launchbox-app.com" || host.endsWith(".launchbox-app.com")) return "launchbox";
   if (host === "itch.io" || host.endsWith(".itch.io")) return "itch";
@@ -302,6 +304,8 @@ $("logout-button").addEventListener("click", () => {
 $("search").addEventListener("input", renderGameList);
 $("sync-filter").addEventListener("change", renderGameList);
 $("game-list").addEventListener("click", (event) => {
+  const tab = event.target.closest("[data-console-tab]");
+  if (tab) { activeConsoleByMaker[tab.dataset.maker] = tab.dataset.consoleTab; renderGameList(); return; }
   const addButton = event.target.closest("[data-add-category]");
   if (addButton) {
     if (currentGame()) readDraft();
@@ -382,9 +386,9 @@ $("close-community").addEventListener("click", () => $("community-dialog").close
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
   if (!url) return notice("Ingresá la URL del juego.", "error");
-  const mode = detectMetadataSource(url);
   setBusy(true, "Consultando metadatos con GitHub Actions…");
   try {
+    const mode = detectMetadataSource(url);
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
     const game = readDraft();
     const payload = data?.data || data;
