@@ -19,7 +19,7 @@ jobs:
           node-version: 22
       - name: Check JavaScript syntax
         run: |
-          find public/js scripts lib cloudflare cloudflare-community -type f \\( -name '*.js' -o -name '*.mjs' \\) -print0 | xargs -0 -n1 node --check
+          find public/js scripts lib cloudflare cloudflare-community -type f \( -name '*.js' -o -name '*.mjs' \) -print0 | xargs -0 -n1 node --check
       - name: Verify static admin entrypoints
         run: |
           test -s public/admin/index.html
