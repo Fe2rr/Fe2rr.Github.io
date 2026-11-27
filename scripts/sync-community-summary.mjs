@@ -44,7 +44,7 @@ export function buildDiscordDigestPayload(reports) {
 }
 
 export async function syncCommunitySummary({
-  apiBase = process.env.NAPL_COMMUNITY_API_BASE || "",
+  apiBase = process.env.NAPL_COMMUNITY_API_BASE || "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/community-sync",
   token = process.env.NAPL_DATA_GITHUB_TOKEN || process.env.GITHUB_TOKEN || "",
   dataDir = process.env.NAPL_DATA_DIR || "data",
   discordWebhookUrl = process.env.DISCORD_WEBHOOK_URL || "",
@@ -65,7 +65,7 @@ export async function syncCommunitySummary({
     Authorization: `Bearer ${token}`,
   };
 
-  // 1. Fetch pre-aggregated public community snapshot from Cloudflare Worker + D1
+  // 1. Fetch pre-aggregated public community snapshot from Supabase Edge Function + Postgres
   const snapshotRes = await fetchImpl(`${cleanBase}/community-snapshot`, {
     method: "GET",
     headers,
