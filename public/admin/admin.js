@@ -75,7 +75,8 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
-let activeConsoleByMaker = {};\nfunction gameSyncStatus(game) {
+let activeConsoleByMaker = {};
+function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
 function platformManufacturer(platform) {
@@ -158,7 +159,8 @@ function renderEditor() {
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
     <article class="port-card" data-port-card="${i}">
       <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
-      <div class="port-source-row">${portField(i,"url","Enlace del port",port.url,"url")}<button type="button" class="button secondary" data-inspect-port="${i}">Obtener datos del enlace</button></div>\n      <details class="port-data-details"><summary>Datos del port</summary><div class="port-fields">
+      <div class="port-source-row">${portField(i,"url","Enlace del port",port.url,"url")}<button type="button" class="button secondary" data-inspect-port="${i}">Obtener datos del enlace</button></div>
+      <details class="port-data-details"><summary>Datos del port</summary><div class="port-fields">
         ${portField(i,"project","Proyecto",port.project)}
         ${portField(i,"developer","Desarrollador",port.developer)}
         ${portField(i,"year","Año",port.year)}
