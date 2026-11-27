@@ -55,8 +55,21 @@ async function inspectItchPage(rawUrl) {
   const response = await fetch(target.toString(), {headers:{"User-Agent":"Mozilla/5.0 NAPL metadata lookup","Accept":"text/html"}});
   if (!response.ok) throw new Error("itch.io respondió HTTP " + response.status + ".");
   const html = await response.text();
-  const meta = (key, attr="property") => {
-    const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\let output = null;
+  const readMeta = (pattern) => {
+    const match = html.match(pattern);
+    return match ? match[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim() : "";
+  };
+  const name = readMeta(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
+    (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/<[^>]+>/g, "").trim();
+  if (!name) throw new Error("No se pudo obtener el título de itch.io.");
+  return {
+    name,
+    coverUrl: readMeta(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i),
+    description: readMeta(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i),
+    itchUrl: target.toString()
+  };
+}
+let output = null;
 let fatalError = null;
 ");
     const patterns = [
