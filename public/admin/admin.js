@@ -75,22 +75,9 @@ function renderAll() {
   renderEditor();
   $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
 }
-let activeConsoleByMaker = {};
+let openPlatforms = new Set();
 function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
-}
-function platformManufacturer(platform) {
-  const value = String(platform || "").toLowerCase().replace(/[_-]+/g, " ").trim();
-  if (value.includes("nintendo") || ["nes","famicom","snes","super nintendo","super famicom","game boy","gameboy","gamecube","wii","wii u","switch","virtual boy"].some(x=>value===x || value.startsWith(x+" "))) return "Nintendo";
-  if (value.includes("playstation") || value.includes("sony") || ["ps1","ps2","ps3","ps4","ps5","psp","ps vita","vita"].some(x=>value===x || value.startsWith(x+" "))) return "Sony";
-  if (value.includes("xbox") || value.includes("microsoft")) return "Microsoft";
-  if (value.includes("sega") || ["megadrive","mega drive","genesis","dreamcast","saturn","game gear","master system","sg-1000","game gear"].some(x=>value===x || value.startsWith(x+" "))) return "Sega";
-  if (value.includes("atari") || ["lynx","jaguar"].some(x=>value===x || value.startsWith(x+" "))) return "Atari";
-  if (value.includes("neogeo") || value.includes("neo geo") || value.includes("snk")) return "SNK";
-  if (["pc","windows","steam","dos","linux"].some(x=>value===x || value.startsWith(x+" "))) return "PC";
-  if (value.includes("commodore") || value.includes("amiga") || value.includes("c64")) return "Commodore";
-  if (value.includes("nec") || value.includes("pc engine") || value.includes("turbografx")) return "NEC";
-  return "Otros";
 }
 function renderGameList() {
   const games = state?.catalog?.games || [];
@@ -104,32 +91,20 @@ function renderGameList() {
     return [game.name,game.slug,game.platform,...(game.ports||[]).flatMap(p=>[p.project,p.developer,p.portId,p.url,p.githubRepo])].join(" ").toLowerCase().includes(q);
   });
   $("catalog-count").textContent = filtered.length + " / " + games.length + " juegos · " + games.reduce((n,g)=>n+(g.ports||[]).length,0) + " ports";
-  const groups = new Map();
-  for (const platform of platforms) {
-    const maker = platformManufacturer(platform);
-    if (!groups.has(maker)) groups.set(maker, []);
-    groups.get(maker).push(platform);
-  }
-  for (const game of filtered) {
-    const platform = game.platform || "Sin consola";
-    const maker = platformManufacturer(platform);
-    if (!groups.has(maker)) groups.set(maker, []);
-    if (!groups.get(maker).includes(platform)) groups.get(maker).push(platform);
-  }
-  $("game-list").innerHTML = [...groups.entries()].map(([maker, consoles]) => {
-    const active = consoles.includes(activeConsoleByMaker[maker]) ? activeConsoleByMaker[maker] : consoles[0];
-    activeConsoleByMaker[maker] = active;
-    const tabs = consoles.map(platform=>`<button type="button" role="tab" aria-selected="${platform===active}" class="console-tab ${platform===active?"active":""}" data-console-tab="${esc(platform)}" data-maker="${esc(maker)}">${esc(platform)}</button>`).join("");
-    const entries = filtered.filter(game=>(game.platform||"Sin consola")===active);
-    const ordered = [...entries].sort((x,y)=>Number(gameSyncStatus(x))-Number(gameSyncStatus(y))||String(x.name).localeCompare(String(y.name)));
-    return `<section class="maker-group"><h3 class="maker-heading">${esc(maker)}</h3>
-      <div class="console-tabs" role="tablist" aria-label="${esc(maker)}">${tabs}</div>
-      <div class="console-tab-content"><div class="console-content-heading"><strong>${esc(active)}</strong><button type="button" class="button secondary category-add" data-add-category="${esc(active)}">+ Juego</button></div>
-      ${ordered.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Con sync":"Sin sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta consola.</p>'}
-      </div></section>`;
+  const orderedPlatforms = [...platforms, ...[...new Set(filtered.map(g=>g.platform).filter(Boolean))].filter(p=>!platforms.includes(p))];
+  $("game-list").innerHTML = orderedPlatforms.map(platform => {
+    const entries = filtered.filter(game=>game.platform===platform);
+    const isOpen = openPlatforms.has(platform);
+    return `<details class="platform-accordion" data-platform-accordion="${esc(platform)}" ${isOpen?"open":""}>
+      <summary><span>${esc(platform)}</span><span class="platform-summary-meta">${entries.length} juegos</span></summary>
+      <div class="platform-accordion-content">
+        <div class="platform-content-heading"><strong>${esc(platform)}</strong><button type="button" class="button secondary category-add" data-add-port-platform="${esc(platform)}">+ Port</button></div>
+        ${entries.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Sync":"No sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta plataforma.</p>'}
+      </div></details>`;
   }).join("") || '<p class="muted">No hay resultados.</p>';
-  $("platform-options").innerHTML = platforms.map(p=>`<option value="${esc(p)}"></option>`).join("");
+  $("platform-options").innerHTML = orderedPlatforms.map(p=>`<option value="${esc(p)}"></option>`).join("");
 }
+
 function detectMetadataSource(rawUrl) {
   let url;
   try { url = new URL(rawUrl); } catch { throw new Error("El enlace no es una URL válida."); }
@@ -147,15 +122,22 @@ function renderEditor() {
   if (!game) return;
   $("editor-title").textContent = game.name || "Nuevo juego";
   const form = $("game-form");
-  for (const key of ["name","slug","platform","year","genre","coverUrl","steamUrl","launchboxUrl","description"]) {
+  for (const key of ["name","slug","platform","year","genre","coverUrl","description"]) {
     const field = form.elements.namedItem(key);
     if (field) field.value = game[key] ?? "";
   }
-  $("metadata-url").value = game.steamUrl || game.launchboxUrl || game.itchUrl || "";
+  const metadataUrl = game.steamUrl || game.launchboxUrl || game.itchUrl || "";
+  $("metadata-url").value = metadataUrl;
+  $("metadata-url").dataset.source = game.steamUrl ? "steam" : game.launchboxUrl ? "launchbox" : game.itchUrl ? "itch" : "";
   const preview = $("game-cover-preview");
   preview.src = game.coverUrl || "";
   preview.hidden = !game.coverUrl;
   $("port-count").textContent = (game.ports || []).length + " ports";
+  const platformSelect = form.elements.namedItem("platform");
+  const platforms = [...new Set([...(state?.catalog?.platformOrder||[]),...(state?.catalog?.games||[]).map(g=>g.platform).filter(Boolean)])];
+  platformSelect.innerHTML = platforms.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("") + '<option value="__add_new__">＋ Agregar nueva plataforma…</option>';
+  if (game.platform && !platforms.includes(game.platform)) platformSelect.insertAdjacentHTML("afterbegin",`<option value="${esc(game.platform)}">${esc(game.platform)}</option>`);
+  platformSelect.value = game.platform || "";
   $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
     <article class="port-card" data-port-card="${i}">
       <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
@@ -163,11 +145,9 @@ function renderEditor() {
       <details class="port-data-details"><summary>Datos del port</summary><div class="port-fields">
         ${portField(i,"project","Proyecto",port.project)}
         ${portField(i,"developer","Desarrollador",port.developer)}
-        ${portField(i,"year","Año",port.year)}
         ${portField(i,"version","Versión",port.version)}
         ${portField(i,"controller","Soporte de mando",port.controller)}
         ${portField(i,"files","Archivos del juego",port.files)}
-        ${portField(i,"works","Estado / funciona",port.works)}
         ${portField(i,"link","Etiqueta del enlace",port.link)}
         ${portField(i,"dataUrl","URL de archivos",port.dataUrl,"url")}
         ${portField(i,"githubRepo","Repositorio GitHub",port.githubRepo)}
@@ -178,6 +158,7 @@ function renderEditor() {
       </div></details>
     </article>`).join("") || '<p class="muted">Esta ficha todavía no tiene ports.</p>';
 }
+
 function portField(i, key, label, value, type = "text", wide = false) {
   const control = type === "textarea"
     ? `<textarea data-port-index="${i}" data-port-field="${key}" rows="2">${esc(value)}</textarea>`
@@ -188,7 +169,7 @@ function readDraft() {
   const game = currentGame();
   if (!game) return null;
   const form = $("game-form");
-  for (const key of ["name","slug","platform","year","genre","coverUrl","steamUrl","launchboxUrl","description"]) {
+  for (const key of ["name","slug","platform","year","genre","coverUrl","description"]) {
     game[key] = String(form.elements.namedItem(key)?.value || "").trim();
   }
   if (!game.slug) game.slug = makeSlug(game.name);
@@ -306,16 +287,22 @@ $("logout-button").addEventListener("click", () => {
 });
 $("search").addEventListener("input", renderGameList);
 $("sync-filter").addEventListener("change", renderGameList);
+$("game-list").addEventListener("toggle", (event) => {
+  const accordion = event.target.closest("[data-platform-accordion]");
+  if (!accordion) return;
+  const platform = accordion.dataset.platformAccordion;
+  if (accordion.open) openPlatforms.add(platform); else openPlatforms.delete(platform);
+}, true);
 $("game-list").addEventListener("click", (event) => {
-  const tab = event.target.closest("[data-console-tab]");
-  if (tab) { activeConsoleByMaker[tab.dataset.maker] = tab.dataset.consoleTab; renderGameList(); return; }
-  const addButton = event.target.closest("[data-add-category]");
-  if (addButton) {
+  const addPortButton = event.target.closest("[data-add-port-platform]");
+  if (addPortButton) {
     if (currentGame()) readDraft();
-    const platform = addButton.dataset.addCategory;
+    const platform = addPortButton.dataset.addPortPlatform;
     const base = {name:"Nuevo juego",slug:"nuevo-juego",platform,year:"",coverUrl:"",genre:"",description:"",ports:[]};
     let slug=base.slug,n=2; while(state.catalog.games.some(g=>g.slug===slug)) slug=base.slug+"-"+n++;
-    base.slug=slug; state.catalog.games.unshift(base); selectedSlug=slug; renderAll(); return;
+    base.slug=slug;
+    base.ports.push({portId:slug+"-port-1",project:"",developer:"",version:"",controller:"",files:"",link:"",url:"",dataUrl:"",githubRepo:"",lastUpdate:"",dateAdded:new Date().toISOString().slice(0,10),notes:""});
+    state.catalog.games.unshift(base); selectedSlug=slug; openPlatforms.add(platform); renderAll(); return;
   }
   const button = event.target.closest("[data-select-game]");
   if (!button) return;
@@ -323,6 +310,7 @@ $("game-list").addEventListener("click", (event) => {
   selectedSlug = button.dataset.selectGame;
   renderAll();
 });
+
 $("new-game").addEventListener("click", () => {
   const base = { name:"Nuevo juego", slug:"nuevo-juego", platform:"", year:"", coverUrl:"", genre:"", description:"", ports:[] };
   let slug = base.slug, n = 2;
@@ -342,7 +330,7 @@ $("delete-game").addEventListener("click", async () => {
 });
 $("add-port").addEventListener("click", () => {
   const game = readDraft();
-  game.ports.push({portId:game.slug+"-port-"+(game.ports.length+1),project:"",developer:"",year:"",version:"",controller:"",files:"",works:"",link:"",url:"",dataUrl:"",githubRepo:"",lastUpdate:"",dateAdded:new Date().toISOString().slice(0,10),notes:""});
+  game.ports.push({portId:game.slug+"-port-"+(game.ports.length+1),project:"",developer:"",version:"",controller:"",files:"",link:"",url:"",dataUrl:"",githubRepo:"",lastUpdate:"",dateAdded:new Date().toISOString().slice(0,10),notes:""});
   renderEditor();
 });
 $("ports-list").addEventListener("click", async (event) => {
@@ -363,7 +351,7 @@ $("ports-list").addEventListener("click", async (event) => {
   try {
     const result = await runGithubLookup("port_source", target, { timeoutMs:300000, pollIntervalMs:4000 });
     const info = result?.data || result;
-    const fields = {project:info.project || info.name,developer:info.developer,year:info.year,version:info.version,controller:info.controller,files:info.files,works:info.works,link:info.link,url:info.repoUrl || info.url || target,githubRepo:info.githubRepo || info.syncTarget,portId:info.portId,lastUpdate:info.lastUpdate};
+    const fields = {project:info.project || info.name,developer:info.developer,version:info.version,controller:info.controller,files:info.files,link:info.link,url:info.repoUrl || info.url || target,githubRepo:info.githubRepo || info.syncTarget,portId:info.portId,lastUpdate:info.lastUpdate};
     for (const [key,value] of Object.entries(fields)) if (value && !port[key]) port[key] = value;
     renderEditor();
     notice("Fuente consultada. Se completaron los datos disponibles; revisalos antes de guardar.", "success");
