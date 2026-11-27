@@ -1,58 +1,20 @@
-# NAPL API — Cloudflare Worker + GitHub JSON
+# Cloudflare legacy resources
 
-## Arquitectura vigente (24 de noviembre de 2026)
+Cloudflare ya no debe encargarse de sincronizar el catálogo ni publicar los archivos estáticos. Esas tareas se ejecutan desde GitHub Actions y GitHub Pages.
 
-El Worker `napl-admin-api` ya no utiliza Cloudflare D1. El catálogo operativo se guarda como JSON privado versionado en `Fe2rr/NAPL-Data`.
+## Recursos que siguen activos temporalmente
 
-- `private/catalog-state.json`: fuente interna del catálogo, con metadatos de sincronización y estado de ports. No se publica en Pages.
-- `public/assets/data/catalog.json`: proyección pública del catálogo, sin campos internos.
-- `private/backups/d1-pre-migration-2026-11-24.json`: exportación íntegra de las tablas D1 anteriores (1000 juegos, 1249 ports, 28 plataformas, 96 logs y metadatos).
-- Cloudflare Pages `napl-catalog` publica exclusivamente la carpeta `public`.
-- El Worker valida la sesión y lee/escribe el JSON privado usando `CATALOG_DATA_GITHUB_TOKEN`.
-- Los visitantes siguen consumiendo únicamente el JSON estático de Pages; no consultan el Worker ni GitHub.
-- Supabase conserva los reportes, visitas, dispositivos y ratings; no se migraron.
+- Worker `napl-admin-api`: compatibilidad con la versión v5 de producción. Su endpoint `GET /api/public-catalog` ahora redirige al JSON público de `Fe2rr/NAPL-Data` en `raw.githubusercontent.com`; ya no depende del proyecto Pages `napl-catalog`.
+- Worker `napl-image-optimizer`: todavía referenciado por la versión v5. Se retirará cuando la versión de producción use exclusivamente las portadas WebP estáticas publicadas desde GitHub.
+- Queue `napl-sync-tasks`: se conserva mientras existan rutas legacy de sincronización manual. No tiene cron programado.
+- Pages `napl-admin`: panel administrativo legacy conectado al repositorio `Fe2rr/Napl-Admin`; se mantiene hasta migrar el panel a GitHub Pages.
 
-## Identificadores de popularidad
+## Recursos retirados
 
-Cada entrada del catálogo usa `popularityKey`, independiente del `slug` de navegación (que puede variar por plataforma) y del nombre visible. Las visitas de Supabase se registran y consultan exclusivamente con esa clave.
+- Pages `napl-catalog`: eliminado. Los 252 despliegues antiguos se borraron y Cloudflare eliminó el proyecto junto con su último despliegue activo.
+- Cron triggers del Worker `napl-admin-api`: eliminados. La sincronización y publicación periódica corresponden a GitHub Actions.
+- No se usa D1 para el catálogo. La única D1 actual es `napl-community`, destinada a ratings, popularidad, compatibilidad y reportes.
 
-- Los catálogos anteriores reciben una clave derivada del nombre al cargarse.
-- Al importar Google Sheets, el Worker conserva la clave previa por juego o por `portId`.
-- Para renombrar un juego sin perder su historial, se puede añadir la columna opcional `POPULARITY_KEY` (o `POPULARITY ID`) y mantener el mismo valor en todas las filas/plataformas de ese juego.
-- La clave debe ser un identificador normalizado: letras minúsculas, números y guiones; no debe cambiar al modificar el nombre visible.
+## Regla de despliegue
 
-## Worker y secretos
-
-Worker: `napl-admin-api`  
-URL: `https://napl-admin-api.federicoxastro.workers.dev`
-
-Secretos conservados:
-- `ADMIN_PASSWORD`: contraseña del panel.
-- `SESSION_SECRET`: firma de sesiones.
-- `GITHUB_TOKEN`: respaldo del JSON público en `Fe2rr/Napl-prueba`.
-- `CATALOG_DATA_GITHUB_TOKEN`: acceso Contents Read and write limitado a `Fe2rr/NAPL-Data`.
-
-Variables:
-- `AUTO_PUBLISH_CRON = true`
-- `CRON_BATCH_SIZE = 10`
-
-Cron activo: `0 * * * *` (cada hora).
-
-## Endpoints
-
-- `GET /api/health`: verifica configuración y lectura del JSON privado; informa `storage: github-json` y `d1: false`.
-- `POST /api/login` / `POST /api/logout`: sesión de administrador (Bearer token de 8 horas).
-- `GET /api/catalog`: catálogo interno, estadísticas y últimos logs.
-- `POST /api/games`, `PUT /api/games/:slug`, `DELETE /api/games/:slug`: CRUD sobre el JSON privado.
-- `POST /api/ports/sync`: sincroniza un port individual.
-- `POST /api/lookup/github`, `POST /api/lookup/source`, `POST /api/lookup/launchbox`: consulta fuentes.
-- `POST /api/sync-github`: lote manual de sincronización.
-- `POST /api/import-sheets`: importa desde Google Sheets al JSON privado.
-- `POST /api/publish`: vuelve a publicar el JSON público y el respaldo de Napl-prueba.
-- `GET /api/public-catalog`: redirige al JSON público de Pages para compatibilidad.
-
-## Restauración
-
-La exportación completa anterior a la migración está en `Fe2rr/NAPL-Data/private/backups/d1-pre-migration-2026-11-24.json`. El estado operativo inicial migrado está en `private/catalog-state.json`. Ambos archivos están fuera de `public/` y no son servidos por Cloudflare Pages.
-
-La base D1 del catálogo fue eliminada después de verificar el respaldo JSON íntegro en `private/backups/d1-pre-migration-2026-11-24.json` y migrar el estado operativo a `private/catalog-state.json`. Para restaurar, recrear D1 con `schema.sql` y reimportar las tablas desde el respaldo.
+No vuelvas a agregar `[triggers] crons` al `wrangler.toml` legacy. Para sincronización programada usa los workflows de GitHub Actions. No borres los dos Workers legacy hasta que la rama `v5` de `Fe2rr/Fe2rr.Github.io` deje de referenciarlos.
