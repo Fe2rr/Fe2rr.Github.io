@@ -6,7 +6,7 @@
 - GitHub Actions: scheduled catalog sync, community snapshot generation, and optional batched Discord report digest.
 - Supabase: only transactional community operations (ratings, compatibility submissions/queries, link reports, visit counters) and the authenticated snapshot endpoint used by Actions.
 - Cloudflare: legacy v5 compatibility only. The community D1 Worker and database were retired on 2026-11-27 after the Supabase cutover passed its GitHub Actions snapshot and report-digest checks.
-- Neon: staging/rollback copy only; not connected to visitor traffic. The current Neon project is in a region without Neon Functions, so it is not used as a production API.
+- Neon: the existing `napl-prueba` project is an isolated test copy, not a current backup and not connected to visitor traffic. Its `sa-east-1` region is not among the current Neon Functions deployment regions; using Neon Functions would require a separate project in a supported region, so it adds no benefit to this architecture today.
 
 ## Functions
 
