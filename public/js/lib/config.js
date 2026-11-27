@@ -2,35 +2,19 @@
  * NAPL — CORE CONFIGURATION
  */
 
-// Single external community microservice URL (Cloudflare Workers + D1 in cloudflare-community/).
-// Replace with your Workers/custom domain (or set <meta name="napl-community-api" content="https://..."> in HTML).
-const DEFAULT_COMMUNITY_API_BASE =
-    "https://napl-community-api.federicoxastro.workers.dev";
-
-function isLocalPreviewHost() {
-    if (typeof window === "undefined") return false;
-    const host = String(window.location.hostname || "").toLowerCase();
-    return (
-        host === "localhost" ||
-        host === "127.0.0.1" ||
-        host.endsWith(".run.app")
-    );
-}
+// Community interactions are served by the single Cloudflare Worker + D1 service.
+const DEFAULT_COMMUNITY_API_BASE = "https://napl-community-api.federicoxastro.workers.dev";
 
 export function resolveCommunityApiBase() {
     if (typeof window !== "undefined") {
-        if (typeof window.NAPL_COMMUNITY_API_BASE === "string" && window.NAPL_COMMUNITY_API_BASE.trim()) {
-            return window.NAPL_COMMUNITY_API_BASE.trim().replace(/\/+$/, "");
-        }
+        const override = typeof window.NAPL_COMMUNITY_API_BASE === "string"
+            ? window.NAPL_COMMUNITY_API_BASE.trim()
+            : "";
+        if (override) return override.replace(/\/+$/, "");
         if (typeof document !== "undefined") {
             const meta = document.querySelector('meta[name="napl-community-api"]');
-            const content = String(meta?.getAttribute("content") || "").trim();
-            if (content) {
-                return content.replace(/\/+$/, "");
-            }
-        }
-        if (isLocalPreviewHost()) {
-            return "/api";
+            const value = String(meta?.getAttribute("content") || "").trim();
+            if (value) return value.replace(/\/+$/, "");
         }
     }
     return DEFAULT_COMMUNITY_API_BASE;
@@ -50,10 +34,6 @@ export const GITHUB_ADMIN_DEFAULTS = {
 };
 
 export function resolveCatalogApiBase() {
-    if (typeof window === "undefined") return "";
-    if (isLocalPreviewHost()) {
-        return "";
-    }
     return "static";
 }
 
