@@ -57,27 +57,22 @@
           </div>
           <section class="section game-main-section">
             <h2>Juego</h2>
-            <div class="autofill-box"><div class="autofill-row">
-              
-              <input id="metadata-url" type="url" placeholder="Pegá un enlace de Steam, LaunchBox o itch.io">
-              <button id="lookup-metadata" type="button" class="button secondary">Obtener datos</button>
-            </div></div>
+            <label class="game-platform-field">Plataforma<select name="platform" required></select></label>
+            <div class="autofill-box">
+              <label class="metadata-cover-field">URL de Steam / LaunchBox / itch.io<input id="metadata-url" type="url" placeholder="Pegá el enlace para autocompletar los datos"></label>
+              <div class="autofill-row"><button id="lookup-metadata" type="button" class="button secondary">Obtener datos</button></div>
+              <label class="metadata-cover-field">Portada URL<input name="coverUrl" type="url" placeholder="Se completa desde la fuente o podés indicar otra URL"></label>
+            </div>
             <div class="game-cover-editor"><img id="game-cover-preview" alt="Portada del juego" hidden><div class="game-title-fields">
               <label>Nombre<input name="name" required></label>
-              <label>Portada URL<input name="coverUrl" type="url"></label>
             </div></div>
             <details class="game-data-details"><summary>Datos restantes del juego</summary>
               <div class="admin-game-meta-grid">
-                
                 <label>Slug<input name="slug" required></label>
-                <label>Plataforma<select name="platform" required></select><datalist id="platform-options"></datalist></label>
                 <label>Año<input name="year"></label>
                 <label>Género<input name="genre"></label>
-                <label>Steam URL<input name="steamUrl" type="url"></label>
-                <label>LaunchBox URL<input name="launchboxUrl" type="url"></label>
                 <label class="field full-width">Descripción<textarea name="description" rows="3"></textarea></label>
               </div>
-              <div class="autofill-box"><button id="optimize-cover" type="button" class="button secondary">Optimizar portada</button></div>
             </details>
           </section>
           <section class="section admin-ports-section">
