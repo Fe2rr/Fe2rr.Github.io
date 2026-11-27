@@ -190,7 +190,11 @@ export async function loginWithGithubPat(rawPat, configOverrides = {}) {
         `/repos/${cfg.codeRepo}/actions/workflows?per_page=100`,
         { pat }
     );
-    const available = new Set((workflows?.workflows || []).map((item) => item.name || item.path?.split("/").pop()));
+    const available = new Set((workflows?.workflows || []).flatMap((item) => [
+        item.name || "",
+        item.path?.split("/").pop() || "",
+        item.path || "",
+    ]));
     const required = [cfg.syncWorkflow, cfg.lookupWorkflow, cfg.deployWorkflow];
     const missing = required.filter((name) => !available.has(name) && !available.has(`.github/workflows/${name}`));
     if (missing.length) {
