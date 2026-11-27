@@ -1075,7 +1075,12 @@ export default {
       const pathname = url.pathname;
 
       if (pathname === "/health" || pathname === "/api/health" || pathname === "/") {
-        return json(origin, env, 200, { ok: true, runtime: "cloudflare-d1-community" });
+        const dbCheck = await env.DB.prepare("SELECT 1 AS ok").first();
+        return json(origin, env, 200, {
+          ok: Number(dbCheck?.ok) === 1,
+          runtime: "cloudflare-d1-community",
+          database: "D1",
+        });
       }
       if (
         pathname === "/ratings" ||
