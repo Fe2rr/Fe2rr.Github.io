@@ -81,7 +81,7 @@ function platformManufacturer(game) {
   if (game.manufacturer) return game.manufacturer;
   const platform = String(game.platform || "").toLowerCase();
   const rules = [
-    [/nintendo|nes|snes|super famicom|game ?boy|gamecube|wii|switch/, "Nintendo"],
+    [/nintendo|\\bnes\\b|\\bsnes\\b|super famicom|game ?boy|gamecube|wii|switch/, "Nintendo"],
     [/playstation|\bps[1-5]\b|psp|vita/, "Sony"],
     [/xbox/, "Microsoft"],
     [/sega|megadrive|mega drive|dreamcast|saturn|game gear/, "Sega"],
