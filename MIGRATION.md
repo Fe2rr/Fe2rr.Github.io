@@ -17,10 +17,22 @@ NAPL ejecuta el sitio público, el panel administrativo, el catálogo JSON, las 
    - Ver guía completa de despliegue paso a paso en [`cloudflare-community/README.md`](cloudflare-community/README.md).
    - Opcional auto-alojado: [`community-server/README.md`](community-server/README.md) (Node 22 + SQLite WAL + Caddy para VPS).
 
-## Pasos de corte a producción
+## Estado actual y pasos pendientes para producción
 
-1. Configura `NAPL_DATA_GITHUB_TOKEN` (Fine-grained PAT con `Contents: Read and write` sobre `Fe2rr/NAPL-Data`) en **Actions secrets** de `Fe2rr/Napl-prueba` y ejecuta `NAPL catalog sync`.
-2. Despliega el Worker + D1 siguiendo [`cloudflare-community/README.md`](cloudflare-community/README.md) e importa tu respaldo de Supabase con `node cloudflare-community/export-to-d1-sql.mjs`.
-3. Agrega los **Actions secrets** `NAPL_COMMUNITY_API_BASE` (`https://napl-community-api.<tu-subdominio>.workers.dev`) y `DISCORD_WEBHOOK_URL` en `Fe2rr/Napl-prueba`, luego ejecuta `NAPL community summary & Discord digest`.
-4. Configura `DEFAULT_COMMUNITY_API_BASE` en `public/js/lib/config.js` (o `<meta name="napl-community-api" content="...">` en `public/index.html`).
-5. Verifica `/health`, votos, popularidad, compatibilidad, digest a Discord y admin por PAT antes de dar de baja Supabase/Workers antiguos.
+### Completado en `Fe2rr/Napl-prueba`
+
+1. `NAPL_DATA_GITHUB_TOKEN` y el acceso de escritura a `Fe2rr/NAPL-Data` están verificados.
+2. `NAPL catalog sync` terminó correctamente con `Import Sheets=false`: 1.262 ports totales, 869 comprobados, 393 omitidos, 9 actualizados y 1 error de origen externo (`Repository access blocked`). El commit de datos fue `19f1772`.
+3. Worker `napl-community-api` y D1 `napl-community` están desplegados. El esquema, índices y conteos de las tablas fueron verificados directamente en D1.
+4. El binding `REPORTER_HASH_SECRET` existe. Su valor no es legible desde la API; confirmar que coincide con el secreto original de Supabase antes de retirar ese servicio.
+5. Los Actions secrets `NAPL_COMMUNITY_API_BASE` y `NAPL_DATA_GITHUB_TOKEN` están siendo reconocidos. La URL comunitaria está configurada en `public/index.html` y `public/js/lib/config.js`.
+6. El frontend carga ratings, popularidad y resumen comunitario desde JSON estático; las visitas pasivas no consultan D1. Las consultas interactivas tienen límites por endpoint.
+7. La sincronización comunitaria trata HTTP 429 por cooldown como una omisión controlada, no como fallo del workflow.
+
+### Pendiente antes de migrar producción
+
+1. Confirmar que el deploy de GitHub Pages posterior al catálogo finalizó correctamente.
+2. Probar desde el sitio `/health`, un voto, registro de popularidad, consulta de compatibilidad y envío de reporte de enlace.
+3. Confirmar el digest de Discord si `DISCORD_WEBHOOK_URL` está configurado.
+4. Confirmar que `REPORTER_HASH_SECRET` conserva el valor original de Supabase.
+5. Mantener Supabase y los Workers antiguos activos hasta completar estas pruebas. No modificar `Fe2rr/Fe2rr.Github.io` ni su rama `main` hasta validar el reemplazo.
