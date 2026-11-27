@@ -16,7 +16,7 @@ const REPO_CFG_SESSION_KEY = "napl_github_repo_cfg_v1";
 
 export const DEFAULT_GITHUB_ADMIN_CONFIG = {
     dataRepo: "Fe2rr/NAPL-Data",
-    codeRepo: "Fe2rr/Napl-prueba",
+    codeRepo: "Fe2rr/Fe2rr.github.io",
     branch: "main",
     syncWorkflow: "sync-catalog.yml",
     lookupWorkflow: "lookup-metadata.yml",
