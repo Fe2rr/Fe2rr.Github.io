@@ -522,9 +522,7 @@ export async function loadGameCompatibility(portIds, fresh = false) {
         )
     );
 
-    if (cleanIds.length === 0) {
-        return {};
-    }
+    if (cleanIds.length === 0) return {};
 
     const cached = {};
     const missingIds = [];
@@ -536,9 +534,46 @@ export async function loadGameCompatibility(portIds, fresh = false) {
             else missingIds.push(id);
         }
         if (missingIds.length === 0) return cached;
+
+        // The scheduled GitHub snapshot includes counts and recent device reports.
+        // Use it for passive page loads so they do not query Supabase.
+        try {
+            const snapshot = await loadCommunitySummary();
+            const compatibility = snapshot?.compatibility;
+            const hasReportDetails =
+                compatibility &&
+                typeof compatibility === "object" &&
+                Object.values(compatibility).some((item) => Array.isArray(item?.reports));
+
+            if (hasReportDetails) {
+                const fromSnapshot = {};
+                for (const id of missingIds) {
+                    const value = compatibility[id];
+                    fromSnapshot[id] = value
+                        ? normalizeCompatSummary(value)
+                        : {
+                              yes: 0,
+                              no: 0,
+                              total: 0,
+                              counts: {
+                                  playable_60: 0,
+                                  playable_30: 0,
+                                  low_fps: 0,
+                                  crash: 0,
+                              },
+                              reports: [],
+                          };
+                }
+                writeCachedCompatibility(fromSnapshot);
+                return { ...cached, ...fromSnapshot };
+            }
+        } catch (error) {
+            console.warn("NAPL: could not load static compatibility snapshot.", error);
+        }
     }
 
     const requestedIds = (fresh ? cleanIds : missingIds).slice(0, 10);
+    if (requestedIds.length === 0) return cached;
 
     try {
         const params = new URLSearchParams({
@@ -568,14 +603,6 @@ export async function loadGameCompatibility(portIds, fresh = false) {
         return { ...cached, ...data.compatibility };
     } catch (error) {
         console.warn("NAPL: could not load compatibility reports.", error);
-        const summary = await loadCommunitySummary();
-        if (summary?.compatibility && typeof summary.compatibility === "object") {
-            for (const id of requestedIds) {
-                if (!cached[id] && summary.compatibility[id]) {
-                    cached[id] = normalizeCompatSummary(summary.compatibility[id]);
-                }
-            }
-        }
         return cached;
     }
 }
