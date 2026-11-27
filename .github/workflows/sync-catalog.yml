@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Checkout NAPL-Prueba
+      - name: Checkout NAPL site repository
         uses: actions/checkout@v4
 
       - name: Validate required Actions secrets
