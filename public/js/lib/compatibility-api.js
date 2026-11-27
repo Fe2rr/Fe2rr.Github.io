@@ -435,7 +435,7 @@ export async function searchCompatibilityByHardware({
         `${COMPATIBILITY_API_URL}?${params.toString()}`,
         {
             method: "GET",
-            cache: "no-store",
+            cache: "default",
         }
     );
 
