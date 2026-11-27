@@ -7,6 +7,7 @@ const tables=["devices","rating_tokens","rating_token_issues","rating_votes","ga
 const client=new Client({connectionString:url,ssl:{rejectUnauthorized:true}});
 await client.connect();
 try{
+ await client.query("BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY");
  const dump={format:"napl-supabase-export-v1",exportedAt:new Date().toISOString(),tables:{}};
  for(const table of tables){
   const {rows}=await client.query(`SELECT * FROM public."${table}"`);
@@ -15,4 +16,5 @@ try{
  }
  await fs.writeFile("napl-supabase-export.json",JSON.stringify(dump));
  console.log("Export written to napl-supabase-export.json");
-}finally{await client.end()}
+ await client.query("COMMIT");
+}catch(error){try{await client.query("ROLLBACK")}catch{};throw error}finally{await client.end()}
