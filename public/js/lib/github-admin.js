@@ -641,22 +641,25 @@ async function commitRepoFiles(files, { message, pat, configOverrides = {} } = {
     const cfg = { ...getSessionConfig(), ...configOverrides };
     const token = pat || getStoredGithubPat();
 
-    const { data: refData } = await githubApi(
+    const refPromise = githubApi(
         `/repos/${cfg.dataRepo}/git/ref/heads/${encodeURIComponent(cfg.branch)}`,
         { pat: token }
-    );
-    const parentCommitSha = refData?.object?.sha;
-    if (!parentCommitSha) {
-        throw new Error("No se pudo resolver la rama de destino en GitHub.");
-    }
+    ).then(async ({ data: refData }) => {
+        const parentCommitSha = refData?.object?.sha;
+        if (!parentCommitSha) {
+            throw new Error("No se pudo resolver la rama de destino en GitHub.");
+        }
+        const { data: parentCommit } = await githubApi(
+            `/repos/${cfg.dataRepo}/git/commits/${parentCommitSha}`,
+            { pat: token }
+        );
+        return {
+            parentCommitSha,
+            baseTreeSha: parentCommit?.tree?.sha,
+        };
+    });
 
-    const { data: parentCommit } = await githubApi(
-        `/repos/${cfg.dataRepo}/git/commits/${parentCommitSha}`,
-        { pat: token }
-    );
-    const baseTreeSha = parentCommit?.tree?.sha;
-
-    const treeItems = await Promise.all(
+    const blobsPromise = Promise.all(
         files.map(async (file) => {
             const { data: blob } = await githubApi(
                 `/repos/${cfg.dataRepo}/git/blobs`,
@@ -678,6 +681,11 @@ async function commitRepoFiles(files, { message, pat, configOverrides = {} } = {
             };
         })
     );
+
+    const [{ parentCommitSha, baseTreeSha }, treeItems] = await Promise.all([
+        refPromise,
+        blobsPromise,
+    ]);
 
     const { data: newTree } = await githubApi(
         `/repos/${cfg.dataRepo}/git/trees`,
@@ -750,7 +758,7 @@ export async function saveAndPublishCatalogState(
     const files = [
         {
             path: "private/catalog-state.json",
-            content: JSON.stringify(stateToSave, null, 2) + "\n",
+            content: JSON.stringify(stateToSave) + "\n",
         },
     ];
 
@@ -775,16 +783,10 @@ export async function saveAndPublishCatalogState(
     };
 }
 
-export async function dispatchWorkflowAndWait(
+export async function dispatchWorkflow(
     workflowFile,
     inputs = {},
-    {
-        pollIntervalMs = 3000,
-        timeoutMs = 300_000,
-        onProgress,
-        pat,
-        configOverrides = {},
-    } = {}
+    { pat, configOverrides = {} } = {}
 ) {
     const cfg = { ...getSessionConfig(), ...configOverrides };
     const token = pat || getStoredGithubPat();
@@ -802,14 +804,33 @@ export async function dispatchWorkflowAndWait(
         }
     );
 
+    return { workflowFile, dispatchedAt, config: cfg };
+}
+
+export async function waitForDispatchedWorkflow(
+    workflowFile,
+    dispatchedAt,
+    {
+        pollIntervalMs = 3000,
+        timeoutMs = 300_000,
+        onProgress,
+        shouldStop,
+        pat,
+        configOverrides = {},
+    } = {}
+) {
+    const cfg = { ...getSessionConfig(), ...configOverrides };
+    const token = pat || getStoredGithubPat();
     let matchedRun = null;
     let cachedJobs = [];
     let lastJobsFetchAt = 0;
     let isFirstPoll = true;
     while (Date.now() - dispatchedAt < timeoutMs) {
+        if (typeof shouldStop === "function" && shouldStop()) return null;
         const waitMs = isFirstPoll ? Math.min(pollIntervalMs, 1200) : pollIntervalMs;
         isFirstPoll = false;
         await new Promise((r) => setTimeout(r, waitMs));
+        if (typeof shouldStop === "function" && shouldStop()) return null;
 
         const { data } = await githubApi(
             `/repos/${cfg.codeRepo}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?event=workflow_dispatch&per_page=8`,
@@ -893,6 +914,15 @@ export async function dispatchWorkflowAndWait(
     }
 
     throw new Error(`Tiempo de espera agotado esperando ${workflowFile}.`);
+}
+
+export async function dispatchWorkflowAndWait(
+    workflowFile,
+    inputs = {},
+    options = {}
+) {
+    const { dispatchedAt } = await dispatchWorkflow(workflowFile, inputs, options);
+    return waitForDispatchedWorkflow(workflowFile, dispatchedAt, options);
 }
 
 export async function runGithubLookup(mode, url, options = {}) {

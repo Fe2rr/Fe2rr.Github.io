@@ -1,6 +1,7 @@
 import {
   clearEncryptedGithubVault,
   clearGithubSession,
+  dispatchWorkflow,
   exportEncryptedGithubVault,
   fetchCommunityAdminDashboard,
   getStoredGithubPat,
@@ -17,7 +18,7 @@ import {
   triggerCommunitySummarySync,
   unlockGithubVaultWithPassword,
   updateCommunityLinkReportStatus,
-  dispatchWorkflowAndWait,
+  waitForDispatchedWorkflow,
 } from "../js/lib/github-admin.js";
 
 const $ = (id) => document.getElementById(id);
@@ -137,6 +138,7 @@ function renderGameList() {
   const games = state?.catalog?.games || [];
   const q = $("search").value.trim().toLowerCase();
   const mode = activeSyncFilter;
+  const isFiltering = Boolean(q) || mode !== "all";
   const platforms = [...new Set([...(state?.catalog?.platformOrder || []), ...games.map(g=>g.platform).filter(Boolean)])];
   const filtered = games.filter(game => {
     const synced = gameSyncStatus(game);
@@ -145,16 +147,20 @@ function renderGameList() {
     return [game.name,game.slug,game.platform,...(game.ports||[]).flatMap(p=>[p.project,p.developer,p.portId,p.url,p.githubRepo])].join(" ").toLowerCase().includes(q);
   });
   $("catalog-count").textContent = filtered.length + " / " + games.length + " juegos · " + games.reduce((n,g)=>n+(g.ports||[]).length,0) + " ports";
-  const orderedPlatforms = [...platforms, ...[...new Set(filtered.map(g=>g.platform).filter(Boolean))].filter(p=>!platforms.includes(p))];
+  const orderedPlatforms = [...platforms, ...[...new Set(filtered.map(g=>g.platform).filter(Boolean))].filter(p=>!platforms.includes(p))]
+    .filter(platform => !isFiltering || filtered.some(game => game.platform === platform));
   const renderPlatform = platform => {
     const entries = filtered.filter(game=>game.platform===platform);
     const isOpen = openPlatforms.has(platform);
-    return `<details class="platform-accordion" data-platform-accordion="${esc(platform)}" ${isOpen?"open":""}>
-      <summary><span>${esc(platform)}</span><span class="platform-summary-meta">${entries.length} juegos</span></summary>
-      <div class="platform-accordion-content">
-        <div class="platform-content-heading"><strong>${esc(platform)}</strong><button type="button" class="button secondary category-add" data-add-port-platform="${esc(platform)}">+ Port</button></div>
-        ${entries.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Sync":"No sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta plataforma.</p>'}
-      </div></details>`;
+    return `<div class="platform-accordion-wrap">
+      <details class="platform-accordion" data-platform-accordion="${esc(platform)}" ${isOpen?"open":""}>
+        <summary><span class="platform-accordion-title">${esc(platform)}</span><span class="platform-summary-meta">${entries.length} juegos</span></summary>
+        <div class="platform-accordion-content">
+          ${entries.map(game=>`<button type="button" class="game-item ${game.slug===selectedSlug?"active":""}" data-select-game="${esc(game.slug)}"><strong>${esc(game.name||"Sin nombre")}</strong><small><span class="sync-dot ${gameSyncStatus(game)?"is-synced":""}"></span>${gameSyncStatus(game)?"Sync":"No sync"} · ${(game.ports||[]).length} ports</small></button>`).join("")||'<p class="muted">No hay juegos en esta plataforma.</p>'}
+        </div>
+      </details>
+      <button type="button" class="platform-add-btn category-add-outside" data-add-port-platform="${esc(platform)}" title="Agregar juego en ${esc(platform)}">+ Juego</button>
+    </div>`;
   };
   const segaPlatforms = orderedPlatforms.filter(platform => /sega/i.test(platform));
   const otherPlatforms = orderedPlatforms.filter(platform => !/sega/i.test(platform));
@@ -351,6 +357,33 @@ async function handleLoginSubmit() {
     setBusy(false);
   }
 }
+let activeDeployGeneration = 0;
+
+async function monitorBackgroundPagesDeploy(workflowFile, dispatchedAt, generation) {
+  const isStale = () => generation !== activeDeployGeneration || !getStoredGithubPat();
+  try {
+    const run = await waitForDispatchedWorkflow(workflowFile, dispatchedAt, {
+      timeoutMs: 300000,
+      pollIntervalMs: 2500,
+      shouldStop: isStale,
+      onProgress: (progress) => {
+        if (isStale()) return;
+        const label = progress.status === "completed" ? "Publicación Pages finalizada" : "Publicando en Pages…";
+        $("connection-state").textContent = label;
+      },
+    });
+    if (!run || isStale()) return;
+    $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
+    $("save-hint").textContent = "Cambios publicados en GitHub Pages.";
+    notice("Cambios publicados en GitHub Pages.", "success");
+  } catch (error) {
+    if (isStale()) return;
+    $("connection-state").textContent = "GitHub conectado · Fe2rr/NAPL-Data";
+    $("save-hint").textContent = "Guardado en GitHub, pero falló la publicación en Pages.";
+    notice(error?.message || "Guardado en GitHub, pero falló la publicación en GitHub Pages.", "error");
+  }
+}
+
 async function saveCatalog() {
   if (busy) return;
   const game = readDraft();
@@ -358,21 +391,25 @@ async function saveCatalog() {
   const duplicates = game ? state.catalog.games.filter((g) => g.slug === game.slug && g !== game) : [];
   if (duplicates.length) throw new Error("Ya existe otro juego con ese slug.");
   setBusy(true, "Guardando catálogo en GitHub…");
+  let deployRun = null;
   try {
-    const saved = await saveAndPublishCatalogState(state, { publishPublic: true, message: "NAPL Admin: " + game.name });
+    const saved = await saveAndPublishCatalogState(state, {
+      publishPublic: true,
+      message: "NAPL Admin: " + (game?.name || "update catalog"),
+    });
     state = normalizeState(saved.state);
     selectedSlug = game?.slug || state.catalog.games[0]?.slug || "";
-    $("save-hint").textContent = "JSON privado y snapshot público guardados.";
-    notice("Guardado en Fe2rr/NAPL-Data. Publicando GitHub Pages…");
-    await dispatchWorkflowAndWait("deploy-pages.yml", {}, {
-      timeoutMs: 300000,
-      pollIntervalMs: 2000,
-      onProgress: (run) => { $("connection-state").textContent = "Publicación Pages: " + run.status; },
-    });
+    deployRun = await dispatchWorkflow("deploy-pages.yml", {});
     renderAll();
-    notice("Cambios guardados y publicados en GitHub Pages.", "success");
+    $("save-hint").textContent = "Guardado en GitHub · Publicando en Pages en segundo plano…";
+    notice("Guardado en GitHub. Publicación en GitHub Pages iniciada…", "success");
   } finally {
     setBusy(false);
+  }
+  if (deployRun) {
+    const generation = ++activeDeployGeneration;
+    $("connection-state").textContent = "Publicando en Pages…";
+    void monitorBackgroundPagesDeploy(deployRun.workflowFile, deployRun.dispatchedAt, generation);
   }
 }
 function renderSyncSteps(run) {
