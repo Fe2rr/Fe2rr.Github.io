@@ -405,6 +405,8 @@ export async function dispatchWorkflowAndWait(
     );
 
     let matchedRun = null;
+    let cachedJobs = [];
+    let lastJobsFetchAt = 0;
     while (Date.now() - dispatchedAt < timeoutMs) {
         await new Promise((r) => setTimeout(r, pollIntervalMs));
 
@@ -425,13 +427,13 @@ export async function dispatchWorkflowAndWait(
 
         if (matchedRun) {
             if (typeof onProgress === "function") {
-                let jobs = [];
-                try {
-                    const { data: jobData } = await githubApi(
-                        `/repos/${cfg.codeRepo}/actions/runs/${matchedRun.id}/jobs?per_page=100`,
-                        { pat: token }
-                    );
-                    jobs = (jobData?.jobs || []).map((job) => ({
+                if (Date.now() - lastJobsFetchAt >= 15000 || matchedRun.status === "completed") {
+                    try {
+                        const { data: jobData } = await githubApi(
+                            `/repos/${cfg.codeRepo}/actions/runs/${matchedRun.id}/jobs?per_page=100`,
+                            { pat: token }
+                        );
+                        cachedJobs = (jobData?.jobs || []).map((job) => ({
                         name: job.name || "Job",
                         status: job.status || "queued",
                         conclusion: job.conclusion || "",
@@ -440,16 +442,18 @@ export async function dispatchWorkflowAndWait(
                             status: step.status || "queued",
                             conclusion: step.conclusion || "",
                         })),
-                    }));
-                } catch {
-                    // Run status remains useful if job details are temporarily unavailable.
+                        }));
+                        lastJobsFetchAt = Date.now();
+                    } catch {
+                        // Run status remains useful if job details are temporarily unavailable.
+                    }
                 }
                 onProgress({
                     id: matchedRun.id,
                     status: matchedRun.status,
                     conclusion: matchedRun.conclusion,
                     htmlUrl: matchedRun.html_url,
-                    jobs,
+                    jobs: cachedJobs,
                 });
             }
             if (matchedRun.status === "completed") {
