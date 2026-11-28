@@ -31,7 +31,7 @@ function notice(message, type = "") {
 function setBusy(value, message = "") {
   busy = value;
   document.querySelectorAll("button").forEach((button) => {
-    if (button.id !== "logout-button" && button.id !== "close-community") {
+    if (button.id !== "logout-button" && button.id !== "close-community" && button.id !== "close-sync") {
       button.disabled = value;
     }
   });
@@ -244,14 +244,83 @@ async function saveCatalog() {
     setBusy(false);
   }
 }
+function renderSyncSteps(run) {
+  const jobs = Array.isArray(run.jobs) ? run.jobs : [];
+  const steps = jobs.flatMap((job) => job.steps || []);
+  const total = steps.length;
+  const completed = steps.filter((step) => step.status === "completed").length;
+  const active = steps.find((step) => step.status === "in_progress");
+  const failed = steps.find((step) => step.conclusion === "failure");
+  const percent = run.status === "completed" ? 100 : total ? Math.min(95, Math.round(((completed + (active ? 0.35 : 0)) / total) * 100)) : 5;
+  $("sync-progress-bar").style.width = percent + "%";
+  $("sync-progress-percent").textContent = percent + "%";
+  $("sync-progress-label").textContent = run.status === "completed" ? "Workflow finalizado" : active?.name || failed?.name || "Ejecutando workflow";
+  $("sync-status").textContent = run.status === "completed"
+    ? "Workflow " + (run.conclusion || "finalizado") + ". Cargando resultados por port…"
+    : "GitHub Actions está procesando la sincronización. El avance corresponde a las etapas reales del workflow.";
+  $("sync-live-results").innerHTML = jobs.map((job) => {
+    const rows = (job.steps || []).map((step) => {
+      const icon = step.conclusion === "success" ? "✓" : step.conclusion === "failure" ? "✕" : step.status === "in_progress" ? "…" : "○";
+      return '<div class="sync-result-row"><span>' + esc(step.name) + '</span><strong>' + icon + '</strong></div>';
+    }).join("");
+    return '<div class="sync-job-group"><strong>' + esc(job.name) + '</strong>' + rows + '</div>';
+  }).join("") || '<span>Esperando a que GitHub Actions inicie el job…</span>';
+  $("sync-workflow-link").innerHTML = run.htmlUrl ? '<a href="' + esc(run.htmlUrl) + '" target="_blank" rel="noopener">Ver ejecución en GitHub Actions</a>' : "";
+}
+function renderSyncResults(lastSync) {
+  const ports = Array.isArray(lastSync?.ports) ? lastSync.ports : [];
+  $("sync-stats").innerHTML = [
+    ["Ports", lastSync?.total ?? ports.length],
+    ["Revisados", lastSync?.checked ?? 0],
+    ["Actualizados", lastSync?.updated ?? 0],
+    ["Con error", lastSync?.errors ?? 0],
+  ].map(([label,value]) => '<div class="sync-stat"><small>' + esc(label) + '</small><strong>' + Number(value || 0).toLocaleString("es-UY") + '</strong></div>').join("");
+  $("sync-results-title").textContent = "Resultado por port · " + ports.length;
+  $("sync-live-results").innerHTML = ports.map((port) => {
+    const status = port.status === "error" || port.status === "down" ? "Error" :
+      port.status === "skipped" ? "Omitido" : port.changed ? "Actualizado" : "Sin cambios";
+    const icon = status === "Error" ? "✕" : status === "Actualizado" ? "✓" : status === "Omitido" ? "—" : "·";
+    const name = port.project || port.portId || port.gameSlug || "Port sin nombre";
+    const detail = [port.gameSlug, port.message].filter(Boolean).join(" · ");
+    return '<div class="sync-result-row"><span><strong>' + esc(name) + '</strong>' + (detail ? '<small>' + esc(detail) + '</small>' : '') + '</span><strong>' + icon + ' ' + status + '</strong></div>';
+  }).join("") || '<span>No hay resultados individuales disponibles.</span>';
+  $("sync-status").textContent = "Sincronización finalizada: " + (lastSync?.updated || 0) + " actualizados, " + (lastSync?.errors || 0) + " con error y " + (lastSync?.skipped || 0) + " omitidos.";
+}
 async function runSync(importSheets = false) {
   if (busy) return;
+  const allPorts = (state?.catalog?.games || []).flatMap((game) => (game.ports || []).map((port) => ({
+    name: port.project || port.portId || game.name,
+    game: game.name || game.slug,
+  })));
+  $("sync-dialog").showModal();
+  $("sync-status").textContent = importSheets ? "Importando CSV y preparando sincronización…" : "Preparando sincronización…";
+  $("sync-progress-bar").style.width = "0%";
+  $("sync-progress-percent").textContent = "0%";
+  $("sync-progress-label").textContent = "Esperando workflow";
+  $("sync-stats").innerHTML = "";
+  $("sync-results-title").textContent = "Ports incluidos en esta ejecución · " + allPorts.length;
+  $("sync-live-results").innerHTML = allPorts.map((port) =>
+    '<div class="sync-result-row"><span><strong>' + esc(port.name) + '</strong><small>' + esc(port.game) + '</small></span><strong>En espera</strong></div>'
+  ).join("") || "<span>No hay ports en el catálogo.</span>";
+  $("sync-workflow-link").textContent = "";
   setBusy(true, importSheets ? "Importando CSV y sincronizando…" : "Sincronizando fuentes…");
   try {
-    await triggerCatalogSync({ importSheets, optimizeCovers: true, timeoutMs: 900000, pollIntervalMs: 5000,
-      onProgress: (run) => { $("connection-state").textContent = "Sync: " + run.status + (run.conclusion ? " · " + run.conclusion : ""); } });
+    const run = await triggerCatalogSync({ importSheets, optimizeCovers: true, timeoutMs: 900000, pollIntervalMs: 5000,
+      onProgress: (progress) => {
+        $("connection-state").textContent = "Sync: " + progress.status + (progress.conclusion ? " · " + progress.conclusion : "");
+        renderSyncSteps(progress);
+      } });
     await loadState();
+    renderSyncResults(state?.lastSync);
+    $("sync-progress-bar").style.width = "100%";
+    $("sync-progress-percent").textContent = "100%";
     notice(importSheets ? "Importación y sincronización completadas." : "Sincronización completada.", "success");
+    return run;
+  } catch (error) {
+    $("sync-status").textContent = error.message || "La sincronización falló.";
+    $("sync-progress-label").textContent = "Error";
+    $("sync-live-results").insertAdjacentHTML("afterbegin", '<div class="sync-result-row"><strong>La ejecución no pudo completarse.</strong><span>✕</span></div>');
+    throw error;
   } finally {
     setBusy(false);
   }
@@ -402,6 +471,7 @@ $("import-button").addEventListener("click", async () => {
 });
 $("community-button").addEventListener("click", loadCommunity);
 $("close-community").addEventListener("click", () => $("community-dialog").close());
+$("close-sync").addEventListener("click", () => $("sync-dialog").close());
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
   if (!url) return notice("Ingresá la URL del juego.", "error");
