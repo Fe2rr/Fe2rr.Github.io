@@ -3,15 +3,15 @@ import path from "node:path";
 import {
   inspectLaunchboxUrl,
   inspectSteamApp,
+  inspectItchPage,
   inspectPortSource,
 } from "../lib/catalog-core.mjs";
-import {
-  optimizeSingleCover,
-  readCoverManifest,
-  writeCoverManifest,
-} from "../lib/cover-optimizer.mjs";
 
 const dataDir = path.resolve(process.env.NAPL_DATA_DIR || "data");
+const dataRepo = String(process.env.NAPL_DATA_REPO || "Fe2rr/NAPL-Data").trim();
+const dataBranch = String(process.env.NAPL_DATA_BRANCH || "main").trim();
+const writeViaApi = process.env.NAPL_WRITE_VIA_API === "1";
+
 const mode = String(process.env.LOOKUP_MODE || "").trim().toLowerCase();
 const url = String(process.env.LOOKUP_URL || "").trim();
 const rawRequestId = String(process.env.LOOKUP_REQUEST_ID || "").trim();
@@ -46,29 +46,60 @@ async function pruneOldResults() {
   }
 }
 
-async function inspectItchPage(rawUrl) {
-  let target;
-  try { target = new URL(rawUrl); } catch { throw new Error("URL de itch.io inválida."); }
-  if (target.protocol !== "https:" || !(target.hostname === "itch.io" || target.hostname.endsWith(".itch.io"))) {
-    throw new Error("Solo se permiten páginas HTTPS de itch.io.");
+async function writeResultViaGithubApi(resultPath, contentText) {
+  const token = env.GITHUB_TOKEN;
+  if (!token) {
+    throw new Error("Missing GITHUB_TOKEN for API result commit.");
   }
-  const response = await fetch(target.toString(), {headers:{"User-Agent":"Mozilla/5.0 NAPL metadata lookup","Accept":"text/html"}});
-  if (!response.ok) throw new Error("itch.io respondió HTTP " + response.status + ".");
-  const html = await response.text();
-  const readMeta = (pattern) => {
-    const match = html.match(pattern);
-    return match ? match[1].replace(/&amp;/g, "&").replace(/&quot;/g, '"').replace(/&#39;/g, "'").trim() : "";
+  const apiUrl = `https://api.github.com/repos/${dataRepo}/contents/${resultPath}`;
+  const headers = {
+    Accept: "application/vnd.github+json",
+    "X-GitHub-Api-Version": "2022-11-28",
+    Authorization: `Bearer ${token}`,
+    "Content-Type": "application/json",
+    "User-Agent": "NAPL-Metadata-Lookup/1.0",
   };
-  const name = readMeta(/<meta[^>]+property=["']og:title["'][^>]+content=["']([^"']+)["']/i) ||
-    (html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "").replace(/<[^>]+>/g, "").trim();
-  if (!name) throw new Error("No se pudo obtener el título de itch.io.");
-  return {
-    name,
-    coverUrl: readMeta(/<meta[^>]+property=["']og:image["'][^>]+content=["']([^"']+)["']/i),
-    description: readMeta(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']+)["']/i),
-    itchUrl: target.toString()
-  };
+  const encoded = Buffer.from(contentText, "utf8").toString("base64");
+  const commitMsg = `NAPL: metadata lookup (${mode || "lookup"})`;
+
+  let res = await fetch(apiUrl, {
+    method: "PUT",
+    headers,
+    body: JSON.stringify({
+      message: commitMsg,
+      content: encoded,
+      branch: dataBranch,
+    }),
+    signal: AbortSignal.timeout(10_000),
+  });
+
+  if (res.status === 422 || res.status === 409) {
+    const existingRes = await fetch(
+      `${apiUrl}?ref=${encodeURIComponent(dataBranch)}`,
+      { headers, signal: AbortSignal.timeout(5_000) }
+    );
+    const existing = await existingRes.json().catch(() => ({}));
+    if (existing?.sha) {
+      res = await fetch(apiUrl, {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({
+          message: commitMsg,
+          content: encoded,
+          branch: dataBranch,
+          sha: existing.sha,
+        }),
+        signal: AbortSignal.timeout(10_000),
+      });
+    }
+  }
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => "");
+    throw new Error(`GitHub Contents API HTTP ${res.status}: ${errText}`);
+  }
 }
+
 let output = null;
 let fatalError = null;
 try {
@@ -86,9 +117,19 @@ try {
   } else if (mode === "port_source" || mode === "source") {
     data = await inspectPortSource(url, env);
   } else if (mode === "optimize_cover") {
+    const { optimizeSingleCover, readCoverManifest, writeCoverManifest } =
+      await import("../lib/cover-optimizer.mjs");
     const res = await optimizeSingleCover(url, coversDir);
     if (res.status === "failed") {
       throw new Error(res.error || "Cover optimization failed.");
+    }
+    if (res.relativePath) {
+      const manifest = await readCoverManifest(coversDir);
+      const cleanCoverUrl = url.trim();
+      if (manifest.covers[cleanCoverUrl] !== res.relativePath) {
+        manifest.covers[cleanCoverUrl] = res.relativePath;
+        await writeCoverManifest(coversDir, manifest.covers);
+      }
     }
     data = {
       coverUrl: url,
@@ -97,20 +138,6 @@ try {
     };
   } else {
     throw new Error(`Unsupported LOOKUP_MODE: ${mode}`);
-  }
-
-  // Pre-optimize any discovered cover image right away into NAPL-Data
-  if (data && typeof data.coverUrl === "string" && data.coverUrl.trim()) {
-    const cleanCoverUrl = data.coverUrl.trim();
-    const coverRes = await optimizeSingleCover(cleanCoverUrl, coversDir);
-    if (coverRes.relativePath) {
-      data.staticCoverPath = coverRes.relativePath;
-      const manifest = await readCoverManifest(coversDir);
-      if (manifest.covers[cleanCoverUrl] !== coverRes.relativePath) {
-        manifest.covers[cleanCoverUrl] = coverRes.relativePath;
-        await writeCoverManifest(coversDir, manifest.covers);
-      }
-    }
   }
 
   output = {
@@ -133,17 +160,23 @@ try {
   };
 }
 
+const serialized = JSON.stringify(output, null, 2) + "\n";
+
 if (requestId) {
-  await fs.mkdir(resultsDir, { recursive: true });
-  await pruneOldResults();
-  await fs.writeFile(
-    path.join(resultsDir, `${requestId}.json`),
-    JSON.stringify(output, null, 2) + "\n",
-    "utf8"
-  );
+  if (writeViaApi && env.GITHUB_TOKEN && mode !== "optimize_cover") {
+    await writeResultViaGithubApi(`private/lookup-results/${requestId}.json`, serialized);
+  } else {
+    await fs.mkdir(resultsDir, { recursive: true });
+    await pruneOldResults();
+    await fs.writeFile(
+      path.join(resultsDir, `${requestId}.json`),
+      serialized,
+      "utf8"
+    );
+  }
 }
 
-console.log(JSON.stringify(output, null, 2));
+console.log(serialized);
 
 if (fatalError && !requestId) {
   process.exitCode = 1;

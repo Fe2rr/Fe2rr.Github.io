@@ -9,6 +9,11 @@
  * snapshots & link reports stored in GitHub without Cloudflare.
  */
 
+import {
+    parseGithubRepo,
+    parseGitlabProject,
+} from "./source-parsers.js";
+
 const LEGACY_PAT_SESSION_KEY = "napl_github_pat_v1";
 const VAULT_STORAGE_KEY = "napl_github_vault_v1";
 const REPO_CFG_SESSION_KEY = "napl_github_repo_cfg_v1";
@@ -925,29 +930,372 @@ export async function dispatchWorkflowAndWait(
     return waitForDispatchedWorkflow(workflowFile, dispatchedAt, options);
 }
 
+const NAPL_MONTHS = [
+    "January",
+    "February",
+    "March",
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+];
+
+function formatNaplDate(isoDate) {
+    if (!isoDate) return "";
+    const d = new Date(isoDate);
+    if (Number.isNaN(d.getTime())) return "";
+    return `${d.getUTCFullYear()}, ${NAPL_MONTHS[d.getUTCMonth()]} ${d.getUTCDate()}`;
+}
+
+function isLocalPreviewOrigin() {
+    try {
+        const host = String(globalThis.location?.hostname || "").toLowerCase();
+        return host === "localhost" || host === "127.0.0.1" || host.endsWith(".run.app");
+    } catch {
+        return false;
+    }
+}
+
+async function tryLocalLookup(mode, url) {
+    if (!isLocalPreviewOrigin()) return null;
+    try {
+        const res = await fetch("/api/lookup-metadata", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+            },
+            body: JSON.stringify({ mode, url }),
+            cache: "no-store",
+        });
+        if (res.status === 404 || res.status === 405 || res.status === 501) {
+            return null;
+        }
+        const payload = await res.json().catch(() => null);
+        if (!res.ok || !payload?.ok) {
+            if (payload?.error) {
+                const err = new Error(payload.error);
+                err.fromLookupApi = true;
+                throw err;
+            }
+            return null;
+        }
+        return payload.data;
+    } catch (error) {
+        if (error?.fromLookupApi) throw error;
+        return null;
+    }
+}
+
+async function inspectGithubRepoDirect(rawTarget, pat) {
+    const parsed = parseGithubRepo(rawTarget);
+    if (!parsed) throw new Error("URL de GitHub inválida.");
+
+    let repoData;
+    try {
+        const res = await githubApi(`/repos/${parsed.owner}/${parsed.repo}`, { pat });
+        repoData = res.data;
+    } catch (error) {
+        if (error?.status === 404 || error?.status === 410) {
+            return {
+                provider: "github",
+                syncProvider: "github",
+                syncTarget: `${parsed.owner}/${parsed.repo}`,
+                status: "down",
+                githubRepo: `${parsed.owner}/${parsed.repo}`,
+                repoUrl: `https://github.com/${parsed.owner}/${parsed.repo}`,
+                error: `Repositorio no disponible (HTTP ${error.status}).`,
+                checkedAt: new Date().toISOString(),
+            };
+        }
+        throw error;
+    }
+
+    const canonicalRepo = String(repoData.full_name || `${parsed.owner}/${parsed.repo}`);
+    const repoUrl = String(repoData.html_url || `https://github.com/${canonicalRepo}`);
+    const moved = canonicalRepo.toLowerCase() !== `${parsed.owner}/${parsed.repo}`.toLowerCase();
+
+    let release = null;
+    try {
+        const latest = await githubApi(`/repos/${canonicalRepo}/releases/latest`, { pat });
+        if (latest.data?.tag_name) release = latest.data;
+    } catch {
+        try {
+            const list = await githubApi(`/repos/${canonicalRepo}/releases?per_page=1`, { pat });
+            if (Array.isArray(list.data) && list.data.length > 0) release = list.data[0];
+        } catch {
+            // No releases
+        }
+    }
+
+    let tagFallback = null;
+    if (!release) {
+        try {
+            const tags = await githubApi(`/repos/${canonicalRepo}/tags?per_page=1`, { pat });
+            if (Array.isArray(tags.data) && tags.data.length > 0) tagFallback = tags.data[0];
+        } catch {
+            // No tags
+        }
+    }
+
+    const assets = Array.isArray(release?.assets) ? release.assets : [];
+    const apkAsset =
+        assets.find((a) => /\.apk$/i.test(String(a.name || "")) && !/debug/i.test(String(a.name || ""))) ||
+        assets.find((a) => /\.apk$/i.test(String(a.name || "")));
+
+    const version = String(release?.tag_name || tagFallback?.name || "").trim();
+    const updatedIso = release?.published_at || repoData.pushed_at || repoData.updated_at || "";
+
+    return {
+        provider: "github",
+        syncProvider: "github",
+        syncTarget: canonicalRepo,
+        status: moved ? "moved" : "ok",
+        moved,
+        archived: Boolean(repoData.archived),
+        githubRepo: canonicalRepo,
+        repoUrl,
+        releaseUrl: release?.html_url || repoUrl,
+        apkUrl: apkAsset?.browser_download_url || "",
+        recommendedUrl: repoUrl,
+        project: String(repoData.name || parsed.repo),
+        developer: String(repoData.owner?.login || parsed.owner),
+        version,
+        lastUpdate: formatNaplDate(updatedIso),
+        link: repoData.archived ? "Free (Github - Archived)" : "Free (Github)",
+        description: String(repoData.description || ""),
+        checkedAt: new Date().toISOString(),
+    };
+}
+
+async function inspectGitlabProjectDirect(rawTarget) {
+    const parsed = parseGitlabProject(rawTarget);
+    if (!parsed) throw new Error("URL de GitLab inválida.");
+
+    const glJson = async (apiPath) => {
+        const res = await fetch(`https://gitlab.com/api/v4${apiPath}`, {
+            headers: { Accept: "application/json" },
+            cache: "no-store",
+        });
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+    };
+
+    const encoded = encodeURIComponent(parsed.projectPath);
+    const { res: projRes, data: projData } = await glJson(`/projects/${encoded}`);
+    if (projRes.status === 404 || projRes.status === 410) {
+        return {
+            provider: "gitlab",
+            syncProvider: "gitlab",
+            syncTarget: parsed.projectPath,
+            status: "down",
+            githubRepo: "",
+            repoUrl: `https://gitlab.com/${parsed.projectPath}`,
+            error: `Repositorio de GitLab no disponible (HTTP ${projRes.status}).`,
+            checkedAt: new Date().toISOString(),
+        };
+    }
+    if (!projRes.ok) {
+        throw new Error(projData?.message || `GitLab HTTP ${projRes.status}`);
+    }
+
+    const canonicalPath = String(projData.path_with_namespace || parsed.projectPath);
+    const canonicalEncoded = encodeURIComponent(canonicalPath);
+    const repoUrl = String(projData.web_url || `https://gitlab.com/${canonicalPath}`);
+    const moved = canonicalPath.toLowerCase() !== parsed.projectPath.toLowerCase();
+
+    let release = null;
+    const rels = await glJson(`/projects/${canonicalEncoded}/releases?per_page=1`);
+    if (rels.res.ok && Array.isArray(rels.data) && rels.data.length > 0) {
+        release = rels.data[0];
+    }
+
+    let tagFallback = null;
+    if (!release) {
+        const tags = await glJson(`/projects/${canonicalEncoded}/repository/tags?per_page=1`);
+        if (tags.res.ok && Array.isArray(tags.data) && tags.data.length > 0) {
+            tagFallback = tags.data[0];
+        }
+    }
+
+    let commitFallback = null;
+    if (!release && !tagFallback) {
+        const commits = await glJson(`/projects/${canonicalEncoded}/repository/commits?per_page=1`);
+        if (commits.res.ok && Array.isArray(commits.data) && commits.data.length > 0) {
+            commitFallback = commits.data[0];
+        }
+    }
+
+    const assetLinks = Array.isArray(release?.assets?.links) ? release.assets.links : [];
+    const apkAsset =
+        assetLinks.find(
+            (l) => /\.apk(?:$|[?#])/i.test(String(l?.name || l?.direct_asset_url || l?.url || "")) &&
+                !/debug/i.test(String(l?.name || ""))
+        ) ||
+        assetLinks.find((l) => /\.apk(?:$|[?#])/i.test(String(l?.name || l?.direct_asset_url || l?.url || "")));
+    let apkUrl = String(apkAsset?.direct_asset_url || apkAsset?.url || "").trim();
+    if (!apkUrl && release?.description) {
+        const mdApk = String(release.description).match(/https?:\/\/[^\s)"']+\.apk/i);
+        if (mdApk) apkUrl = mdApk[0];
+    }
+
+    const version = String(release?.tag_name || tagFallback?.name || "").trim();
+    const updatedIso =
+        release?.released_at ||
+        release?.created_at ||
+        tagFallback?.commit?.committed_date ||
+        commitFallback?.committed_date ||
+        projData.last_activity_at ||
+        "";
+    const releaseUrl = release?.tag_name
+        ? `${repoUrl}/-/releases/${encodeURIComponent(release.tag_name)}`
+        : repoUrl;
+
+    return {
+        provider: "gitlab",
+        syncProvider: "gitlab",
+        syncTarget: canonicalPath,
+        status: moved ? "moved" : "ok",
+        moved,
+        archived: Boolean(projData.archived),
+        githubRepo: "",
+        repoUrl,
+        releaseUrl,
+        apkUrl,
+        recommendedUrl: apkUrl || releaseUrl || repoUrl,
+        project: String(projData.name || parsed.project),
+        developer: String(projData.namespace?.name || projData.namespace?.full_path || parsed.namespace),
+        version,
+        lastUpdate: formatNaplDate(updatedIso),
+        link: projData.archived ? "Free (Gitlab - Archived)" : "Free (Gitlab)",
+        description: String(projData.description || ""),
+        checkedAt: new Date().toISOString(),
+    };
+}
+
+async function waitForLookupResultFile(
+    cfg,
+    requestId,
+    dispatchedAt,
+    { pat, timeoutMs = 180_000, pollIntervalMs = 1000 } = {}
+) {
+    const resultPath = `private/lookup-results/${requestId}.json`;
+    const startedAt = Date.now();
+    const intervalMs = Math.max(750, Math.min(Number(pollIntervalMs) || 1000, 1500));
+    let matchedRunId = null;
+    let lastRunCheckAt = 0;
+
+    // Wait briefly so GitHub has time to create the workflow run before the first poll
+    await new Promise((r) => setTimeout(r, 1600));
+
+    while (Date.now() - startedAt < timeoutMs) {
+        const fileRes = await readRepoJsonFile(resultPath, {
+            pat,
+            configOverrides: cfg,
+            optional: true,
+        });
+        if (!fileRes.missing && fileRes.data) {
+            if (!fileRes.data.ok) {
+                throw new Error(fileRes.data.error || "La consulta en GitHub Actions falló.");
+            }
+            return fileRes.data.data;
+        }
+
+        if (Date.now() - lastRunCheckAt >= 3000) {
+            lastRunCheckAt = Date.now();
+            try {
+                const { data } = await githubApi(
+                    `/repos/${cfg.codeRepo}/actions/workflows/${encodeURIComponent(cfg.lookupWorkflow)}/runs?event=workflow_dispatch&per_page=5`,
+                    { pat }
+                );
+                const runs = Array.isArray(data?.workflow_runs) ? data.workflow_runs : [];
+                const matchedRun = matchedRunId
+                    ? runs.find((r) => r.id === matchedRunId)
+                    : runs.find((r) => Date.parse(r.created_at || "") >= dispatchedAt);
+                if (matchedRun) {
+                    matchedRunId = matchedRun.id;
+                    if (matchedRun.status === "completed") {
+                        if (matchedRun.conclusion !== "success") {
+                            throw new Error(
+                                `El workflow ${cfg.lookupWorkflow} terminó con estado: ${matchedRun.conclusion || "failed"}.`
+                            );
+                        }
+                        const finalRes = await readRepoJsonFile(resultPath, {
+                            pat,
+                            configOverrides: cfg,
+                            optional: true,
+                        });
+                        if (!finalRes.missing && finalRes.data) {
+                            if (!finalRes.data.ok) {
+                                throw new Error(finalRes.data.error || "La consulta en GitHub Actions falló.");
+                            }
+                            return finalRes.data.data;
+                        }
+                        throw new Error("El workflow finalizó pero no devolvió el archivo de resultado.");
+                    }
+                }
+            } catch (statusErr) {
+                if (statusErr?.message?.includes(cfg.lookupWorkflow) || statusErr?.message?.includes("archivo de resultado")) {
+                    throw statusErr;
+                }
+                // Keep polling result file if run-status check hit transient error
+            }
+        }
+
+        await new Promise((r) => setTimeout(r, intervalMs));
+    }
+
+    throw new Error(`Tiempo de espera agotado esperando ${cfg.lookupWorkflow}.`);
+}
+
 export async function runGithubLookup(mode, url, options = {}) {
+    const cleanMode = String(mode || "").trim().toLowerCase();
+    const cleanUrl = String(url || "").trim();
     const cfg = { ...getSessionConfig(), ...options.configOverrides };
     const pat = options.pat || getStoredGithubPat();
-    const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-    await dispatchWorkflowAndWait(
+    if (cleanMode === "port_source" || cleanMode === "source") {
+        if (parseGithubRepo(cleanUrl)) {
+            try {
+                return await inspectGithubRepoDirect(cleanUrl, pat);
+            } catch {
+                // Fall back to local endpoint or GitHub Actions
+            }
+        } else if (parseGitlabProject(cleanUrl)) {
+            try {
+                return await inspectGitlabProjectDirect(cleanUrl);
+            } catch {
+                // Fall back to local endpoint or GitHub Actions
+            }
+        }
+    }
+
+    if (cleanMode !== "optimize_cover") {
+        const localData = await tryLocalLookup(cleanMode, cleanUrl);
+        if (localData) return localData;
+    }
+
+    const requestId = `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const { dispatchedAt } = await dispatchWorkflow(
         cfg.lookupWorkflow,
         {
-            mode: String(mode || "").trim(),
-            url: String(url || "").trim(),
+            mode: cleanMode,
+            url: cleanUrl,
             request_id: requestId,
         },
-        { ...options, pat, configOverrides: cfg }
-    );
-
-    const { data: result } = await readRepoJsonFile(
-        `private/lookup-results/${requestId}.json`,
         { pat, configOverrides: cfg }
     );
-    if (!result?.ok) {
-        throw new Error(result?.error || "La consulta en GitHub Actions falló.");
-    }
-    return result.data;
+
+    return waitForLookupResultFile(cfg, requestId, dispatchedAt, {
+        pat,
+        timeoutMs: options.timeoutMs || 180_000,
+        pollIntervalMs: options.pollIntervalMs || 1000,
+    });
 }
 
 export async function triggerCatalogSync({

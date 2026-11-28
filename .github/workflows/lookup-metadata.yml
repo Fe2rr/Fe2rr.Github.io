@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       mode:
-        description: "Lookup mode: launchbox | steam | port_source | optimize_cover"
+        description: "Lookup mode: launchbox | steam | itch | port_source | optimize_cover"
         required: true
         type: choice
         options:
@@ -33,10 +33,16 @@ permissions:
 jobs:
   lookup:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     steps:
       - name: Checkout NAPL-Prueba
         uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            lib
+            scripts/lookup-metadata.mjs
+            public/js/lib/source-parsers.js
+          sparse-checkout-cone-mode: false
 
       - name: Validate required Actions secrets
         env:
@@ -45,6 +51,7 @@ jobs:
           test -n "$NAPL_DATA_GITHUB_TOKEN" || { echo "::error::Missing Actions secret NAPL_DATA_GITHUB_TOKEN"; exit 1; }
 
       - name: Checkout NAPL-Data assets repository
+        if: inputs.mode == 'optimize_cover'
         uses: actions/checkout@v4
         with:
           repository: Fe2rr/NAPL-Data
@@ -52,12 +59,7 @@ jobs:
           path: data
           token: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
 
-      - name: Configure Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-
-      - name: Run metadata lookup & cover pre-optimization
+      - name: Run metadata lookup
         env:
           GITHUB_TOKEN: ${{ secrets.NAPL_DATA_GITHUB_TOKEN }}
           STEAMGRIDDB_API_KEY: ${{ secrets.STEAMGRIDDB_API_KEY }}
@@ -65,9 +67,13 @@ jobs:
           LOOKUP_URL: ${{ inputs.url }}
           LOOKUP_REQUEST_ID: ${{ inputs.request_id }}
           NAPL_DATA_DIR: data
+          NAPL_DATA_REPO: Fe2rr/NAPL-Data
+          NAPL_DATA_BRANCH: main
+          NAPL_WRITE_VIA_API: ${{ (inputs.mode != 'optimize_cover' && inputs.request_id != '') && '1' || '0' }}
         run: node scripts/lookup-metadata.mjs
 
       - name: Commit lookup result and cover assets
+        if: inputs.mode == 'optimize_cover'
         working-directory: data
         run: |
           git config user.name "github-actions[bot]"

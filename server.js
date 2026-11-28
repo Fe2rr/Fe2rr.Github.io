@@ -3,6 +3,12 @@ import fs from "node:fs";
 import path from "node:path";
 import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
+import {
+  inspectLaunchboxUrl,
+  inspectSteamApp,
+  inspectItchPage,
+  inspectPortSource,
+} from "./lib/catalog-core.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -273,16 +279,93 @@ function resolveLegacyRedirect(rawPath, search) {
   return isPublicPrefixed ? cleanPath + search : null;
 }
 
+const MAX_LOOKUP_BODY_BYTES = 8192;
+
+async function readJsonBody(req) {
+  let size = 0;
+  const chunks = [];
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > MAX_LOOKUP_BODY_BYTES) {
+      const err = new Error("Payload too large.");
+      err.status = 413;
+      throw err;
+    }
+    chunks.push(chunk);
+  }
+  const raw = Buffer.concat(chunks).toString("utf8").trim();
+  if (!raw) return {};
+  try {
+    return JSON.parse(raw);
+  } catch {
+    const err = new Error("Invalid JSON body.");
+    err.status = 400;
+    throw err;
+  }
+}
+
+async function handleLookupMetadata(req, res) {
+  try {
+    const body = await readJsonBody(req);
+    const mode = String(body?.mode || "").trim().toLowerCase();
+    const url = String(body?.url || "").trim();
+    if (!mode || !url || url.length > 1000) {
+      const errBuf = Buffer.from(
+        JSON.stringify({ ok: false, error: "Parámetros inválidos." })
+      );
+      return sendBuffer(req, res, 400, errBuf, MIME_TYPES[".json"]);
+    }
+
+    const env = {
+      GITHUB_TOKEN: process.env.GITHUB_TOKEN || "",
+      GITLAB_TOKEN: process.env.GITLAB_TOKEN || "",
+      STEAMGRIDDB_API_KEY: process.env.STEAMGRIDDB_API_KEY || "",
+    };
+
+    let data;
+    if (mode === "launchbox") {
+      data = await inspectLaunchboxUrl(url);
+    } else if (mode === "steam") {
+      data = await inspectSteamApp(url, env);
+    } else if (mode === "itch") {
+      data = await inspectItchPage(url);
+    } else if (mode === "port_source" || mode === "source") {
+      data = await inspectPortSource(url, env);
+    } else {
+      const errBuf = Buffer.from(
+        JSON.stringify({ ok: false, error: `Modo no soportado: ${mode}` })
+      );
+      return sendBuffer(req, res, 400, errBuf, MIME_TYPES[".json"]);
+    }
+
+    const okBuf = Buffer.from(JSON.stringify({ ok: true, data }));
+    return sendBuffer(req, res, 200, okBuf, MIME_TYPES[".json"]);
+  } catch (err) {
+    const status = Number(err?.status) || 502;
+    const errBuf = Buffer.from(
+      JSON.stringify({
+        ok: false,
+        error: err?.message || "Error consultando metadatos.",
+      })
+    );
+    return sendBuffer(req, res, status, errBuf, MIME_TYPES[".json"]);
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   try {
+    const reqUrl = new URL(req.url || "/", "http://localhost");
+    const pathname = decodeURIComponent(reqUrl.pathname);
+    const search = reqUrl.search || "";
+
+    if (pathname === "/api/lookup-metadata" && req.method === "POST") {
+      return await handleLookupMetadata(req, res);
+    }
+
     if (req.method !== "GET" && req.method !== "HEAD") {
       res.writeHead(405, { Allow: "GET, HEAD" });
       return res.end("Method Not Allowed");
     }
-
-    const reqUrl = new URL(req.url || "/", "http://localhost");
-    const pathname = decodeURIComponent(reqUrl.pathname);
-    const search = reqUrl.search || "";
 
     if (pathname === "/api/health") {
       const body = Buffer.from(JSON.stringify({ ok: true, mode: "preview-proxy" }));

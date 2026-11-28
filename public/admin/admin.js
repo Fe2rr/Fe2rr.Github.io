@@ -813,9 +813,9 @@ $("ports-list").addEventListener("click", async (event) => {
   const port = game.ports[Number(inspectButton.dataset.inspectPort)];
   const target = port?.githubRepo || port?.url || port?.link;
   if (!target) return notice("Este port no tiene una fuente para consultar.", "error");
-  setBusy(true, "Revisando fuente del port con GitHub Actions…");
+  setBusy(true, "Consultando fuente del port…");
   try {
-    const result = await runGithubLookup("port_source", target, { timeoutMs:300000, pollIntervalMs:1500 });
+    const result = await runGithubLookup("port_source", target, { timeoutMs:180000, pollIntervalMs:1000 });
     const info = result?.data || result;
     const fields = {project:info.project || info.name,developer:info.developer,version:info.version,controller:info.controller,files:info.files,link:info.link,url:info.repoUrl || info.url || target,githubRepo:info.githubRepo || info.syncTarget,portId:info.portId,lastUpdate:info.lastUpdate};
     for (const [key,value] of Object.entries(fields)) if (value && !port[key]) port[key] = value;
@@ -887,10 +887,10 @@ $("community-data").addEventListener("click", async (event) => {
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
   if (!url) return notice("Ingresá la URL del juego.", "error");
-  setBusy(true, "Consultando metadatos con GitHub Actions…");
+  setBusy(true, "Consultando metadatos…");
   try {
     const mode = detectMetadataSource(url);
-    const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:1500 });
+    const data = await runGithubLookup(mode, url, { timeoutMs:180000, pollIntervalMs:1000 });
     const game = readDraft();
     const payload = data?.data || data;
     const isPlaceholderName = !game.name || /^nuevo juego$/i.test(game.name.trim());
