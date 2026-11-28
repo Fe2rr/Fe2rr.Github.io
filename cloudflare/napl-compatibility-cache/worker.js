@@ -1,9 +1,18 @@
-const UPSTREAM = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1/compatibility";
+const UPSTREAM_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   "Access-Control-Allow-Headers": "Content-Type, apikey, Authorization",
 };
+const POST_ROUTES = new Set([
+  "/compatibility",
+  "/popularity",
+  "/ratings/token",
+  "/ratings/my-votes",
+  "/ratings/vote",
+  "/ratings/unvote",
+  "/report-link",
+]);
 const inflight = new Map();
 
 function json(data, status = 200, extra = {}) {
@@ -43,7 +52,7 @@ function normalizeGet(url) {
   return { params, ttl: 60, fresh };
 }
 
-async function cachedGet(url) {
+async function cachedCompatibilityGet(url) {
   const normalized = normalizeGet(url);
   if (normalized.retired) {
     return json({ success: false, error: "The device catalog is served from static JSON." }, 410, {
@@ -53,7 +62,7 @@ async function cachedGet(url) {
   if (normalized.error) return json({ success: false, error: normalized.error }, 400);
   if (normalized.empty) return json({ success: true, compatibility: {} });
 
-  const upstreamUrl = new URL(UPSTREAM);
+  const upstreamUrl = new URL(UPSTREAM_BASE + "/compatibility");
   upstreamUrl.search = normalized.params.toString();
   if (normalized.fresh) {
     const response = await fetch(upstreamUrl, { headers: { Accept: "application/json" } });
@@ -110,36 +119,53 @@ async function cachedGet(url) {
 export default {
   async fetch(request) {
     const url = new URL(request.url);
+    const pathname = url.pathname.replace(/\/+$/, "") || "/";
     if (request.method === "OPTIONS") {
+      if (!POST_ROUTES.has(pathname) && pathname !== "/compatibility") {
+        return json({ success: false, error: "Not found." }, 404);
+      }
       return new Response(null, { status: 204, headers: cors });
     }
-    if (request.method === "GET") {
+
+    if (request.method === "GET" && pathname === "/compatibility") {
       try {
-        return await cachedGet(url);
+        return await cachedCompatibilityGet(url);
       } catch {
         return json({ success: false, error: "Compatibility service temporarily unavailable." }, 502, {
           "Cache-Control": "no-store",
         });
       }
     }
-    if (request.method === "POST") {
+
+    if (request.method === "GET" && (pathname === "/popularity" || pathname === "/ratings")) {
+      return json({ success: false, error: "Public data is served from static snapshots." }, 410, {
+        "Cache-Control": "no-store",
+      });
+    }
+
+    if (request.method === "POST" && POST_ROUTES.has(pathname)) {
       try {
-        const response = await fetch(UPSTREAM, {
+        const upstream = await fetch(UPSTREAM_BASE + pathname, {
           method: "POST",
-          headers: { "Content-Type": request.headers.get("Content-Type") || "application/json" },
+          headers: {
+            "Content-Type": request.headers.get("Content-Type") || "application/json",
+            ...(request.headers.get("Authorization") ? { Authorization: request.headers.get("Authorization") } : {}),
+            ...(request.headers.get("apikey") ? { apikey: request.headers.get("apikey") } : {}),
+          },
           body: request.body,
         });
-        const headers = new Headers(response.headers);
+        const headers = new Headers(upstream.headers);
         for (const [key, value] of Object.entries(cors)) headers.set(key, value);
         headers.set("Cache-Control", "no-store");
-        return new Response(response.body, { status: response.status, headers });
+        return new Response(upstream.body, { status: upstream.status, headers });
       } catch {
-        return json({ success: false, error: "Compatibility report could not be submitted." }, 502, {
+        return json({ success: false, error: "Community request could not be processed." }, 502, {
           "Cache-Control": "no-store",
         });
       }
     }
-    return json({ success: false, error: "Method not allowed." }, 405, {
+
+    return json({ success: false, error: "Method not allowed or route not found." }, 405, {
       "Allow": "GET, POST, OPTIONS",
     });
   },
