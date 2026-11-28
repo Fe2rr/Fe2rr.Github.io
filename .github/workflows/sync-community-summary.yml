@@ -61,7 +61,7 @@ jobs:
           NAPL_DATA_DIR: data
         run: node scripts/sync-community-summary.mjs
 
-      - name: Commit updated community-summary.json
+      - name: Commit updated community snapshots
         if: steps.check_env.outputs.ready == 'true'
         id: commit_summary
         working-directory: data
@@ -71,18 +71,26 @@ jobs:
           if [ -f "public/assets/data/community-summary.json" ]; then
             git add public/assets/data/community-summary.json
           fi
+          if ! git diff --cached --quiet -- public/assets/data/community-summary.json; then
+            echo "summary_changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "summary_changed=false" >> "$GITHUB_OUTPUT"
+          fi
+          if [ -f "private/link-reports.json" ]; then
+            git add private/link-reports.json
+          fi
           if ! git diff --cached --quiet; then
-            git commit -m "NAPL: update static community summary"
+            git commit -m "NAPL: update community summary & link reports"
             git pull --rebase origin main
             git push origin HEAD:main
             echo "changed=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No community summary changes detected."
+            echo "No community summary or link report changes detected."
             echo "changed=false" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Trigger GitHub Pages redeploy when summary changed
-        if: steps.check_env.outputs.ready == 'true' && steps.commit_summary.outputs.changed == 'true'
+      - name: Trigger GitHub Pages redeploy when public summary changed
+        if: steps.check_env.outputs.ready == 'true' && steps.commit_summary.outputs.summary_changed == 'true'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}

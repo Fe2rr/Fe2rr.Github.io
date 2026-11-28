@@ -1,12 +1,22 @@
 import {
+  clearEncryptedGithubVault,
   clearGithubSession,
+  exportEncryptedGithubVault,
   fetchCommunityAdminDashboard,
   getStoredGithubPat,
+  hasEncryptedGithubVault,
+  hasLegacyPlaintextPat,
+  importEncryptedGithubVault,
+  lockGithubSession,
   loginWithGithubPat,
   readAdminCatalogState,
   runGithubLookup,
   saveAndPublishCatalogState,
+  setupGithubPasswordVault,
   triggerCatalogSync,
+  triggerCommunitySummarySync,
+  unlockGithubVaultWithPassword,
+  updateCommunityLinkReportStatus,
   dispatchWorkflowAndWait,
 } from "../js/lib/github-admin.js";
 
@@ -17,6 +27,8 @@ let pat = getStoredGithubPat();
 let state = null;
 let selectedSlug = "";
 let busy = false;
+let loginMode = hasEncryptedGithubVault() ? "unlock" : "setup";
+let useLegacyMigrationPat = !hasEncryptedGithubVault() && hasLegacyPlaintextPat();
 
 const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (c) => ({
   "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -44,6 +56,40 @@ function makeSlug(value) {
   return String(value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
+function syncLoginModeUi() {
+  const vaultExists = hasEncryptedGithubVault();
+  if (loginMode === "unlock" && !vaultExists) {
+    loginMode = "setup";
+  }
+  const isUnlock = loginMode === "unlock";
+  $("unlock-fields").hidden = !isUnlock;
+  $("setup-fields").hidden = isUnlock;
+  $("admin-password").required = isUnlock;
+  $("setup-password").required = !isUnlock;
+  $("setup-password-confirm").required = !isUnlock;
+  $("github-pat").required = !isUnlock && !useLegacyMigrationPat;
+  $("pat-field-wrap").hidden = isUnlock || useLegacyMigrationPat;
+  $("legacy-pat-banner").hidden = isUnlock || !useLegacyMigrationPat;
+  $("switch-to-setup").hidden = !isUnlock;
+  $("switch-to-unlock").hidden = isUnlock || !vaultExists;
+  $("forget-vault").hidden = !vaultExists;
+  $("export-vault-btn").hidden = !vaultExists;
+
+  if (isUnlock) {
+    $("login-title").textContent = "Desbloquear panel";
+    $("login-subtitle").textContent = "Ingresá tu contraseña para descifrar tu acceso a GitHub en este navegador.";
+    $("login-submit").textContent = "Entrar";
+  } else if (useLegacyMigrationPat) {
+    $("login-title").textContent = "Proteger acceso con contraseña";
+    $("login-subtitle").textContent = "Definí una contraseña para cifrar el token guardado y entrar solo con contraseña a partir de ahora.";
+    $("login-submit").textContent = "Guardar contraseña y entrar";
+  } else {
+    $("login-title").textContent = "Configurar acceso con contraseña";
+    $("login-subtitle").textContent = "Tu GitHub PAT se cifra localmente con AES-256 usando tu contraseña y nunca se guarda sin cifrar.";
+    $("login-submit").textContent = "Guardar contraseña y entrar";
+  }
+}
+
 function showAdmin() {
   loginView.hidden = true;
   adminView.hidden = false;
@@ -52,6 +98,7 @@ function showAdmin() {
 function showLogin(message = "") {
   adminView.hidden = true;
   loginView.hidden = false;
+  syncLoginModeUi();
   $("login-message").textContent = message;
 }
 function normalizeState(value) {
@@ -204,19 +251,65 @@ async function loadState() {
   selectedSlug = state.catalog.games[0]?.slug || "";
   renderAll();
 }
-async function login(raw) {
-  setBusy(true, "Verificando permisos de GitHub…");
+async function handleLoginSubmit() {
+  if (busy) return;
+  $("login-message").textContent = "";
+  if (loginMode === "unlock") {
+    const password = $("admin-password").value;
+    if (!password) {
+      $("login-message").textContent = "Ingresá tu contraseña.";
+      return;
+    }
+    setBusy(true, "Descifrando y verificando acceso en GitHub…");
+    try {
+      const result = await unlockGithubVaultWithPassword(password);
+      pat = getStoredGithubPat();
+      $("admin-password").value = "";
+      await loadState();
+      showAdmin();
+      notice("Conectado como " + (result.user?.login || "administrador") + ".", "success");
+    } catch (error) {
+      lockGithubSession();
+      pat = "";
+      showLogin(error.message || "No se pudo desbloquear el acceso.");
+    } finally {
+      setBusy(false);
+    }
+    return;
+  }
+
+  const rawPat = $("github-pat").value;
+  const password = $("setup-password").value;
+  const confirmPassword = $("setup-password-confirm").value;
+  if (password.length < 8) {
+    $("login-message").textContent = "La contraseña debe tener al menos 8 caracteres.";
+    return;
+  }
+  if (password !== confirmPassword) {
+    $("login-message").textContent = "Las contraseñas no coinciden.";
+    return;
+  }
+
+  setBusy(true, "Validando permisos en GitHub y cifrando acceso…");
   try {
-    const result = await loginWithGithubPat(raw);
-    pat = raw.trim();
+    const result = await setupGithubPasswordVault({
+      pat: rawPat,
+      password,
+      useLegacyPat: useLegacyMigrationPat,
+    });
+    pat = getStoredGithubPat();
+    useLegacyMigrationPat = false;
+    loginMode = "unlock";
     $("github-pat").value = "";
+    $("setup-password").value = "";
+    $("setup-password-confirm").value = "";
     await loadState();
     showAdmin();
-    notice("Conectado como " + (result.user?.login || "administrador") + ".", "success");
+    notice("Contraseña configurada. Conectado como " + (result.user?.login || "administrador") + ".", "success");
   } catch (error) {
-    clearGithubSession();
+    lockGithubSession();
     pat = "";
-    showLogin(error.message || "No se pudo validar el PAT.");
+    showLogin(error.message || "No se pudo configurar la contraseña.");
   } finally {
     setBusy(false);
   }
@@ -325,46 +418,176 @@ async function runSync(importSheets = false) {
     setBusy(false);
   }
 }
+let communityState = null;
+let communityRefreshing = false;
+
+function formatCommunityTimestamp(iso) {
+  if (!iso) return "";
+  const ms = Date.parse(iso);
+  if (!Number.isFinite(ms)) return iso;
+  return new Date(ms).toLocaleString("es-UY");
+}
+
 function table(title, rows, columns) {
   const content = Array.isArray(rows) ? rows : [];
-  return `<section class="community-section"><h3>${esc(title)} · ${content.length}</h3><div class="table-wrap"><table><thead><tr>${columns.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${content.map(row=>`<tr>${columns.map(c=>`<td>${esc(typeof c.value==="function"?c.value(row):row[c.key])}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">Sin registros.</td></tr>`}</tbody></table></div></section>`;
+  return `<section class="community-section"><h3>${esc(title)} · ${content.length}</h3><div class="table-wrap"><table><thead><tr>${columns.map(c=>`<th>${esc(c.label)}</th>`).join("")}</tr></thead><tbody>${content.map(row=>`<tr>${columns.map(c=>`<td>${typeof c.html === "function" ? c.html(row) : esc(typeof c.value==="function"?c.value(row):row[c.key])}</td>`).join("")}</tr>`).join("") || `<tr><td colspan="${columns.length}">Sin registros.</td></tr>`}</tbody></table></div></section>`;
 }
+
+function renderCommunityDashboard(data) {
+  communityState = data;
+  const totals = data?.totals || {};
+  const metrics = [
+    ["Reportes pendientes", totals.linkReports],
+    ["Reportes resueltos", totals.resolvedLinkReports],
+    ["Reportes compatibilidad", totals.compatibilityReports],
+    ["Votos", totals.ratingVotes],
+    ["Juegos con visitas", totals.gamesTracked],
+    ["Visitas totales", totals.allTimeVisits],
+  ];
+  $("community-data").innerHTML = '<div class="community-grid">' + metrics.map(([label,value])=>`<div class="metric"><small>${esc(label)}</small><strong>${Number(value || 0).toLocaleString("es-UY")}</strong></div>`).join("") + "</div>" +
+    table("Reportes de enlaces", data.reports, [
+      {label:"Fecha",value:r=>formatCommunityTimestamp(r.updated_at || r.created_at)},
+      {label:"Port ID",key:"port_id"},
+      {label:"Motivo",key:"reason"},
+      {label:"Nota",key:"note"},
+      {label:"URL",key:"url"},
+      {label:"Discord",value:r=>r.discord_notified_at?"Enviado":"Pendiente"},
+      {label:"Estado",html:r=>`<span class="report-status-badge ${r.status==="resolved"?"is-resolved":"is-pending"}">${r.status==="resolved"?"Resuelto":"Pendiente"}</span>`},
+      {label:"Acción",html:r=>{
+        const next = r.status === "resolved" ? "pending" : "resolved";
+        const label = r.status === "resolved" ? "Reabrir" : "Resolver";
+        return `<button type="button" class="button secondary report-status-btn" data-toggle-report="${esc(r.reportKey)}" data-next-status="${esc(next)}">${label}</button>`;
+      }},
+    ]) +
+    table("Reportes de compatibilidad", data.compatibility, [
+      {label:"Fecha",value:r=>formatCommunityTimestamp(r.updated_at)},{label:"Port ID",key:"port_id"},{label:"Dispositivo",key:"device_name"},{label:"Estado",key:"status"},{label:"Funciona",value:r=>r.works?"Sí":"No"}
+    ]) +
+    table("Ratings", data.ratings, [
+      {label:"Port ID",key:"port_id"},{label:"Votos",key:"votes"},{label:"Promedio",key:"avg"},{label:"Puntaje",key:"score"}
+    ]) +
+    table("Popularidad", data.popularity, [
+      {label:"Juego",key:"game_key"},{label:"Visitas totales",key:"all_time_visits"},{label:"Semana",key:"week_visits"},{label:"Mes",key:"month_visits"},{label:"Actualizado",value:r=>formatCommunityTimestamp(r.updated_at)}
+    ]);
+
+  if (!data.hasSummaryFile && !data.hasReportsFile) {
+    $("community-status").textContent = "Todavía no hay archivos comunitarios en Fe2rr/NAPL-Data. Usá «Actualizar desde GitHub Actions» para generarlos.";
+    return;
+  }
+  const parts = ["Datos leídos desde JSON en GitHub (Fe2rr/NAPL-Data)"];
+  if (data.generatedAt) parts.push("Snapshot: " + formatCommunityTimestamp(data.generatedAt));
+  if (!data.hasReportsFile) parts.push("Sin historial de reportes aún");
+  $("community-status").textContent = parts.join(" · ");
+}
+
 async function loadCommunity() {
-  $("community-status").textContent = "Consultando resumen comunitario…";
+  $("community-status").textContent = "Consultando archivos JSON en GitHub…";
   $("community-data").innerHTML = "";
-  $("community-dialog").showModal();
+  if (!$("community-dialog").open) {
+    $("community-dialog").showModal();
+  }
   try {
     const data = await fetchCommunityAdminDashboard({ pat });
-    const totals = data.totals || {};
-    const metrics = [
-      ["Reportes pendientes", totals.linkReports], ["Reportes compatibilidad", totals.compatibilityReports],
-      ["Votos", totals.ratingVotes], ["Juegos con visitas", totals.gamesTracked], ["Visitas totales", totals.allTimeVisits],
-    ];
-    $("community-data").innerHTML = '<div class="community-grid">' + metrics.map(([label,value])=>`<div class="metric"><small>${esc(label)}</small><strong>${Number(value || 0).toLocaleString("es-UY")}</strong></div>`).join("") + "</div>" +
-      table("Reportes de enlaces", data.reports, [
-        {label:"Fecha",key:"updated_at"},{label:"Port ID",key:"port_id"},{label:"Motivo",key:"reason"},{label:"Nota",key:"note"},{label:"URL",key:"url"},{label:"Discord",value:r=>r.discord_notified_at?"Enviado":"Pendiente"}
-      ]) +
-      table("Reportes de compatibilidad", data.compatibility, [
-        {label:"Fecha",key:"updated_at"},{label:"Port ID",key:"port_id"},{label:"Dispositivo",key:"device_name"},{label:"Estado",key:"status"},{label:"Funciona",value:r=>r.works?"Sí":"No"}
-      ]) +
-      table("Ratings", data.ratings, [
-        {label:"Port ID",key:"port_id"},{label:"Votos",key:"votes"},{label:"Promedio",key:"avg"},{label:"Puntaje",key:"score"}
-      ]) +
-      table("Popularidad", data.popularity, [
-        {label:"Juego",key:"game_key"},{label:"Visitas totales",key:"all_time_visits"},{label:"Semana",key:"week_visits"},{label:"Mes",key:"month_visits"},{label:"Actualizado",key:"updated_at"}
-      ]);
-    $("community-status").textContent = "Datos obtenidos desde Supabase y snapshots de GitHub.";
+    renderCommunityDashboard(data);
   } catch (error) {
-    $("community-status").textContent = error.message || "No se pudo cargar el dashboard.";
+    $("community-status").textContent = error.message || "No se pudo cargar el dashboard desde GitHub.";
+  }
+}
+
+async function refreshCommunityFromActions() {
+  if (communityRefreshing) return;
+  communityRefreshing = true;
+  const button = $("refresh-community");
+  button.disabled = true;
+  $("community-status").textContent = "Iniciando actualización en GitHub Actions…";
+  try {
+    await triggerCommunitySummarySync({
+      pat,
+      timeoutMs: 300000,
+      pollIntervalMs: 4000,
+      onProgress: (run) => {
+        $("community-status").textContent = "GitHub Actions (" + (run.status || "running") + (run.conclusion ? " · " + run.conclusion : "") + ")…";
+      },
+    });
+    await loadCommunity();
+    notice("Datos comunitarios actualizados desde GitHub Actions.", "success");
+  } catch (error) {
+    $("community-status").textContent = error.message || "No se pudo ejecutar la actualización en GitHub Actions.";
+  } finally {
+    communityRefreshing = false;
+    button.disabled = false;
   }
 }
 
 $("login-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  login($("github-pat").value);
+  handleLoginSubmit();
+});
+$("switch-to-setup").addEventListener("click", () => {
+  loginMode = "setup";
+  useLegacyMigrationPat = false;
+  $("login-message").textContent = "";
+  syncLoginModeUi();
+});
+$("switch-to-unlock").addEventListener("click", () => {
+  loginMode = "unlock";
+  useLegacyMigrationPat = false;
+  $("login-message").textContent = "";
+  syncLoginModeUi();
+});
+$("use-new-pat-btn").addEventListener("click", () => {
+  useLegacyMigrationPat = false;
+  $("login-message").textContent = "";
+  syncLoginModeUi();
+});
+$("toggle-vault-transfer").addEventListener("click", () => {
+  const panel = $("vault-transfer-panel");
+  panel.hidden = !panel.hidden;
+});
+$("export-vault-btn").addEventListener("click", async () => {
+  try {
+    const serialized = exportEncryptedGithubVault();
+    $("vault-transfer-input").value = serialized;
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(serialized);
+      $("login-message").textContent = "Bóveda cifrada copiada al portapapeles.";
+    } else {
+      $("vault-transfer-input").select();
+      $("login-message").textContent = "Bóveda cifrada lista para copiar abajo.";
+    }
+  } catch (error) {
+    $("login-message").textContent = error.message || "No se pudo exportar la bóveda.";
+  }
+});
+$("import-vault-btn").addEventListener("click", () => {
+  try {
+    importEncryptedGithubVault($("vault-transfer-input").value);
+    useLegacyMigrationPat = false;
+    loginMode = "unlock";
+    $("vault-transfer-panel").hidden = true;
+    $("vault-transfer-input").value = "";
+    syncLoginModeUi();
+    $("login-message").textContent = "Bóveda importada. Ingresá tu contraseña para entrar.";
+  } catch (error) {
+    $("login-message").textContent = error.message || "No se pudo importar la bóveda.";
+  }
+});
+$("forget-vault").addEventListener("click", () => {
+  if (!confirm("¿Eliminar el acceso guardado en este navegador?")) return;
+  clearEncryptedGithubVault();
+  pat = "";
+  useLegacyMigrationPat = false;
+  loginMode = "setup";
+  $("admin-password").value = "";
+  $("login-message").textContent = "Acceso eliminado de este navegador.";
+  syncLoginModeUi();
 });
 $("logout-button").addEventListener("click", () => {
-  clearGithubSession(); pat = ""; state = null; showLogin();
+  lockGithubSession();
+  pat = "";
+  state = null;
+  loginMode = hasEncryptedGithubVault() ? "unlock" : "setup";
+  $("admin-password").value = "";
+  showLogin("Sesión bloqueada.");
 });
 $("search").addEventListener("input", renderGameList);
 $("sync-filter").addEventListener("click", (event) => {
@@ -470,8 +693,48 @@ $("import-button").addEventListener("click", async () => {
   try { await runSync(true); } catch (error) { notice(error.message || "Falló la importación.", "error"); }
 });
 $("community-button").addEventListener("click", loadCommunity);
+$("refresh-community").addEventListener("click", refreshCommunityFromActions);
 $("close-community").addEventListener("click", () => $("community-dialog").close());
 $("close-sync").addEventListener("click", () => $("sync-dialog").close());
+$("community-data").addEventListener("click", async (event) => {
+  const button = event.target.closest("[data-toggle-report]");
+  if (!button || button.disabled) return;
+  const reportKey = button.dataset.toggleReport;
+  const nextStatus = button.dataset.nextStatus;
+  button.disabled = true;
+  button.textContent = "Guardando…";
+  $("community-status").textContent = "Guardando estado del reporte en GitHub…";
+  try {
+    const result = await updateCommunityLinkReportStatus(reportKey, nextStatus, { pat });
+    if (communityState) {
+      const updatedReports = (result.reports || []).map((item) => ({
+        ...item,
+        reportKey: item.id !== null && item.id !== undefined && String(item.id).trim() !== ""
+          ? `id:${String(item.id).trim()}`
+          : `key:${item.port_id}|${item.created_at || item.updated_at}|${item.url}`,
+      }));
+      const pendingCount = updatedReports.filter((item) => item.status !== "resolved").length;
+      renderCommunityDashboard({
+        ...communityState,
+        reportsUpdatedAt: result.updatedAt,
+        hasReportsFile: true,
+        totals: {
+          ...communityState.totals,
+          linkReports: pendingCount,
+          resolvedLinkReports: updatedReports.length - pendingCount,
+          totalLinkReports: updatedReports.length,
+        },
+        reports: updatedReports,
+      });
+    } else {
+      await loadCommunity();
+    }
+  } catch (error) {
+    $("community-status").textContent = error.message || "No se pudo actualizar el estado del reporte.";
+    button.disabled = false;
+    button.textContent = nextStatus === "resolved" ? "Resolver" : "Reabrir";
+  }
+});
 $("lookup-metadata").addEventListener("click", async () => {
   const url = $("metadata-url").value.trim();
   if (!url) return notice("Ingresá la URL del juego.", "error");
@@ -504,7 +767,11 @@ $("optimize-cover").addEventListener("click", async () => {
 });
 
 async function boot() {
-  if (!pat) return showLogin();
+  if (!pat) {
+    loginMode = hasEncryptedGithubVault() ? "unlock" : "setup";
+    useLegacyMigrationPat = !hasEncryptedGithubVault() && hasLegacyPlaintextPat();
+    return showLogin();
+  }
   try {
     await loginWithGithubPat(pat);
     await loadState();

@@ -16,12 +16,48 @@
   <section id="login-view" class="login-shell">
     <form id="login-form" class="login-card">
       <div class="brand-mark">NAPL <span>ADMIN · JSON</span></div>
-      <h1>Panel de catálogo</h1>
-      <p>Acceso directo a GitHub. El token permanece en la sesión del navegador. Solo se envía a GitHub y a Supabase para validar permisos y consultar el panel comunitario; no se almacena permanentemente.</p>
-      <label for="github-pat">GitHub Fine-grained PAT</label>
-      <input id="github-pat" type="password" autocomplete="off" spellcheck="false" required placeholder="github_pat_…">
-      <button class="button primary full" type="submit">Conectar con GitHub</button>
-      <p class="hint">Permisos necesarios: Contents Read and write en Fe2rr/NAPL-Data y Actions Read and write en Fe2rr/Fe2rr.github.io.</p>
+      <h1 id="login-title">Acceso con contraseña</h1>
+      <p id="login-subtitle">Tu token de GitHub se cifra localmente con tu contraseña y nunca se guarda sin cifrar ni se envía fuera de GitHub.</p>
+
+      <div id="unlock-fields" hidden>
+        <label for="admin-password">Contraseña</label>
+        <input id="admin-password" type="password" autocomplete="current-password" spellcheck="false" placeholder="Ingresá tu contraseña…">
+      </div>
+
+      <div id="setup-fields">
+        <div id="pat-field-wrap">
+          <label for="github-pat">GitHub Fine-grained PAT</label>
+          <input id="github-pat" type="password" autocomplete="off" spellcheck="false" placeholder="github_pat_…">
+        </div>
+        <div id="legacy-pat-banner" class="hint" hidden>
+          Detectamos un token guardado de una sesión anterior. Creá una contraseña para cifrarlo y no tener que pegarlo de nuevo.
+          <button id="use-new-pat-btn" type="button" class="link-button">Usar otro PAT</button>
+        </div>
+        <label for="setup-password">Contraseña de acceso (mínimo 8 caracteres)</label>
+        <input id="setup-password" type="password" autocomplete="new-password" spellcheck="false" minlength="8" placeholder="Elegí una contraseña segura…">
+        <label for="setup-password-confirm">Confirmar contraseña</label>
+        <input id="setup-password-confirm" type="password" autocomplete="new-password" spellcheck="false" minlength="8" placeholder="Repetí tu contraseña…">
+      </div>
+
+      <button id="login-submit" class="button primary full" type="submit">Entrar</button>
+
+      <div class="login-secondary-actions">
+        <button id="switch-to-setup" type="button" class="link-button" hidden>Cambiar contraseña o PAT</button>
+        <button id="switch-to-unlock" type="button" class="link-button" hidden>Volver al acceso con contraseña</button>
+        <button id="toggle-vault-transfer" type="button" class="link-button">Exportar / importar bóveda</button>
+        <button id="forget-vault" type="button" class="link-button danger-link" hidden>Olvidar acceso</button>
+      </div>
+
+      <div id="vault-transfer-panel" class="vault-transfer-panel" hidden>
+        <label for="vault-transfer-input">Bóveda cifrada (segura para mover entre dispositivos)</label>
+        <textarea id="vault-transfer-input" rows="3" spellcheck="false" placeholder="Pegá aquí una bóveda exportada o generá la tuya para copiarla…"></textarea>
+        <div class="vault-transfer-actions">
+          <button id="export-vault-btn" type="button" class="button secondary" hidden>Copiar mi bóveda</button>
+          <button id="import-vault-btn" type="button" class="button secondary">Importar bóveda</button>
+        </div>
+      </div>
+
+      <p class="hint">Permisos necesarios del PAT: Contents Read and write en Fe2rr/NAPL-Data y Actions Read and write en Fe2rr/Fe2rr.github.io.</p>
       <p id="login-message" class="message" role="status"></p>
     </form>
   </section>
@@ -100,8 +136,14 @@
     <p id="sync-workflow-link" class="muted"></p>
   </dialog>
   <dialog id="community-dialog" class="sync-modal">
-    <div class="sync-modal-header"><div><small class="editor-eyebrow">DATOS DE LA COMUNIDAD · SUPABASE + GITHUB</small><h2>Comunidad y reportes</h2></div><button id="close-community" class="button quiet">Cerrar</button></div>
-    <p id="community-status" class="muted">Consultando datos…</p>
+    <div class="sync-modal-header">
+      <div><small class="editor-eyebrow">DATOS DE LA COMUNIDAD · GITHUB</small><h2>Comunidad y reportes</h2></div>
+      <div class="community-modal-actions">
+        <button id="refresh-community" type="button" class="button secondary">Actualizar desde GitHub Actions</button>
+        <button id="close-community" type="button" class="button quiet">Cerrar</button>
+      </div>
+    </div>
+    <p id="community-status" class="muted">Consultando archivos JSON en GitHub…</p>
     <div id="community-data"></div>
   </dialog>
 </body>

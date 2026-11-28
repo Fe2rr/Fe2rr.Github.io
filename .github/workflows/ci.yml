@@ -27,5 +27,6 @@ jobs:
           test -s public/admin/admin.js
           test -s public/admin/admin.css
           grep -q 'fetchCommunityAdminDashboard' public/admin/admin.js
-          grep -q 'community-sync/admin-dashboard' public/js/lib/github-admin.js
+          grep -q 'private/link-reports.json' public/js/lib/github-admin.js
+          ! grep -q 'COMMUNITY_API_BASE' public/js/lib/github-admin.js
           ! grep -R -n -E 'ADMIN_DASHBOARD_API_URL|napl-community-api|napl-admin-api|napl-image-optimizer|Napl-prueba|cloudflare-community' public/js public/admin scripts lib

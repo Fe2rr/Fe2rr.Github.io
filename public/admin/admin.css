@@ -1506,3 +1506,26 @@ button {
 #sync-dialog .sync-job-group > strong { color:#9ce7b9; }
 #sync-workflow-link a { color:#9ce7b9; }
 @media(max-width:560px) { #sync-dialog { padding:15px; } #sync-dialog .sync-stats-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Community modal GitHub actions & report statuses */
+.community-modal-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.report-status-badge { display:inline-flex; align-items:center; padding:3px 8px; border-radius:999px; font:700 10px "JetBrains Mono",monospace; letter-spacing:.04em; text-transform:uppercase; white-space:nowrap; }
+.report-status-badge.is-pending { background:rgba(245,158,11,.14); border:1px solid rgba(245,158,11,.36); color:#fbbf24; }
+.report-status-badge.is-resolved { background:rgba(110,231,160,.14); border:1px solid rgba(110,231,160,.34); color:#6ee7a0; }
+.report-status-btn { padding:5px 9px; font-size:10px; white-space:nowrap; }
+
+/* Password login & encrypted vault panel */
+.login-card label { display:block; margin-top:12px; color:var(--muted); font-size:10px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; }
+.login-card input, .login-card textarea { width:100%; margin-top:6px; border:1px solid var(--line); border-radius:8px; background:#0c1916; color:var(--text); padding:10px 12px; outline:none; font-size:13px; }
+.login-card input:focus, .login-card textarea:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(110,231,160,.14); }
+.login-card #login-submit { margin-top:16px; }
+.login-secondary-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 14px; margin-top:14px; }
+.link-button { background:none; border:0; padding:2px 0; color:#9ce7b9; font-size:12px; font-weight:600; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
+.link-button:hover { color:var(--accent); }
+.link-button.danger-link { color:#fca5a5; }
+.vault-transfer-panel { margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:9px; background:#0d1a17; }
+.vault-transfer-panel label { margin-top:0; }
+.vault-transfer-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+.vault-transfer-actions .button { flex:1 1 0; }
+
+
