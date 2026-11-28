@@ -4,7 +4,7 @@
 
 // Dynamic community actions use the existing Supabase Edge Functions.
 // Public reads are served from GitHub snapshots; Supabase is only used for writes and detailed queries.
-const DEFAULT_COMMUNITY_API_BASE = "https://gsksanvcdbdoevairzpj.supabase.co/functions/v1";
+const DEFAULT_COMMUNITY_API_BASE = "https://napl-compatibility-cache.federicoxastro.workers.dev";
 
 export function resolveCommunityApiBase() {
     const override = typeof window !== "undefined" && typeof window.NAPL_COMMUNITY_API_BASE === "string"
@@ -16,8 +16,8 @@ export function resolveCommunityApiBase() {
 export const COMMUNITY_API_BASE = resolveCommunityApiBase();
 export const RATINGS_API_BASE = `${COMMUNITY_API_BASE}/ratings`;
 export const POPULARITY_API_BASE = `${COMMUNITY_API_BASE}/popularity`;
-// GET compatibility queries are cached at Cloudflare; POST reports are transparently forwarded to Supabase.
-export const COMPATIBILITY_API_URL = "https://napl-compatibility-cache.federicoxastro.workers.dev";
+// Compatibility reads are cached at Cloudflare; community writes are forwarded to Supabase.
+export const COMPATIBILITY_API_URL = `${COMMUNITY_API_BASE}/compatibility`;
 export const REPORT_LINK_API_URL = `${COMMUNITY_API_BASE}/report-link`;
 
 export const GITHUB_ADMIN_DEFAULTS = {
