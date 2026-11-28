@@ -88,6 +88,17 @@
     </section>
   </main>
 
+  <dialog id="sync-dialog" class="sync-modal">
+    <div class="sync-modal-header"><div><small class="editor-eyebrow">GITHUB ACTIONS · CATÁLOGO</small><h2>Sincronización de fuentes</h2></div><button id="close-sync" class="button quiet">Cerrar</button></div>
+    <p id="sync-status" class="muted">Preparando sincronización…</p>
+    <div class="sync-progress-wrap">
+      <div class="sync-progress-head"><strong id="sync-progress-label">Preparando workflow</strong><strong id="sync-progress-percent">0%</strong></div>
+      <div class="sync-progress-track"><div id="sync-progress-bar" class="sync-progress-bar"></div></div>
+    </div>
+    <div id="sync-stats" class="sync-stats-grid"></div>
+    <section class="sync-history-section"><h3 id="sync-results-title">Ports incluidos en esta ejecución</h3><div id="sync-live-results" class="sync-live-results"></div></section>
+    <p id="sync-workflow-link" class="muted"></p>
+  </dialog>
   <dialog id="community-dialog" class="sync-modal">
     <div class="sync-modal-header"><div><small class="editor-eyebrow">DATOS DE LA COMUNIDAD · SUPABASE + GITHUB</small><h2>Comunidad y reportes</h2></div><button id="close-community" class="button quiet">Cerrar</button></div>
     <p id="community-status" class="muted">Consultando datos…</p>
