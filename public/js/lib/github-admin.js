@@ -425,11 +425,31 @@ export async function dispatchWorkflowAndWait(
 
         if (matchedRun) {
             if (typeof onProgress === "function") {
+                let jobs = [];
+                try {
+                    const { data: jobData } = await githubApi(
+                        `/repos/${cfg.codeRepo}/actions/runs/${matchedRun.id}/jobs?per_page=100`,
+                        { pat: token }
+                    );
+                    jobs = (jobData?.jobs || []).map((job) => ({
+                        name: job.name || "Job",
+                        status: job.status || "queued",
+                        conclusion: job.conclusion || "",
+                        steps: (job.steps || []).map((step) => ({
+                            name: step.name || "Paso",
+                            status: step.status || "queued",
+                            conclusion: step.conclusion || "",
+                        })),
+                    }));
+                } catch {
+                    // Run status remains useful if job details are temporarily unavailable.
+                }
                 onProgress({
                     id: matchedRun.id,
                     status: matchedRun.status,
                     conclusion: matchedRun.conclusion,
                     htmlUrl: matchedRun.html_url,
+                    jobs,
                 });
             }
             if (matchedRun.status === "completed") {
