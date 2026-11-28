@@ -12,6 +12,7 @@ import { loadCommunitySummary } from "./community-summary.js";
 
 let ratingTokenMemory = "";
 let myVotesCache = null;
+let myVotesPromise = null;
 let ratingsCache = null;
 
 function normalizeRatingsPayload(data) {
@@ -111,6 +112,8 @@ export async function getRatingToken() {
 
 function clearStoredRatingToken() {
     ratingTokenMemory = "";
+    myVotesCache = null;
+    myVotesPromise = null;
 
     try {
         localStorage.removeItem(RATING_TOKEN_STORAGE_KEY);
@@ -137,19 +140,34 @@ async function postWithTokenRefresh(endpoint, payload) {
 
 async function loadMyVotes(portId) {
     if (!portId) return myVotesCache || {};
-    if (!myVotesCache) myVotesCache = {};
-    if (Object.prototype.hasOwnProperty.call(myVotesCache, portId)) {
-        return myVotesCache;
+    if (myVotesCache) return myVotesCache;
+
+    // The API returns the voter's complete vote map. Fetch it once per page,
+    // not once for every port displayed in a game.
+    if (!myVotesPromise) {
+        myVotesPromise = postWithTokenRefresh("/my-votes", {})
+            .then((data) => {
+                if (!data || !data.votes || typeof data.votes !== "object" || Array.isArray(data.votes)) {
+                    throw new Error("The ratings server returned an invalid vote response.");
+                }
+
+                const votes = {};
+                for (const [id, rawValue] of Object.entries(data.votes)) {
+                    const value = Number(rawValue);
+                    if (typeof id === "string" && Number.isInteger(value) && value >= 1 && value <= 5) {
+                        votes[id] = value;
+                    }
+                }
+                myVotesCache = votes;
+                return myVotesCache;
+            })
+            .catch((error) => {
+                myVotesPromise = null;
+                throw error;
+            });
     }
 
-    const data = await postWithTokenRefresh("/my-votes", { port_id: portId });
-    if (!data || !data.votes || typeof data.votes !== "object" || Array.isArray(data.votes)) {
-        throw new Error("The ratings server returned an invalid vote response.");
-    }
-
-    const value = Number(data.votes[portId]);
-    myVotesCache[portId] = Number.isInteger(value) && value >= 1 && value <= 5 ? value : 0;
-    return myVotesCache;
+    return myVotesPromise;
 }
 
 export async function loadPortRatings(fresh = false) {
