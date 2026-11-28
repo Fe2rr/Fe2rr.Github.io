@@ -15,6 +15,9 @@ import { loadCommunitySummary } from "./community-summary.js";
 
 let devicesCache = null;
 let devicesPromise = null;
+const compatibilitySearchCache = new Map();
+const compatibilitySearchPromises = new Map();
+const COMPATIBILITY_SEARCH_CACHE_TTL = 5 * 60_000;
 
 const COMPATIBILITY_CACHE_PREFIX = "napl_compatibility_v2:";
 const COMPATIBILITY_CACHE_TTL = 15 * 60_000;
@@ -425,44 +428,96 @@ export async function searchCompatibilityByHardware({
     limit = 200,
 } = {}) {
     const clampedLimit = Math.min(Math.max(Number(limit) || 200, 1), 200);
-    const params = new URLSearchParams({ action: "search" });
-    if (deviceId) params.set("device_id", deviceId);
-    if (soc) params.set("soc", soc);
-    if (query) params.set("q", query);
-    params.set("limit", String(clampedLimit));
+    const normalized = {
+        deviceId: String(deviceId || "").trim(),
+        soc: String(soc || "").trim(),
+        query: String(query || "").trim(),
+        limit: clampedLimit,
+    };
+    const cacheKey = JSON.stringify(normalized);
+    const now = Date.now();
+    const memoryCached = compatibilitySearchCache.get(cacheKey);
+    if (memoryCached && now - memoryCached.savedAt < COMPATIBILITY_SEARCH_CACHE_TTL) {
+        return memoryCached.value;
+    }
 
-    const response = await fetch(
-        `${COMPATIBILITY_API_URL}?${params.toString()}`,
-        {
-            method: "GET",
-            cache: "default",
+    const storageKey = COMPATIBILITY_CACHE_PREFIX + "hardware-search:" + encodeURIComponent(cacheKey);
+    try {
+        const stored = JSON.parse(localStorage.getItem(storageKey) || "null");
+        const ttl = Array.isArray(stored?.value) && stored.value.length === 0
+            ? 60_000
+            : COMPATIBILITY_SEARCH_CACHE_TTL;
+        if (stored && typeof stored.savedAt === "number" && now - stored.savedAt < ttl && Array.isArray(stored.value)) {
+            compatibilitySearchCache.set(cacheKey, stored);
+            return stored.value;
         }
-    );
+    } catch {
+        // Continue with a network request when local storage is unavailable.
+    }
 
-    if (!response.ok) {
-        throw new Error(
-            `Compatibility search failed (HTTP ${response.status}).`
+    if (compatibilitySearchPromises.has(cacheKey)) {
+        return compatibilitySearchPromises.get(cacheKey);
+    }
+
+    const request = (async () => {
+        const params = new URLSearchParams({ action: "search" });
+        if (normalized.deviceId) params.set("device_id", normalized.deviceId);
+        if (normalized.soc) params.set("soc", normalized.soc);
+        if (normalized.query) params.set("q", normalized.query);
+        params.set("limit", String(clampedLimit));
+
+        const response = await fetch(
+            `${COMPATIBILITY_API_URL}?${params.toString()}`,
+            { method: "GET", cache: "default" }
         );
-    }
 
-    const payload = await response.json();
-    if (!payload?.success || !Array.isArray(payload.reports)) {
-        throw new Error("Compatibility search returned an invalid response.");
-    }
+        if (!response.ok) {
+            throw new Error(`Compatibility search failed (HTTP ${response.status}).`);
+        }
 
-    return payload.reports.map((report) => {
-        const meta = getCompatStatusMeta(report?.status, report?.works);
-        return {
-            portId: String(report?.portId || "").trim(),
-            deviceId: String(report?.deviceId || "").trim(),
-            deviceName: String(report?.deviceName || report?.deviceId || "").trim(),
-            deviceSoc: String(report?.deviceSoc || "").trim(),
-            deviceType: String(report?.deviceType || "phone").trim() || "phone",
-            status: meta.id,
-            works: meta.works,
-            updatedAt: String(report?.updatedAt || ""),
-        };
-    });
+        const payload = await response.json();
+        if (!payload?.success || !Array.isArray(payload.reports)) {
+            throw new Error("Compatibility search returned an invalid response.");
+        }
+
+        const value = payload.reports.map((report) => {
+            const meta = getCompatStatusMeta(report?.status, report?.works);
+            return {
+                portId: String(report?.portId || "").trim(),
+                deviceId: String(report?.deviceId || "").trim(),
+                deviceName: String(report?.deviceName || report?.deviceId || "").trim(),
+                deviceSoc: String(report?.deviceSoc || "").trim(),
+                deviceType: String(report?.deviceType || "phone").trim() || "phone",
+                status: meta.id,
+                works: meta.works,
+                updatedAt: String(report?.updatedAt || ""),
+            };
+        });
+
+        const entry = { savedAt: Date.now(), value };
+        compatibilitySearchCache.set(cacheKey, entry);
+        try {
+            localStorage.setItem(storageKey, JSON.stringify(entry));
+            const keys = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key?.startsWith(COMPATIBILITY_CACHE_PREFIX + "hardware-search:")) keys.push(key);
+            }
+            if (keys.length > 30) {
+                for (const key of keys.slice(0, keys.length - 30)) localStorage.removeItem(key);
+            }
+        } catch {
+            // Memory cache still prevents repeated requests during this page session.
+        }
+        return value;
+    })();
+
+    compatibilitySearchPromises.set(cacheKey, request);
+    try {
+        return await request;
+    } finally {
+        compatibilitySearchPromises.delete(cacheKey);
+    }
 }
 
 export function getStoredUserDevice() {
@@ -650,6 +705,8 @@ export function createCompatibilityActions() {
                 );
             }
 
+            compatibilitySearchCache.clear();
+            compatibilitySearchPromises.clear();
             const refreshed = await loadGameCompatibility([portId], true);
             return {
                 report: data.report,
