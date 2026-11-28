@@ -309,6 +309,7 @@ async function handleLoginSubmit() {
   } catch (error) {
     lockGithubSession();
     pat = "";
+    loginMode = hasEncryptedGithubVault() ? "unlock" : "setup";
     showLogin(error.message || "No se pudo configurar la contraseña.");
   } finally {
     setBusy(false);

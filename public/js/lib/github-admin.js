@@ -334,9 +334,12 @@ export async function unlockGithubVaultWithPassword(password, configOverrides = 
 }
 
 async function githubApi(path, { pat, method = "GET", headers = {}, body, raw = false } = {}) {
-    const token = pat || getStoredGithubPat();
+    const token = String(pat || getStoredGithubPat() || "").trim();
     if (!token) {
         throw new Error("Sesión GitHub no iniciada. Ingresá tu Fine-grained PAT.");
+    }
+    if (!/^[\x21-\x7E]+$/.test(token)) {
+        throw new Error("El GitHub PAT contiene espacios, saltos de línea o caracteres no válidos.");
     }
 
     const reqHeaders = {
@@ -349,12 +352,20 @@ async function githubApi(path, { pat, method = "GET", headers = {}, body, raw = 
         reqHeaders["Content-Type"] = "application/json";
     }
 
-    const response = await fetch(`https://api.github.com${path}`, {
-        method,
-        headers: reqHeaders,
-        body: body !== undefined ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
-        cache: "no-store",
-    });
+    let response;
+    try {
+        response = await fetch(`https://api.github.com${path}`, {
+            method,
+            headers: reqHeaders,
+            body: body !== undefined ? (typeof body === "string" ? body : JSON.stringify(body)) : undefined,
+            cache: "no-store",
+        });
+    } catch (error) {
+        const cleanPath = String(path || "").split("?")[0];
+        throw new Error(
+            `Error de red al conectar con GitHub (${cleanPath}): ${error?.message || "Failed to fetch"}. Verificá tu conexión o bloqueadores del navegador.`
+        );
+    }
 
     const text = await response.text();
     if (raw) {
@@ -485,19 +496,106 @@ export async function loginWithGithubPat(rawPat, configOverrides = {}) {
     };
 }
 
+function decodeBase64Utf8(base64) {
+    const clean = String(base64 || "").replace(/\s+/g, "");
+    return new TextDecoder().decode(base64ToBytes(clean));
+}
+
+async function resolveBlobShaFromBranch(cfg, repoPath, pat) {
+    const normalizedPath = String(repoPath || "").replace(/^\/+/, "");
+    const slashIdx = normalizedPath.lastIndexOf("/");
+    const parentDir = slashIdx >= 0 ? normalizedPath.slice(0, slashIdx) : "";
+    const fileName = slashIdx >= 0 ? normalizedPath.slice(slashIdx + 1) : normalizedPath;
+
+    try {
+        const dirPath = parentDir ? `/contents/${parentDir}` : "/contents";
+        const { data: entries } = await githubApi(
+            `/repos/${cfg.dataRepo}${dirPath}?ref=${encodeURIComponent(cfg.branch)}`,
+            { pat }
+        );
+        if (Array.isArray(entries)) {
+            const match = entries.find((item) => item?.name === fileName && item?.type === "file" && item?.sha);
+            if (match?.sha) return match.sha;
+        }
+    } catch (error) {
+        if (error?.status === 404) {
+            const notFound = new Error(`No se encontró ${normalizedPath} en ${cfg.dataRepo}.`);
+            notFound.status = 404;
+            throw notFound;
+        }
+        // Fall through to recursive tree lookup if directory listing failed (e.g. >1000 items)
+    }
+
+    const { data: refData } = await githubApi(
+        `/repos/${cfg.dataRepo}/git/ref/heads/${encodeURIComponent(cfg.branch)}`,
+        { pat }
+    );
+    const commitSha = refData?.object?.sha;
+    if (!commitSha) {
+        throw new Error(`No se pudo resolver la rama ${cfg.branch} en ${cfg.dataRepo}.`);
+    }
+    const { data: treeData } = await githubApi(
+        `/repos/${cfg.dataRepo}/git/trees/${commitSha}?recursive=1`,
+        { pat }
+    );
+    const treeEntry = Array.isArray(treeData?.tree)
+        ? treeData.tree.find((item) => item?.path === normalizedPath && item?.type === "blob" && item?.sha)
+        : null;
+    if (!treeEntry?.sha) {
+        const notFound = new Error(`No se encontró ${normalizedPath} en ${cfg.dataRepo}.`);
+        notFound.status = 404;
+        throw notFound;
+    }
+    return treeEntry.sha;
+}
+
 async function readRepoJsonFile(repoPath, { pat, configOverrides = {}, optional = false } = {}) {
     const cfg = { ...getSessionConfig(), ...configOverrides };
     try {
-        const { response, text } = await githubApi(
-            `/repos/${cfg.dataRepo}/contents/${repoPath}?ref=${encodeURIComponent(cfg.branch)}`,
-            { pat, raw: true }
+        try {
+            const { data } = await githubApi(
+                `/repos/${cfg.dataRepo}/contents/${repoPath}?ref=${encodeURIComponent(cfg.branch)}`,
+                { pat }
+            );
+            if (data && typeof data === "object" && typeof data.content === "string" && data.encoding === "base64") {
+                const text = decodeBase64Utf8(data.content);
+                return {
+                    data: JSON.parse(text),
+                    sha: String(data.sha || ""),
+                    config: cfg,
+                };
+            }
+            if (data && typeof data === "object" && data.sha) {
+                const { data: blob } = await githubApi(
+                    `/repos/${cfg.dataRepo}/git/blobs/${data.sha}`,
+                    { pat }
+                );
+                const text = decodeBase64Utf8(blob?.content || "");
+                return {
+                    data: JSON.parse(text),
+                    sha: String(data.sha || ""),
+                    config: cfg,
+                };
+            }
+        } catch (contentsError) {
+            if (contentsError?.status !== 403) {
+                throw contentsError;
+            }
+            // GitHub /contents/ returns 403 for files > 1 MB; read directly via Git Blob API (up to 100 MB, no CORS redirect).
+        }
+
+        const blobSha = await resolveBlobShaFromBranch(cfg, repoPath, pat);
+        const { data: blob } = await githubApi(
+            `/repos/${cfg.dataRepo}/git/blobs/${blobSha}`,
+            { pat }
         );
-        const parsed = JSON.parse(text);
-        const etag = String(response.headers.get("etag") || "");
-        const shaMatch = etag.match(/"([a-f0-9]{40})"/i);
+        if (!blob || typeof blob.content !== "string") {
+            throw new Error(`No se pudo leer el blob de ${repoPath}.`);
+        }
+        const text = decodeBase64Utf8(blob.content);
         return {
-            data: parsed,
-            sha: shaMatch ? shaMatch[1] : "",
+            data: JSON.parse(text),
+            sha: blobSha,
             config: cfg,
         };
     } catch (error) {
@@ -752,11 +850,10 @@ export async function runGithubLookup(mode, url, options = {}) {
         { ...options, pat, configOverrides: cfg }
     );
 
-    const { text } = await githubApi(
-        `/repos/${cfg.dataRepo}/contents/private/lookup-results/${requestId}.json?ref=${encodeURIComponent(cfg.branch)}`,
-        { pat, raw: true }
+    const { data: result } = await readRepoJsonFile(
+        `private/lookup-results/${requestId}.json`,
+        { pat, configOverrides: cfg }
     );
-    const result = JSON.parse(text);
     if (!result?.ok) {
         throw new Error(result?.error || "La consulta en GitHub Actions falló.");
     }
