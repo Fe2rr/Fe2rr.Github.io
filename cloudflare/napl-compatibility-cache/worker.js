@@ -121,13 +121,13 @@ export default {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/+$/, "") || "/";
     if (request.method === "OPTIONS") {
-      if (!POST_ROUTES.has(pathname) && pathname !== "/compatibility") {
+      if (!POST_ROUTES.has(routePath) && routePath !== "/compatibility") {
         return json({ success: false, error: "Not found." }, 404);
       }
       return new Response(null, { status: 204, headers: cors });
     }
 
-    if (request.method === "GET" && pathname === "/compatibility") {
+    if (request.method === "GET" && routePath === "/compatibility") {
       try {
         return await cachedCompatibilityGet(url);
       } catch {
@@ -137,15 +137,15 @@ export default {
       }
     }
 
-    if (request.method === "GET" && (pathname === "/popularity" || pathname === "/ratings")) {
+    if (request.method === "GET" && (routePath === "/popularity" || routePath === "/ratings")) {
       return json({ success: false, error: "Public data is served from static snapshots." }, 410, {
         "Cache-Control": "no-store",
       });
     }
 
-    if (request.method === "POST" && POST_ROUTES.has(pathname)) {
+    if (request.method === "POST" && POST_ROUTES.has(routePath)) {
       try {
-        const upstream = await fetch(UPSTREAM_BASE + pathname, {
+        const upstream = await fetch(UPSTREAM_BASE + routePath, {
           method: "POST",
           headers: {
             "Content-Type": request.headers.get("Content-Type") || "application/json",
