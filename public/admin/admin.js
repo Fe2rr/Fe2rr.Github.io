@@ -178,6 +178,19 @@ function detectMetadataSource(rawUrl) {
   if (host === "itch.io" || host.endsWith(".itch.io")) return "itch";
   throw new Error("No reconozco el sitio. Usá un enlace de Steam, LaunchBox o itch.io.");
 }
+function getPortRepoStatusMeta(port) {
+  const rawStatus = String(port?.githubStatus || "").trim().toLowerCase();
+  if (rawStatus === "down") {
+    return { cls: "down", label: "Caído" };
+  }
+  if (rawStatus === "moved") {
+    return { cls: "moved", label: "Movido" };
+  }
+  if (rawStatus === "ok" || (port?.syncProvider && port?.syncTarget)) {
+    return { cls: "ok", label: "Activo" };
+  }
+  return { cls: "", label: "Sin verificar" };
+}
 function renderEditor() {
   const game = currentGame();
   $("empty-state").hidden = Boolean(game);
@@ -205,25 +218,35 @@ function renderEditor() {
     + '<option value="__add_new__">＋ Agregar nueva plataforma…</option>';
   if (game.platform && !platforms.includes(game.platform)) platformSelect.insertAdjacentHTML("afterbegin",`<option value="${esc(game.platform)}">${esc(game.platform)}</option>`);
   platformSelect.value = game.platform || "";
-  $("ports-list").innerHTML = (game.ports || []).map((port, i) => `
+  $("ports-list").innerHTML = (game.ports || []).map((port, i) => {
+    const repoStatus = getPortRepoStatusMeta(port);
+    return `
     <article class="port-card" data-port-card="${i}">
-      <div class="port-head"><strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong><div><button type="button" class="button danger" data-remove-port="${i}">Eliminar</button></div></div>
+      <div class="port-head">
+        <strong>Port ${i + 1} · ${esc(port.project || "Sin proyecto")}</strong>
+        <span class="gh-badge ${repoStatus.cls}" title="Estado del repositorio">${esc(repoStatus.label)}</span>
+      </div>
       <div class="port-source-row">${portField(i,"url","Enlace del port",port.url,"url")}<button type="button" class="button secondary" data-inspect-port="${i}">Obtener datos del enlace</button></div>
-      <details class="port-data-details"><summary>Datos del port</summary><div class="port-fields">
+      <div class="port-fields">
         ${portField(i,"project","Proyecto",port.project)}
+        ${portField(i,"link","Etiqueta de URL",port.link)}
         ${portField(i,"developer","Desarrollador",port.developer)}
         ${portField(i,"version","Versión",port.version)}
-        ${portField(i,"controller","Soporte de mando",port.controller)}
-        ${portField(i,"files","Archivos del juego",port.files)}
-        ${portField(i,"link","Etiqueta del enlace",port.link)}
-        ${portField(i,"dataUrl","URL de archivos",port.dataUrl,"url")}
-        ${portField(i,"githubRepo","Repositorio GitHub",port.githubRepo)}
-        ${portField(i,"portId","ID del port",port.portId)}
         ${portField(i,"lastUpdate","Última actualización",port.lastUpdate)}
-        ${portField(i,"dateAdded","Fecha de alta",port.dateAdded)}
+        ${portField(i,"files","Archivos de juego",port.files)}
+        ${portField(i,"dataUrl","URL de archivos",port.dataUrl,"url")}
+        ${portField(i,"controller","Soporte de mando",port.controller)}
         ${portField(i,"notes","Notas",port.notes,"textarea",true)}
+      </div>
+      <details class="port-data-details"><summary>ID y fecha de alta</summary><div class="port-fields">
+        ${portField(i,"portId","ID",port.portId)}
+        ${portField(i,"dateAdded","Fecha de alta",port.dateAdded)}
       </div></details>
-    </article>`).join("") || '<p class="muted">Esta ficha todavía no tiene ports.</p>';
+      <div class="port-card-footer">
+        <button type="button" class="button small danger-button" data-remove-port="${i}">Eliminar port</button>
+      </div>
+    </article>`;
+  }).join("") || '<p class="muted">Esta ficha todavía no tiene ports.</p>';
 }
 
 function portField(i, key, label, value, type = "text", wide = false) {
@@ -748,6 +771,9 @@ $("ports-list").addEventListener("click", async (event) => {
     const info = result?.data || result;
     const fields = {project:info.project || info.name,developer:info.developer,version:info.version,controller:info.controller,files:info.files,link:info.link,url:info.repoUrl || info.url || target,githubRepo:info.githubRepo || info.syncTarget,portId:info.portId,lastUpdate:info.lastUpdate};
     for (const [key,value] of Object.entries(fields)) if (value && !port[key]) port[key] = value;
+    if (info?.status) port.githubStatus = info.status;
+    if (info?.syncProvider) port.syncProvider = info.syncProvider;
+    if (info?.syncTarget) port.syncTarget = info.syncTarget;
     renderEditor();
     notice("Fuente consultada. Se completaron los datos disponibles; revisalos antes de guardar.", "success");
   } catch (error) {

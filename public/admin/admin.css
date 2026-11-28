@@ -1410,13 +1410,15 @@ button {
 .admin-ports-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:16px; }
 .admin-ports-heading h2 { font:700 22px "Outfit",sans-serif; }
 .admin-port-grid,.ports-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
-.port-card { min-width:0; overflow:hidden; border:1px solid rgba(167,243,208,.22); border-radius:11px; background:#142620; }
-.port-head { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:15px 17px 13px; background:linear-gradient(135deg,rgba(110,231,160,.06),transparent 70%); border-bottom:1px solid rgba(167,243,208,.22); }
-.port-head strong { color:#fff; font:700 15px "Outfit",sans-serif; }
-.port-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; padding:15px 17px 16px; }
+.port-card { display:flex; flex-direction:column; min-width:0; overflow:hidden; border:1px solid rgba(167,243,208,.22); border-radius:11px; background:#142620; }
+.port-head { display:flex; align-items:center; justify-content:space-between; gap:10px; padding:14px 17px 13px; background:linear-gradient(135deg,rgba(110,231,160,.06),transparent 70%); border-bottom:1px solid rgba(167,243,208,.22); }
+.port-head strong { min-width:0; overflow-wrap:anywhere; color:#fff; font:700 15px "Outfit",sans-serif; }
+.port-head .gh-badge { flex:0 0 auto; white-space:nowrap; }
+.port-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:11px; padding:15px 17px 14px; }
 .port-fields label { min-width:0; }
 .port-fields input,.port-fields textarea { background:#0f211b; border-color:rgba(167,243,208,.18); font-size:11px; padding:8px 10px; }
-.port-fields label:has(textarea) { grid-column:1/-1; }
+.port-fields label:has(textarea), .port-fields label.wide { grid-column:1/-1; }
+.port-card-footer { margin-top:auto; display:flex; align-items:center; justify-content:flex-start; gap:10px; padding:12px 17px 14px; border-top:1px solid rgba(167,243,208,.14); }
 .save-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:20px 0 32px; border-top:1px solid rgba(167,243,208,.22); }
 .save-row span { color:var(--muted); font-size:11px; }
 #community-dialog { width:min(1100px,calc(100vw - 24px)); max-height:88vh; border:1px solid var(--line); border-radius:12px; padding:22px; background:#12221e; color:var(--text); box-shadow:var(--shadow); }
@@ -1449,9 +1451,13 @@ button {
 #metadata-source{min-width:115px;padding:10px;border:1px solid var(--line);border-radius:7px;background:#0c1916;color:var(--text)}
 @media(max-width:680px){.game-title-fields{grid-template-columns:1fr}.game-cover-editor{align-items:flex-start}}
 
-.port-source-row{display:flex;align-items:end;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
-.port-source-row label{flex:1;min-width:0}.port-data-details{padding:10px 14px}
-.port-data-details summary{cursor:pointer;color:#9ccbb0;font-size:12px;font-weight:700;margin-bottom:10px}
+.port-source-row{display:flex;align-items:end;gap:10px;padding:12px 17px;border-bottom:1px solid var(--line)}
+.port-source-row label{flex:1;min-width:0}.port-data-details{margin:0 17px 12px;padding:10px 0 2px;border-top:1px solid rgba(167,243,208,.14)}
+.port-data-details summary{cursor:pointer;color:#9ccbb0;font-size:12px;font-weight:700;list-style:none;display:flex;align-items:center;justify-content:space-between}
+.port-data-details summary::-webkit-details-marker{display:none}
+.port-data-details summary:after{content:"＋";color:var(--accent);font:700 14px "JetBrains Mono",monospace}
+.port-data-details[open] summary:after{content:"−"}
+.port-data-details .port-fields{padding:10px 0 4px}
 @media(max-width:640px){.port-source-row{align-items:stretch;flex-direction:column}}
 
 .console-tabs{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;margin-bottom:8px;border-bottom:1px solid var(--line);scrollbar-width:thin}
