@@ -2,8 +2,8 @@
  * NAPL — CORE CONFIGURATION
  */
 
-// Dynamic community actions use the existing Supabase Edge Functions.
-// Public reads are served from GitHub snapshots; Supabase is only used for writes and detailed queries.
+// Community API traffic passes through Cloudflare; writes are forwarded to Supabase Edge Functions.
+// Public ratings and popularity reads use GitHub snapshots; compatibility GETs use edge caching.
 const DEFAULT_COMMUNITY_API_BASE = "https://napl-compatibility-cache.federicoxastro.workers.dev";
 
 export function resolveCommunityApiBase() {
