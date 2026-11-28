@@ -134,6 +134,39 @@ let activeSyncFilter = "all";
 function gameSyncStatus(game) {
   return (game.ports || []).some((port) => Boolean(port.syncProvider && port.syncTarget && port.githubStatus !== "down"));
 }
+const ADMIN_PLATFORM_GROUP_ORDER = ["Nintendo", "Sega", "Sony", "Xbox", "Others"];
+
+function getAdminPlatformGroup(platform) {
+  const normalized = String(platform || "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+  if (normalized === "others" || normalized === "other") return "Others";
+  if (
+    normalized.includes("playstation") ||
+    normalized.includes("sony") ||
+    /\bps[1-5p]\b/.test(normalized) ||
+    normalized.includes("vita")
+  ) {
+    return "Sony";
+  }
+  if (normalized.includes("sega")) return "Sega";
+  if (normalized.startsWith("xbox")) return "Xbox";
+  if (
+    normalized.includes("nintendo") ||
+    normalized.includes("game boy") ||
+    normalized.includes("gameboy") ||
+    normalized.includes("gamecube") ||
+    normalized === "nes"
+  ) {
+    return "Nintendo";
+  }
+  return "Others";
+}
+
 function renderGameList() {
   const games = state?.catalog?.games || [];
   const q = $("search").value.trim().toLowerCase();
@@ -150,7 +183,9 @@ function renderGameList() {
   const orderedPlatforms = [...platforms, ...[...new Set(filtered.map(g=>g.platform).filter(Boolean))].filter(p=>!platforms.includes(p))]
     .filter(platform => !isFiltering || filtered.some(game => game.platform === platform));
   const renderPlatform = platform => {
-    const entries = filtered.filter(game=>game.platform===platform);
+    const entries = filtered
+      .filter(game => game.platform === platform)
+      .sort((a, b) => Number(gameSyncStatus(a)) - Number(gameSyncStatus(b)));
     const isOpen = openPlatforms.has(platform);
     return `<div class="platform-accordion-wrap">
       <details class="platform-accordion" data-platform-accordion="${esc(platform)}" ${isOpen?"open":""}>
@@ -162,10 +197,17 @@ function renderGameList() {
       <button type="button" class="platform-add-btn category-add-outside" data-add-port-platform="${esc(platform)}" title="Agregar juego en ${esc(platform)}">+ Juego</button>
     </div>`;
   };
-  const segaPlatforms = orderedPlatforms.filter(platform => /sega/i.test(platform));
-  const otherPlatforms = orderedPlatforms.filter(platform => !/sega/i.test(platform));
-  const segaGroup = segaPlatforms.length ? `<section class="admin-maker-group"><h3>SEGA</h3>${segaPlatforms.map(renderPlatform).join("")}</section>` : "";
-  $("game-list").innerHTML = otherPlatforms.map(renderPlatform).join("") + segaGroup || '<p class="muted">No hay resultados.</p>';
+  const grouped = new Map(ADMIN_PLATFORM_GROUP_ORDER.map(group => [group, []]));
+  for (const platform of orderedPlatforms) {
+    const group = getAdminPlatformGroup(platform);
+    if (!grouped.has(group)) grouped.set(group, []);
+    grouped.get(group).push(platform);
+  }
+  const sectionsHtml = [...grouped.entries()]
+    .filter(([, groupPlatforms]) => groupPlatforms.length > 0)
+    .map(([group, groupPlatforms]) => `<section class="admin-maker-group"><h3>${esc(group)}</h3>${groupPlatforms.map(renderPlatform).join("")}</section>`)
+    .join("");
+  $("game-list").innerHTML = sectionsHtml || '<p class="muted">No hay resultados.</p>';
 }
 
 function detectMetadataSource(rawUrl) {
@@ -211,10 +253,16 @@ function renderEditor() {
   $("port-count").textContent = (game.ports || []).length + " ports";
   const platformSelect = form.elements.namedItem("platform");
   const platforms = [...new Set([...(state?.catalog?.platformOrder||[]),...(state?.catalog?.games||[]).map(g=>g.platform).filter(Boolean)])];
-  const segaPlatforms = platforms.filter(p => /sega/i.test(p));
-  const otherPlatforms = platforms.filter(p => !/sega/i.test(p));
-  platformSelect.innerHTML = otherPlatforms.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("")
-    + (segaPlatforms.length ? `<optgroup label="SEGA">${segaPlatforms.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("")}</optgroup>` : "")
+  const groupedPlatforms = new Map(ADMIN_PLATFORM_GROUP_ORDER.map(group => [group, []]));
+  for (const p of platforms) {
+    const group = getAdminPlatformGroup(p);
+    if (!groupedPlatforms.has(group)) groupedPlatforms.set(group, []);
+    groupedPlatforms.get(group).push(p);
+  }
+  platformSelect.innerHTML = [...groupedPlatforms.entries()]
+    .filter(([, list]) => list.length > 0)
+    .map(([group, list]) => `<optgroup label="${esc(group)}">${list.map(p=>`<option value="${esc(p)}">${esc(p)}</option>`).join("")}</optgroup>`)
+    .join("")
     + '<option value="__add_new__">＋ Agregar nueva plataforma…</option>';
   if (game.platform && !platforms.includes(game.platform)) platformSelect.insertAdjacentHTML("afterbegin",`<option value="${esc(game.platform)}">${esc(game.platform)}</option>`);
   platformSelect.value = game.platform || "";
