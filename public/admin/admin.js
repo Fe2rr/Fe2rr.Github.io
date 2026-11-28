@@ -782,12 +782,31 @@ $("lookup-metadata").addEventListener("click", async () => {
     const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:1500 });
     const game = readDraft();
     const payload = data?.data || data;
+    const isPlaceholderName = !game.name || /^nuevo juego$/i.test(game.name.trim());
+    const wasPlaceholderSlug = !game.slug || /^nuevo-juego(?:-\d+)?$/i.test(game.slug.trim());
     const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description"};
-    for (const [source,target] of Object.entries(aliases)) if (payload?.[source] && !game[target]) game[target] = payload[source];
+    for (const [source,target] of Object.entries(aliases)) {
+      if (!payload?.[source]) continue;
+      if (target === "name") {
+        if (isPlaceholderName) game.name = payload[source];
+      } else if (!game[target]) {
+        game[target] = payload[source];
+      }
+    }
+    if (game.name && !/^nuevo juego$/i.test(game.name.trim()) && wasPlaceholderSlug) {
+      const baseSlug = makeSlug(game.name) || "juego";
+      let nextSlug = baseSlug;
+      let n = 2;
+      while (state.catalog.games.some((g) => g !== game && g.slug === nextSlug)) {
+        nextSlug = `${baseSlug}-${n++}`;
+      }
+      game.slug = nextSlug;
+      selectedSlug = nextSlug;
+    }
     game.steamUrl = mode === "steam" ? url : "";
     game.launchboxUrl = mode === "launchbox" ? url : "";
     game.itchUrl = mode === "itch" ? url : "";
-    renderEditor();
+    renderAll();
     notice("Consulta completada. Revisá los campos y guardá los cambios.", "success");
   } catch (error) { notice(error.message || "No se pudieron obtener los metadatos.", "error"); }
   finally { setBusy(false); }
