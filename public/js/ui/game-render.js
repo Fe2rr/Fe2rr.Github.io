@@ -1540,31 +1540,32 @@ function displayGameSummary(game, parentElement) {
 
     const coverUrl = String(game.coverUrl || "").trim();
     if (/^https?:\/\/\S+$/i.test(coverUrl)) {
+        media.classList.add("is-cover-loading");
         const cover = document.createElement("img");
         cover.className = "game-summary-cover";
         cover.alt = `${game.name} cover`;
         cover.loading = "eager";
         cover.decoding = "async";
         cover.referrerPolicy = "no-referrer";
-        cover.addEventListener(
-            "load",
-            () => {
-                syncBackdrop(cover.currentSrc || cover.src);
-            },
-            { once: true }
-        );
+        const markLoaded = () => {
+            media.classList.remove("is-cover-loading");
+            media.classList.add("is-loaded");
+            syncBackdrop(cover.currentSrc || cover.src);
+        };
+        cover.addEventListener("load", markLoaded, { once: true });
         media.appendChild(cover);
         loadOptimizedCoverImage(
             cover,
             coverUrl,
             () => {
+                media.classList.remove("is-cover-loading", "is-loaded");
                 syncBackdrop("");
                 cover.replaceWith(createCoverFallback(game.name));
             },
             240
         );
         if (cover.complete && cover.naturalWidth > 0) {
-            syncBackdrop(cover.currentSrc || cover.src);
+            markLoaded();
         }
     } else {
         media.appendChild(createCoverFallback(game.name));

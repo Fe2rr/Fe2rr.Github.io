@@ -502,11 +502,22 @@ export function createCompatViewController() {
                 img.loading = "lazy";
                 img.decoding = "async";
                 img.referrerPolicy = "no-referrer";
+                img.addEventListener(
+                    "load",
+                    () => {
+                        coverWrap.classList.add("is-loaded");
+                    },
+                    { once: true }
+                );
                 coverWrap.appendChild(img);
                 loadCoverImage(img, game.coverUrl, () => {
                     img.remove();
+                    coverWrap.classList.remove("is-loaded");
                     coverWrap.classList.add("cover-unavailable");
                 });
+                if (img.complete && img.naturalWidth > 0) {
+                    coverWrap.classList.add("is-loaded");
+                }
             } else {
                 coverWrap.classList.add("cover-unavailable");
             }

@@ -10,12 +10,26 @@ import { resolveCatalogApiBase } from "./config.js";
 
 let catalogPromise = null;
 
+function isLocalPreviewHost() {
+    if (typeof window === "undefined") return false;
+    const host = String(window.location.hostname || "").toLowerCase();
+    return (
+        host === "localhost" ||
+        host === "127.0.0.1" ||
+        host.endsWith(".run.app")
+    );
+}
+
 function getCatalogUrls() {
+    const staticCatalogUrl = new URL(
+        "../../assets/data/catalog.json",
+        import.meta.url
+    ).toString();
     const mode = resolveCatalogApiBase();
-    if (!mode) {
-        return ["/api/public-catalog", "assets/data/catalog.json"];
+    if (!mode || isLocalPreviewHost()) {
+        return ["/api/public-catalog", staticCatalogUrl];
     }
-    return ["assets/data/catalog.json"];
+    return [staticCatalogUrl];
 }
 
 async function fetchStaticJsonCatalog() {

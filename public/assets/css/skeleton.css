@@ -177,3 +177,99 @@
     background-image: none;
   }
 }
+
+/* Cover Image Skeleton Loading States */
+.home-game-cover-container,
+.spotlight-cover-frame,
+.compat-game-cover-wrap,
+.game-hero-media {
+  position: relative;
+}
+
+.home-game-cover-container::before,
+.spotlight-cover-frame::before,
+.compat-game-cover-wrap::before,
+.game-hero-media.is-cover-loading::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  border-radius: inherit;
+  background-color: var(--surface-2);
+  background-image: linear-gradient(
+    105deg,
+    var(--surface-2) 15%,
+    var(--surface-3) 48%,
+    var(--surface-2) 82%
+  );
+  background-size: 220% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 220ms var(--ease-out);
+}
+
+.home-game-cover-container.is-loaded::before,
+.home-game-cover-container.cover-unavailable::before,
+.spotlight-cover-frame.is-loaded::before,
+.spotlight-cover-frame.cover-unavailable::before,
+.compat-game-cover-wrap.is-loaded::before,
+.compat-game-cover-wrap.cover-unavailable::before {
+  opacity: 0;
+}
+
+.compat-game-cover-wrap:not(.is-loaded):not(.cover-unavailable) {
+  aspect-ratio: 3 / 4;
+}
+
+.game-hero-media.is-cover-loading {
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-medium);
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.home-game-cover,
+.spotlight-cover,
+.compat-game-cover,
+.game-summary-cover {
+  opacity: 0;
+  transition:
+    opacity 220ms var(--ease-out),
+    transform 240ms var(--ease-out);
+}
+
+.game-hero-media.is-cover-loading .game-summary-cover {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+}
+
+.home-game-cover-container.is-loaded .home-game-cover,
+.spotlight-cover-frame.is-loaded .spotlight-cover,
+.compat-game-cover-wrap.is-loaded .compat-game-cover,
+.game-hero-media.is-loaded .game-summary-cover {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .home-game-cover-container::before,
+  .spotlight-cover-frame::before,
+  .compat-game-cover-wrap::before,
+  .game-hero-media.is-cover-loading::before {
+    animation: none;
+    background-image: none;
+  }
+
+  .home-game-cover,
+  .spotlight-cover,
+  .compat-game-cover,
+  .game-summary-cover {
+    transition: none;
+  }
+}
+
