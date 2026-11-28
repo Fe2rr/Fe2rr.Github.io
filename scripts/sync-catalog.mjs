@@ -61,6 +61,7 @@ async function readState() {
         catalog: parsed.catalog,
         syncCursor: Number(parsed.syncCursor) || 0,
         syncLog: Array.isArray(parsed.syncLog) ? parsed.syncLog : [],
+        lastSync: parsed.lastSync && typeof parsed.lastSync === "object" ? parsed.lastSync : null,
       };
     }
   } catch (err) {
@@ -78,6 +79,7 @@ async function readState() {
         catalog: pub,
         syncCursor: 0,
         syncLog: [],
+        lastSync: null,
       };
     }
   } catch {
@@ -131,6 +133,7 @@ let skippedCount = 0;
 let updatedCount = 0;
 let errorCount = 0;
 const syncEntries = [];
+const syncResults = [];
 
 async function syncWorker() {
   while (cursor < syncTargets.length) {
@@ -141,6 +144,14 @@ async function syncWorker() {
         `sync ${port.portId || port.project || "port"}`,
         2
       );
+      syncResults.push({
+        portId: port.portId || "",
+        gameSlug: port.gameSlug || "",
+        project: port.project || "",
+        status: result.status || "checked",
+        changed: Boolean(result.changed),
+        message: result.message || "",
+      });
       if (result.status === "skipped") {
         skippedCount++;
       } else {
@@ -161,14 +172,18 @@ async function syncWorker() {
       console.warn(
         `Sync error [${port.portId || port.project}]: ${err.message}`
       );
-      syncEntries.push({
-        at: new Date().toISOString(),
+      const failedResult = {
         portId: port.portId || "",
         gameSlug: port.gameSlug || "",
         project: port.project || "",
         status: "error",
         changed: false,
         message: err.message,
+      };
+      syncResults.push(failedResult);
+      syncEntries.push({
+        at: new Date().toISOString(),
+        ...failedResult,
       });
     }
   }
@@ -182,6 +197,15 @@ if (updatedCount > 0 || IMPORT_SHEETS) {
   state.catalog.updatedAt = new Date().toISOString();
 }
 state.syncCursor = 0;
+state.lastSync = {
+  at: new Date().toISOString(),
+  total: syncTargets.length,
+  checked: checkedCount,
+  skipped: skippedCount,
+  updated: updatedCount,
+  errors: errorCount,
+  ports: syncResults,
+};
 if (syncEntries.length > 0) {
   state.syncLog = [...syncEntries.slice(0, 40), ...(state.syncLog || [])].slice(
     0,
