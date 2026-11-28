@@ -164,6 +164,10 @@ async function serveCommunitySummaryJson(req, res) {
   }
 }
 
+const remoteCoverCache = new Map();
+const REMOTE_COVER_CACHE_MAX = 250;
+const REMOTE_COVER_TTL_MS = 30 * 60 * 1000;
+
 async function serveCoverAsset(req, res, pathname) {
   const rel = pathname.replace(/^\/+/, "");
   const safePath = path.resolve(PUBLIC_DIR, rel);
@@ -178,14 +182,25 @@ async function serveCoverAsset(req, res, pathname) {
     if (cached && Date.now() - cached.fetchedAt < REMOTE_JSON_TTL_MS) {
       return sendBuffer(req, res, 200, cached.body, MIME_TYPES[".json"], "public, max-age=300");
     }
+  } else {
+    const cachedCover = remoteCoverCache.get(pathname);
+    if (cachedCover && Date.now() - cachedCover.fetchedAt < REMOTE_COVER_TTL_MS) {
+      return sendBuffer(req, res, 200, cachedCover.body, cachedCover.contentType, "public, max-age=86400");
+    }
   }
 
   try {
     const { buf, contentType } = await fetchUpstreamBuffer(pathname, isManifest);
     if (isManifest) {
       remoteJsonCache.set(pathname, { body: buf, fetchedAt: Date.now() });
+    } else {
+      if (remoteCoverCache.size >= REMOTE_COVER_CACHE_MAX) {
+        const oldestKey = remoteCoverCache.keys().next().value;
+        if (oldestKey) remoteCoverCache.delete(oldestKey);
+      }
+      remoteCoverCache.set(pathname, { body: buf, contentType, fetchedAt: Date.now() });
     }
-    return sendBuffer(req, res, 200, buf, contentType, "public, max-age=3600");
+    return sendBuffer(req, res, 200, buf, contentType, isManifest ? "public, max-age=300" : "public, max-age=86400");
   } catch {
     if (isManifest) {
       const empty = Buffer.from(JSON.stringify({ version: 1, covers: {} }));

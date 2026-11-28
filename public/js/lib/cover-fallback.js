@@ -29,17 +29,22 @@ function isLocalPreviewHost() {
 }
 
 let coverManifestPromise = null;
+export function preloadCoverManifest() {
+    if (typeof window === "undefined") return Promise.resolve({});
+    if (!coverManifestPromise) {
+        const manifestUrl = new URL("assets/covers/manifest.json", window.location.href).toString();
+        coverManifestPromise = fetch(manifestUrl, { cache: "default" })
+            .then((response) => (response.ok ? response.json() : {}))
+            .catch(() => ({}));
+    }
+    return coverManifestPromise;
+}
+
 async function getStaticCoverUrl(rawUrl) {
     const cleanRaw = String(rawUrl || "").trim();
     if (!cleanRaw || typeof window === "undefined") return "";
     try {
-        if (!coverManifestPromise) {
-            const manifestUrl = new URL("assets/covers/manifest.json", window.location.href).toString();
-            coverManifestPromise = fetch(manifestUrl, { cache: "force-cache" })
-                .then((response) => (response.ok ? response.json() : {}))
-                .catch(() => ({}));
-        }
-        const manifest = await coverManifestPromise;
+        const manifest = await preloadCoverManifest();
         const mapped = String(manifest?.covers?.[cleanRaw] || "").trim();
         if (!mapped) return "";
         return new URL(mapped, window.location.href).toString();

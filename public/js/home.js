@@ -3,6 +3,7 @@
  */
 
 import { loadCatalog } from "./lib/data.js";
+import { preloadCoverManifest } from "./lib/cover-fallback.js";
 import { clearHeroViewTransitions } from "./lib/helpers.js";
 import { initNavigation } from "./ui/navigation.js";
 import { initSearch } from "./ui/search.js?v=2";
@@ -566,7 +567,10 @@ async function initHomePage() {
             }
         };
 
-        const catalog = await loadCatalog();
+        const [catalog] = await Promise.all([
+            loadCatalog(),
+            preloadCoverManifest(),
+        ]);
         applyCatalog(catalog);
     } catch (error) {
         console.error("NAPL: could not load games.", error);

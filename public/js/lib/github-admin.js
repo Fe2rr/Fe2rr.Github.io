@@ -15,6 +15,17 @@ const REPO_CFG_SESSION_KEY = "napl_github_repo_cfg_v1";
 const VAULT_KDF_ITERATIONS = 600_000;
 
 let memoryGithubPat = "";
+const blobTextCache = new Map();
+const BLOB_TEXT_CACHE_MAX = 8;
+
+function setCachedBlobText(cacheKey, text) {
+    if (!cacheKey || typeof text !== "string") return;
+    if (blobTextCache.size >= BLOB_TEXT_CACHE_MAX) {
+        const oldestKey = blobTextCache.keys().next().value;
+        if (oldestKey) blobTextCache.delete(oldestKey);
+    }
+    blobTextCache.set(cacheKey, text);
+}
 
 export const DEFAULT_GITHUB_ADMIN_CONFIG = {
     dataRepo: "Fe2rr/NAPL-Data",
@@ -253,6 +264,7 @@ export function getStoredGithubPat() {
 
 export function lockGithubSession() {
     memoryGithubPat = "";
+    blobTextCache.clear();
     try {
         if (typeof sessionStorage !== "undefined") {
             sessionStorage.removeItem(REPO_CFG_SESSION_KEY);
@@ -446,22 +458,20 @@ export async function loginWithGithubPat(rawPat, configOverrides = {}) {
     }
 
     const cfg = { ...getSessionConfig(), ...configOverrides };
-    const { data: repo } = await githubApi(`/repos/${cfg.dataRepo}`, { pat });
+    const [repoRes, workflowsRes, userRes] = await Promise.all([
+        githubApi(`/repos/${cfg.dataRepo}`, { pat }),
+        githubApi(`/repos/${cfg.codeRepo}/actions/workflows?per_page=100`, { pat }),
+        githubApi("/user", { pat }).catch(() => null),
+    ]);
 
+    const repo = repoRes.data;
     if (!repo?.permissions?.push && !repo?.permissions?.admin) {
         throw new Error(
             `El token no tiene permisos de escritura (Contents: Read and write) sobre ${cfg.dataRepo}.`
         );
     }
 
-    // The same PAT must be able to dispatch the GitHub Actions workflows
-    // in the code repository. Listing workflows verifies repository access;
-    // dispatch itself will enforce the Actions: Read and write permission.
-    await githubApi(`/repos/${cfg.codeRepo}`, { pat });
-    const { data: workflows } = await githubApi(
-        `/repos/${cfg.codeRepo}/actions/workflows?per_page=100`,
-        { pat }
-    );
+    const workflows = workflowsRes.data;
     const available = new Set((workflows?.workflows || []).flatMap((item) => [
         item.name || "",
         item.path?.split("/").pop() || "",
@@ -473,17 +483,12 @@ export async function loginWithGithubPat(rawPat, configOverrides = {}) {
         throw new Error(`No se pudieron verificar estos workflows en ${cfg.codeRepo}: ${missing.join(", ")}.`);
     }
 
-    let user = null;
-    try {
-        const userRes = await githubApi("/user", { pat });
-        user = {
-            login: userRes.data?.login || "",
-            avatarUrl: userRes.data?.avatar_url || "",
-        };
-    } catch {
-        // Fine-grained PATs scoped only to repositories may not include user:read
-        user = { login: repo?.owner?.login || "admin", avatarUrl: "" };
-    }
+    const user = userRes?.data
+        ? {
+            login: userRes.data.login || "",
+            avatarUrl: userRes.data.avatar_url || "",
+        }
+        : { login: repo?.owner?.login || "admin", avatarUrl: "" };
 
     saveGithubSession(pat, cfg);
     return {
@@ -549,50 +554,76 @@ async function resolveBlobShaFromBranch(cfg, repoPath, pat) {
     return treeEntry.sha;
 }
 
-async function readRepoJsonFile(repoPath, { pat, configOverrides = {}, optional = false } = {}) {
-    const cfg = { ...getSessionConfig(), ...configOverrides };
-    try {
-        try {
-            const { data } = await githubApi(
-                `/repos/${cfg.dataRepo}/contents/${repoPath}?ref=${encodeURIComponent(cfg.branch)}`,
-                { pat }
-            );
-            if (data && typeof data === "object" && typeof data.content === "string" && data.encoding === "base64") {
-                const text = decodeBase64Utf8(data.content);
-                return {
-                    data: JSON.parse(text),
-                    sha: String(data.sha || ""),
-                    config: cfg,
-                };
-            }
-            if (data && typeof data === "object" && data.sha) {
-                const { data: blob } = await githubApi(
-                    `/repos/${cfg.dataRepo}/git/blobs/${data.sha}`,
-                    { pat }
-                );
-                const text = decodeBase64Utf8(blob?.content || "");
-                return {
-                    data: JSON.parse(text),
-                    sha: String(data.sha || ""),
-                    config: cfg,
-                };
-            }
-        } catch (contentsError) {
-            if (contentsError?.status !== 403) {
-                throw contentsError;
-            }
-            // GitHub /contents/ returns 403 for files > 1 MB; read directly via Git Blob API (up to 100 MB, no CORS redirect).
-        }
+const KNOWN_LARGE_REPO_PATHS = new Set([
+    "private/catalog-state.json",
+    "public/assets/data/catalog.json",
+]);
 
-        const blobSha = await resolveBlobShaFromBranch(cfg, repoPath, pat);
+async function readBlobText(cfg, blobSha, pat) {
+    const cacheKey = `${cfg.dataRepo}:${blobSha}`;
+    const cachedText = blobTextCache.get(cacheKey);
+    if (typeof cachedText === "string") {
+        return cachedText;
+    }
+
+    try {
+        const { text } = await githubApi(
+            `/repos/${cfg.dataRepo}/git/blobs/${blobSha}`,
+            { pat, raw: true }
+        );
+        setCachedBlobText(cacheKey, text);
+        return text;
+    } catch (rawErr) {
+        if (rawErr?.status === 404) throw rawErr;
         const { data: blob } = await githubApi(
             `/repos/${cfg.dataRepo}/git/blobs/${blobSha}`,
             { pat }
         );
         if (!blob || typeof blob.content !== "string") {
-            throw new Error(`No se pudo leer el blob de ${repoPath}.`);
+            throw rawErr;
         }
         const text = decodeBase64Utf8(blob.content);
+        setCachedBlobText(cacheKey, text);
+        return text;
+    }
+}
+
+async function readRepoJsonFile(repoPath, { pat, configOverrides = {}, optional = false } = {}) {
+    const cfg = { ...getSessionConfig(), ...configOverrides };
+    const cleanPath = String(repoPath || "").replace(/^\/+/, "");
+    try {
+        if (!KNOWN_LARGE_REPO_PATHS.has(cleanPath)) {
+            try {
+                const { data } = await githubApi(
+                    `/repos/${cfg.dataRepo}/contents/${cleanPath}?ref=${encodeURIComponent(cfg.branch)}`,
+                    { pat }
+                );
+                if (data && typeof data === "object" && typeof data.content === "string" && data.encoding === "base64") {
+                    const text = decodeBase64Utf8(data.content);
+                    return {
+                        data: JSON.parse(text),
+                        sha: String(data.sha || ""),
+                        config: cfg,
+                    };
+                }
+                if (data && typeof data === "object" && data.sha) {
+                    const text = await readBlobText(cfg, String(data.sha), pat);
+                    return {
+                        data: JSON.parse(text),
+                        sha: String(data.sha || ""),
+                        config: cfg,
+                    };
+                }
+            } catch (contentsError) {
+                if (contentsError?.status !== 403) {
+                    throw contentsError;
+                }
+                // GitHub /contents/ returns 403 for files > 1 MB; read directly via Git Blob API (up to 100 MB, no CORS redirect).
+            }
+        }
+
+        const blobSha = await resolveBlobShaFromBranch(cfg, cleanPath, pat);
+        const text = await readBlobText(cfg, blobSha, pat);
         return {
             data: JSON.parse(text),
             sha: blobSha,
@@ -625,26 +656,28 @@ async function commitRepoFiles(files, { message, pat, configOverrides = {} } = {
     );
     const baseTreeSha = parentCommit?.tree?.sha;
 
-    const treeItems = [];
-    for (const file of files) {
-        const { data: blob } = await githubApi(
-            `/repos/${cfg.dataRepo}/git/blobs`,
-            {
-                pat: token,
-                method: "POST",
-                body: {
-                    content: utf8ToBase64(file.content),
-                    encoding: "base64",
-                },
-            }
-        );
-        treeItems.push({
-            path: file.path,
-            mode: "100644",
-            type: "blob",
-            sha: blob.sha,
-        });
-    }
+    const treeItems = await Promise.all(
+        files.map(async (file) => {
+            const { data: blob } = await githubApi(
+                `/repos/${cfg.dataRepo}/git/blobs`,
+                {
+                    pat: token,
+                    method: "POST",
+                    body: {
+                        content: utf8ToBase64(file.content),
+                        encoding: "base64",
+                    },
+                }
+            );
+            setCachedBlobText(`${cfg.dataRepo}:${blob.sha}`, file.content);
+            return {
+                path: file.path,
+                mode: "100644",
+                type: "blob",
+                sha: blob.sha,
+            };
+        })
+    );
 
     const { data: newTree } = await githubApi(
         `/repos/${cfg.dataRepo}/git/trees`,
@@ -772,8 +805,11 @@ export async function dispatchWorkflowAndWait(
     let matchedRun = null;
     let cachedJobs = [];
     let lastJobsFetchAt = 0;
+    let isFirstPoll = true;
     while (Date.now() - dispatchedAt < timeoutMs) {
-        await new Promise((r) => setTimeout(r, pollIntervalMs));
+        const waitMs = isFirstPoll ? Math.min(pollIntervalMs, 1200) : pollIntervalMs;
+        isFirstPoll = false;
+        await new Promise((r) => setTimeout(r, waitMs));
 
         const { data } = await githubApi(
             `/repos/${cfg.codeRepo}/actions/workflows/${encodeURIComponent(workflowFile)}/runs?event=workflow_dispatch&per_page=8`,
@@ -792,7 +828,7 @@ export async function dispatchWorkflowAndWait(
 
         if (matchedRun) {
             if (typeof onProgress === "function") {
-                if (Date.now() - lastJobsFetchAt >= 15000 || matchedRun.status === "completed") {
+                if (Date.now() - lastJobsFetchAt >= 5000 || matchedRun.status === "completed") {
                     try {
                         const { data: jobData } = await githubApi(
                             `/repos/${cfg.codeRepo}/actions/runs/${matchedRun.id}/jobs?per_page=100`,

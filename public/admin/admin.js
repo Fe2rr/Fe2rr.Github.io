@@ -366,6 +366,7 @@ async function saveCatalog() {
     notice("Guardado en Fe2rr/NAPL-Data. Publicando GitHub Pages…");
     await dispatchWorkflowAndWait("deploy-pages.yml", {}, {
       timeoutMs: 300000,
+      pollIntervalMs: 2000,
       onProgress: (run) => { $("connection-state").textContent = "Publicación Pages: " + run.status; },
     });
     renderAll();
@@ -435,7 +436,7 @@ async function runSync(importSheets = false) {
   $("sync-workflow-link").textContent = "";
   setBusy(true, importSheets ? "Importando CSV y sincronizando…" : "Sincronizando fuentes…");
   try {
-    const run = await triggerCatalogSync({ importSheets, optimizeCovers: true, timeoutMs: 900000, pollIntervalMs: 5000,
+    const run = await triggerCatalogSync({ importSheets, optimizeCovers: true, timeoutMs: 900000, pollIntervalMs: 2500,
       onProgress: (progress) => {
         $("connection-state").textContent = "Sync: " + progress.status + (progress.conclusion ? " · " + progress.conclusion : "");
         renderSyncSteps(progress);
@@ -540,7 +541,7 @@ async function refreshCommunityFromActions() {
     await triggerCommunitySummarySync({
       pat,
       timeoutMs: 300000,
-      pollIntervalMs: 4000,
+      pollIntervalMs: 2000,
       onProgress: (run) => {
         $("community-status").textContent = "GitHub Actions (" + (run.status || "running") + (run.conclusion ? " · " + run.conclusion : "") + ")…";
       },
@@ -706,7 +707,7 @@ $("ports-list").addEventListener("click", async (event) => {
   if (!target) return notice("Este port no tiene una fuente para consultar.", "error");
   setBusy(true, "Revisando fuente del port con GitHub Actions…");
   try {
-    const result = await runGithubLookup("port_source", target, { timeoutMs:300000, pollIntervalMs:4000 });
+    const result = await runGithubLookup("port_source", target, { timeoutMs:300000, pollIntervalMs:1500 });
     const info = result?.data || result;
     const fields = {project:info.project || info.name,developer:info.developer,version:info.version,controller:info.controller,files:info.files,link:info.link,url:info.repoUrl || info.url || target,githubRepo:info.githubRepo || info.syncTarget,portId:info.portId,lastUpdate:info.lastUpdate};
     for (const [key,value] of Object.entries(fields)) if (value && !port[key]) port[key] = value;
@@ -778,7 +779,7 @@ $("lookup-metadata").addEventListener("click", async () => {
   setBusy(true, "Consultando metadatos con GitHub Actions…");
   try {
     const mode = detectMetadataSource(url);
-    const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:4000 });
+    const data = await runGithubLookup(mode, url, { timeoutMs:300000, pollIntervalMs:1500 });
     const game = readDraft();
     const payload = data?.data || data;
     const aliases = {title:"name",name:"name",year:"year",coverUrl:"coverUrl",cover_url:"coverUrl",genre:"genre",description:"description"};
@@ -797,7 +798,7 @@ $("optimize-cover")?.addEventListener("click", async () => {
   if (!url) return notice("El juego no tiene una URL de portada.", "error");
   setBusy(true, "Optimizando portada con GitHub Actions…");
   try {
-    const result = await runGithubLookup("optimize_cover", url, { timeoutMs:300000, pollIntervalMs:4000 });
+    const result = await runGithubLookup("optimize_cover", url, { timeoutMs:300000, pollIntervalMs:1500 });
     notice("Portada optimizada: " + (result.staticCoverPath || "manifest actualizado") + ". Guardá el catálogo para publicar.", "success");
   } catch (error) { notice(error.message || "No se pudo optimizar la portada.", "error"); }
   finally { setBusy(false); }
