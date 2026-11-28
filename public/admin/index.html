@@ -14,7 +14,7 @@
 </head>
 <body>
   <section id="login-view" class="login-shell">
-    <form id="login-form" class="login-card">
+    <form id="login-form" class="login-card" novalidate>
       <div class="brand-mark">NAPL <span>ADMIN · JSON</span></div>
       <h1 id="login-title">Acceso con contraseña</h1>
       <p id="login-subtitle">Tu token de GitHub se cifra localmente con tu contraseña y nunca se guarda sin cifrar ni se envía fuera de GitHub.</p>
@@ -39,6 +39,7 @@
         <input id="setup-password-confirm" type="password" autocomplete="new-password" spellcheck="false" minlength="8" placeholder="Repetí tu contraseña…">
       </div>
 
+      <p id="login-message" class="message" role="status"></p>
       <button id="login-submit" class="button primary full" type="submit">Entrar</button>
 
       <div class="login-secondary-actions">
@@ -58,7 +59,6 @@
       </div>
 
       <p class="hint">Permisos necesarios del PAT: Contents Read and write en Fe2rr/NAPL-Data y Actions Read and write en Fe2rr/Fe2rr.github.io.</p>
-      <p id="login-message" class="message" role="status"></p>
     </form>
   </section>
 

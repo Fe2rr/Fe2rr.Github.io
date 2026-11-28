@@ -823,8 +823,32 @@ export async function dispatchWorkflowAndWait(
             }
             if (matchedRun.status === "completed") {
                 if (matchedRun.conclusion !== "success") {
+                    if (!cachedJobs.length) {
+                        try {
+                            const { data: jobData } = await githubApi(
+                                `/repos/${cfg.codeRepo}/actions/runs/${matchedRun.id}/jobs?per_page=100`,
+                                { pat: token }
+                            );
+                            cachedJobs = (jobData?.jobs || []).map((job) => ({
+                                name: job.name || "Job",
+                                status: job.status || "queued",
+                                conclusion: job.conclusion || "",
+                                steps: (job.steps || []).map((step) => ({
+                                    name: step.name || "Paso",
+                                    status: step.status || "queued",
+                                    conclusion: step.conclusion || "",
+                                })),
+                            }));
+                        } catch {
+                            // Fall back to run-level status message.
+                        }
+                    }
+                    const failedStep = cachedJobs
+                        .flatMap((job) => job.steps || [])
+                        .find((step) => step.conclusion && step.conclusion !== "success" && step.conclusion !== "skipped");
+                    const stepHint = failedStep ? ` (paso fallido: "${failedStep.name}")` : "";
                     throw new Error(
-                        `El workflow ${workflowFile} terminó con estado: ${matchedRun.conclusion || "failed"}.`
+                        `El workflow ${workflowFile} terminó con estado: ${matchedRun.conclusion || "failed"}${stepHint}.`
                     );
                 }
                 return matchedRun;

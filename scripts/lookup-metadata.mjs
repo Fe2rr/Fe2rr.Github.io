@@ -101,12 +101,15 @@ try {
 
   // Pre-optimize any discovered cover image right away into NAPL-Data
   if (data && typeof data.coverUrl === "string" && data.coverUrl.trim()) {
-    const coverRes = await optimizeSingleCover(data.coverUrl, coversDir);
+    const cleanCoverUrl = data.coverUrl.trim();
+    const coverRes = await optimizeSingleCover(cleanCoverUrl, coversDir);
     if (coverRes.relativePath) {
       data.staticCoverPath = coverRes.relativePath;
       const manifest = await readCoverManifest(coversDir);
-      manifest.covers[data.coverUrl.trim()] = coverRes.relativePath;
-      await writeCoverManifest(coversDir, manifest.covers);
+      if (manifest.covers[cleanCoverUrl] !== coverRes.relativePath) {
+        manifest.covers[cleanCoverUrl] = coverRes.relativePath;
+        await writeCoverManifest(coversDir, manifest.covers);
+      }
     }
   }
 

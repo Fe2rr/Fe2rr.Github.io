@@ -64,9 +64,13 @@ function syncLoginModeUi() {
   const isUnlock = loginMode === "unlock";
   $("unlock-fields").hidden = !isUnlock;
   $("setup-fields").hidden = isUnlock;
+  $("admin-password").disabled = !isUnlock;
   $("admin-password").required = isUnlock;
+  $("setup-password").disabled = isUnlock;
   $("setup-password").required = !isUnlock;
+  $("setup-password-confirm").disabled = isUnlock;
   $("setup-password-confirm").required = !isUnlock;
+  $("github-pat").disabled = isUnlock || useLegacyMigrationPat;
   $("github-pat").required = !isUnlock && !useLegacyMigrationPat;
   $("pat-field-wrap").hidden = isUnlock || useLegacyMigrationPat;
   $("legacy-pat-banner").hidden = isUnlock || !useLegacyMigrationPat;
@@ -258,41 +262,63 @@ async function handleLoginSubmit() {
     const password = $("admin-password").value;
     if (!password) {
       $("login-message").textContent = "Ingresá tu contraseña.";
+      $("admin-password").focus();
       return;
     }
     setBusy(true, "Descifrando y verificando acceso en GitHub…");
+    $("login-submit").textContent = "Verificando acceso…";
+    let unlockedResult = null;
     try {
-      const result = await unlockGithubVaultWithPassword(password);
+      unlockedResult = await unlockGithubVaultWithPassword(password);
       pat = getStoredGithubPat();
-      $("admin-password").value = "";
-      await loadState();
-      showAdmin();
-      notice("Conectado como " + (result.user?.login || "administrador") + ".", "success");
     } catch (error) {
       lockGithubSession();
       pat = "";
+      setBusy(false);
       showLogin(error.message || "No se pudo desbloquear el acceso.");
+      return;
+    }
+
+    try {
+      $("login-submit").textContent = "Cargando catálogo…";
+      await loadState();
+      $("admin-password").value = "";
+      showAdmin();
+      notice("Conectado como " + (unlockedResult.user?.login || "administrador") + ".", "success");
+    } catch (error) {
+      lockGithubSession();
+      pat = "";
+      showLogin("Acceso verificado, pero falló la carga del catálogo: " + (error.message || "error desconocido"));
     } finally {
       setBusy(false);
     }
     return;
   }
 
-  const rawPat = $("github-pat").value;
+  const rawPat = $("github-pat").value.trim();
   const password = $("setup-password").value;
   const confirmPassword = $("setup-password-confirm").value;
+  if (!useLegacyMigrationPat && !rawPat) {
+    $("login-message").textContent = "Ingresá tu GitHub Fine-grained PAT.";
+    $("github-pat").focus();
+    return;
+  }
   if (password.length < 8) {
     $("login-message").textContent = "La contraseña debe tener al menos 8 caracteres.";
+    $("setup-password").focus();
     return;
   }
   if (password !== confirmPassword) {
     $("login-message").textContent = "Las contraseñas no coinciden.";
+    $("setup-password-confirm").focus();
     return;
   }
 
   setBusy(true, "Validando permisos en GitHub y cifrando acceso…");
+  $("login-submit").textContent = "Cifrando y verificando…";
+  let setupResult = null;
   try {
-    const result = await setupGithubPasswordVault({
+    setupResult = await setupGithubPasswordVault({
       pat: rawPat,
       password,
       useLegacyPat: useLegacyMigrationPat,
@@ -300,17 +326,27 @@ async function handleLoginSubmit() {
     pat = getStoredGithubPat();
     useLegacyMigrationPat = false;
     loginMode = "unlock";
+  } catch (error) {
+    lockGithubSession();
+    pat = "";
+    setBusy(false);
+    showLogin(error.message || "No se pudo configurar la contraseña.");
+    return;
+  }
+
+  try {
+    $("login-submit").textContent = "Cargando catálogo…";
+    await loadState();
     $("github-pat").value = "";
     $("setup-password").value = "";
     $("setup-password-confirm").value = "";
-    await loadState();
     showAdmin();
-    notice("Contraseña configurada. Conectado como " + (result.user?.login || "administrador") + ".", "success");
+    notice("Contraseña configurada. Conectado como " + (setupResult.user?.login || "administrador") + ".", "success");
   } catch (error) {
     lockGithubSession();
     pat = "";
     loginMode = hasEncryptedGithubVault() ? "unlock" : "setup";
-    showLogin(error.message || "No se pudo configurar la contraseña.");
+    showLogin("Contraseña guardada, pero falló la carga del catálogo: " + (error.message || "error desconocido"));
   } finally {
     setBusy(false);
   }
@@ -755,7 +791,7 @@ $("lookup-metadata").addEventListener("click", async () => {
   } catch (error) { notice(error.message || "No se pudieron obtener los metadatos.", "error"); }
   finally { setBusy(false); }
 });
-$("optimize-cover").addEventListener("click", async () => {
+$("optimize-cover")?.addEventListener("click", async () => {
   const game = readDraft();
   const url = game.coverUrl || $("metadata-url").value.trim();
   if (!url) return notice("El juego no tiene una URL de portada.", "error");

@@ -23,6 +23,10 @@ on:
         type: string
         default: ""
 
+concurrency:
+  group: napl-metadata-lookup
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
@@ -74,11 +78,26 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git pull --rebase origin main
-          git add private/lookup-results public/assets/covers || true
+          if [ -d "private/lookup-results" ]; then
+            git add -A private/lookup-results
+          fi
+          if [ -d "public/assets/covers" ]; then
+            git add -A public/assets/covers
+          fi
           if ! git diff --cached --quiet; then
             git commit -m "NAPL: metadata lookup (${{ inputs.mode }})"
-            git push origin HEAD:main
+            for attempt in 1 2 3; do
+              if ! git pull --rebase origin main; then
+                git rebase --abort || true
+                exit 1
+              fi
+              if git push origin HEAD:main; then
+                exit 0
+              fi
+              sleep 2
+            done
+            echo "::error::Failed to push lookup results after 3 attempts."
+            exit 1
           else
             echo "No lookup output changes to commit."
           fi
