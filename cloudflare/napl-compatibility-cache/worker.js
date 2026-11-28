@@ -120,6 +120,7 @@ export default {
   async fetch(request) {
     const url = new URL(request.url);
     const pathname = url.pathname.replace(/\/+$/, "") || "/";
+    const routePath = pathname === "/" ? "/compatibility" : pathname;
     if (request.method === "OPTIONS") {
       if (!POST_ROUTES.has(routePath) && routePath !== "/compatibility") {
         return json({ success: false, error: "Not found." }, 404);
