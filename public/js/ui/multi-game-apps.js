@@ -39,6 +39,11 @@ const NON_UNIQUE_PROJECT_NAMES = new Set([
     "android ports",
 ]);
 
+const EXCLUDED_ALSO_PLAY_PROJECTS = new Set([
+    "unofficial port",
+    "arm64 mod (opera-fan)",
+]);
+
 function normalizeProjectKey(projectName) {
     return normalizeText(projectName).replace(/\s+/g, " ");
 }
@@ -71,6 +76,7 @@ export function findGamesUsingApp(appName, allRows) {
         const normalizedGameName = normalizeText(gameName);
 
         if (normalizedGameName === appNameNormalized) continue;
+        if (EXCLUDED_ALSO_PLAY_PROJECTS.has(projectName)) continue;
         if (projectName !== appNameNormalized) continue;
 
         if (!gamesUsingApp.has(normalizedGameName)) {
